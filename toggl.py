@@ -2,14 +2,17 @@
 """
 toggl.py
 
-Created by D. Robert Adams on 2012-04-19.
+Created by Robert Adams on 2012-04-19.
 Copyright (c) 2012 D. Robert Adams. All rights reserved.
 """
 
 #############################################################################
 ### Configuration Section                                                 ###
-###                                                                       ###
+###   
+# How do you log into toggl.com?
 AUTH = ('YOUR_KEY_HERE', 'api_token')
+# Do you want to ignore starting times by default?
+IGNORE_START_TIMES = True   
 ###                                                                       ###
 ### End of Configuration Section                                          ###
 #############################################################################
@@ -145,8 +148,7 @@ def print_time_entry(entry):
         project_name = " @%s" % entry['project']['name']   
         
     print "%s%s%s%s" % (is_running, entry['description'], project_name, e_time)
-
-            
+        
 def start_time_entry(args):
     """
        Starts a new time entry. args is the remaining command-line arguments
@@ -181,20 +183,20 @@ def start_time_entry(args):
           'billable' : True, 
           'start' : datetime.datetime.utcnow().isoformat(), 
           'description' : entry, 
-          'created_with' : 'toggl-cli'
+          'created_with' : 'toggl-cli',
+          'ignore_start_and_stop' : options.ignore_start_and_stop
         } 
     }
     if project_id != None:
         data['time_entry']['project'] = { 'id' : project_id }
     headers = {'content-type': 'application/json'}
     
-    global options
     if options.verbose:
         print json.dumps(data)
     
-    r = requests.post("%s/time_entries.json" % TOGGL_URL, auth=AUTH,
-        data=json.dumps(data), headers=headers)
-    r.raise_for_status() # raise exception on error
+#    r = requests.post("%s/time_entries.json" % TOGGL_URL, auth=AUTH,
+#        data=json.dumps(data), headers=headers)
+#    r.raise_for_status() # raise exception on error
     
     return 0
     
@@ -248,6 +250,12 @@ def main(argv=None):
     parser.add_option("-v", "--verbose",
                           action="store_true", dest="verbose", default=False,
                           help="print debugging output")
+    parser.add_option("-i", "--ignore",
+                        action="store_true", dest="ignore_start_and_stop", default=IGNORE_START_TIMES,
+                        help="ignore starting and ending times")
+    parser.add_option("-n", "--no_ignore",
+                        action="store_false", dest="ignore_start_and_stop", default=IGNORE_START_TIMES,
+                        help="don't ignore starting and ending times")
     (options, args) = parser.parse_args()
         
     if len(args) == 0 or args[0] == "ls":
