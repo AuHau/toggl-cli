@@ -3,6 +3,7 @@
 toggl.py
 
 Created by Robert Adams on 2012-04-19.
+Last modified: Mon May 21, 2012 10:36AM
 Copyright (c) 2012 D. Robert Adams. All rights reserved.
 """
 
@@ -11,6 +12,7 @@ Copyright (c) 2012 D. Robert Adams. All rights reserved.
 ###
 # How do you log into toggl.com?
 AUTH = ('YOUR_KEY_HERE', 'api_token')
+
 # Do you want to ignore starting times by default?
 IGNORE_START_TIMES = True
 ###                                                                       ###
@@ -197,14 +199,31 @@ def list_projects():
     return 0
 
 def list_time_entries():
-    """Lists all of the time entries from yesterday and today along with
-       the amount of time devoted to each.
-    """
-    response = get_time_entry_data()
-    
-    for entry in response['data']:
-        print_time_entry(entry)
-    return 0
+	"""Lists all of the time entries from yesterday and today along with
+	   the amount of time devoted to each.
+	"""
+
+	# Get an array of objects of recent time data.
+	response = get_time_entry_data()
+
+	# Sort the time entries into buckets based on "Month Day" of the entry.
+	days = { }
+	for entry in response['data']:
+		start_time = iso8601.parse_date(entry['start']).astimezone(pytz.utc).strftime("%b %d")
+		if start_time not in days:
+			days[start_time] = []
+		days[start_time].append(entry)
+
+	# For each day, print the entries, then sum the times.
+	for date in sorted(days.keys()):
+		print date
+		duration = 0
+		for entry in days[date]:
+			print "  ",
+			duration += print_time_entry(entry)
+		print "   (%s)" % elapsed_time(int(duration))
+
+	return 0
 
 def parse_duration(str):
     """Parses a string of the form [[Hours:]Minutes:]Seconds and returns
@@ -223,24 +242,28 @@ def parse_duration(str):
     return duration
         
 def print_time_entry(entry):
-    """Utility function to print a time entry object."""
+    """Utility function to print a time entry object and returns the
+	   integer duration for this entry."""
     
     # If the duration is negative, the entry is currently running so we
     # have to calculate the duration by adding the current time.
     is_running = ''
+    e_time = 0
     if entry['duration'] > 0:
-        e_time = entry['duration']
+        e_time = int(entry['duration'])
     else:
         is_running = '* '
         e_time = time.time() + int(entry['duration'])
-    e_time = " %s" % elapsed_time(int(e_time), separator='')
+    e_time_str = " %s" % elapsed_time(int(e_time), separator='')
     
     # Get the project name (if one exists).
     project_name = ''
     if 'project' in entry:
         project_name = " @%s" % entry['project']['name']
     
-    print "%s%s%s%s" % (is_running, entry['description'], project_name, e_time)
+	print "%s%s%s%s" % (is_running, entry['description'], project_name, e_time_str)
+
+	return e_time
 
 def start_time_entry(args):
     """
