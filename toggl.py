@@ -3,18 +3,23 @@
 toggl.py
 
 Created by Robert Adams on 2012-04-19.
-Last modified: Mon May 21, 2012 10:36AM
+Last modified: Thu May 24, 2012 08:37PM
 Copyright (c) 2012 D. Robert Adams. All rights reserved.
 """
 
 #############################################################################
 ### Configuration Section                                                 ###
 ###
+
 # How do you log into toggl.com?
 AUTH = ('YOUR_KEY_HERE', 'api_token')
 
 # Do you want to ignore starting times by default?
 IGNORE_START_TIMES = True
+
+# Command to visit toggl.com
+VISIT_WWW_COMMAND = "open http://www.toggl.com"
+
 ###                                                                       ###
 ### End of Configuration Section                                          ###
 #############################################################################
@@ -23,6 +28,7 @@ import datetime
 import iso8601
 import json
 import optparse
+import os
 import pytz
 import requests
 import sys
@@ -329,6 +335,9 @@ def stop_time_entry():
     
     return 0
 
+def visit_web():
+	os.system(VISIT_WWW_COMMAND)	
+
 def main(argv=None):
     """Program entry point."""
     
@@ -345,6 +354,7 @@ def main(argv=None):
         "  projects\t\t\tlists all projects\n"
         "  start ENTRY [@PROJECT]\tstarts a new entry\n"
         "  stop\t\t\t\tstops the current entry\n"
+		"  www\t\t\t\tvisits toggl.com\n"
         "\n"
         "  DURATION = [[Hours:]Minutes:]Seconds\n")
     parser.add_option("-v", "--verbose",
@@ -370,6 +380,8 @@ def main(argv=None):
         return start_time_entry(args[1:])
     elif args[0] == "stop":
         return stop_time_entry()
+    elif args[0] == "www":
+        return visit_web()
     else:
         parser.print_help()
         return 1
