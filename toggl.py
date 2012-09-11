@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """
 toggl.py
 
@@ -12,10 +12,10 @@ Copyright (c) 2012 D. Robert Adams. All rights reserved.
 ###
 
 # How do you log into toggl.com?
-AUTH = ('YOUR_KEY_HERE', 'api_token')
+AUTH = ('', '')
 
 # Do you want to ignore starting times by default?
-IGNORE_START_TIMES = True
+IGNORE_START_TIMES = False
 
 # Command to visit toggl.com
 VISIT_WWW_COMMAND = "open http://www.toggl.com"
@@ -34,6 +34,8 @@ import requests
 import sys
 import time
 import urllib
+import ConfigParser
+from dateutil.parser import *
 
 TOGGL_URL = "https://www.toggl.com/api/v6"
 
@@ -53,7 +55,7 @@ def add_time_entry(args):
     
     # See if we have a @project.
     if len(args) == 2:
-        project_name = args[0][1:]
+	project_name = find_project(args[0][1:])
         args = args[1:] # strip off the project
     
     # Get the duration.
@@ -102,7 +104,7 @@ def create_time_entry_json(description, project_name=None, duration=0):
     # Create JSON object to send to toggl.
     data = { 'time_entry' : \
         { 'duration' : duration,
-          'billable' : True,
+          'billable' : False,
           'start' : datetime.datetime.utcnow().isoformat(),
           'description' : description,
           'created_with' : 'toggl-cli',
@@ -204,6 +206,15 @@ def list_projects():
         print "@%s" % project['name']
     return 0
 
+def find_project(proj):
+    """Find a project given the unique prefix of the name"""
+    response = get_projects()
+    for project in response['data']:
+        if project['name'].startswith(proj):
+		return project['name']
+    print "Could not find project!"
+    sys.exit(1)
+
 def list_time_entries():
 	"""Lists all of the time entries from yesterday and today along with
 	   the amount of time devoted to each.
@@ -267,9 +278,33 @@ def print_time_entry(entry):
     if 'project' in entry:
         project_name = " @%s" % entry['project']['name']
     
-	print "%s%s%s%s" % (is_running, entry['description'], project_name, e_time_str)
+        if options.verbose:
+	    print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'])
+	else:
+	    print "%s%s%s%s" % (is_running, entry['description'], project_name, e_time_str)
 
-	return e_time
+    return e_time
+
+def delete_time_entry(args):
+    if len(args) == 0:
+        global parser
+        parser.print_help()
+        return 1
+
+    entry_id = args[0]
+
+    response = get_time_entry_data()
+
+    for entry in response['data']:
+	if str(entry['id']) == entry_id:
+            print "Deleting entry " + entry_id
+
+            headers = {'content-type': 'application/json'}
+            r = requests.delete("%s/time_entries/%s.json" % (TOGGL_URL, entry_id), auth=AUTH,
+                data=None, headers=headers)
+            r.raise_for_status() # raise exception on error
+
+    return 0
 
 def start_time_entry(args):
     """
@@ -277,6 +312,7 @@ def start_time_entry(args):
        args should be: ENTRY [@PROJECT]
     """
     
+    global toggl_cfg
     # Make sure we have an entry description.
     if len(args) == 0:
         global parser
@@ -287,11 +323,17 @@ def start_time_entry(args):
     
     # See if we have a @project.
     project_name = None
-    if len(args) == 1 and args[0][0] == '@':
-        project_name = args[0][1:]
-    
+    if len(args) >= 1 and args[0][0] == '@':
+	project_name = find_project(args[0][1:])
+        args = args[1:] # strip off the project
+
     # Create JSON object to send to toggl.
     data = create_time_entry_json(entry, project_name, 0)
+
+    if len(args) == 1:
+	tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+	st = tz.localize(parse(args[0]))
+        data['time_entry']['start'] = st.astimezone(pytz.utc).isoformat()
     
     if options.verbose:
         print json.dumps(data)
@@ -303,44 +345,70 @@ def start_time_entry(args):
     
     return 0
 
-def stop_time_entry():
+def stop_time_entry(args=None):
     """Stops the current time entry (duration is negative)."""
+    global toggl_cfg
+
     entry = get_current_time_entry()
     if entry != None:
-        
         # Get the start time from the entry, converted to UTC.
         start_time = iso8601.parse_date(entry['start']).astimezone(pytz.utc)
-        
-        # Get stop time(now) in UTC.
-        stop_time = datetime.datetime.now(pytz.utc)
-        
+
+        if args != None and len(args) == 1:
+	    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+	    stop_time = tz.localize(parse(args[0])).astimezone(pytz.utc)
+        else:
+            # Get stop time(now) in UTC.
+            stop_time = datetime.datetime.now(pytz.utc)
+
         # Create the payload.
         data = { 'time_entry' : entry }
         data['time_entry']['stop'] = stop_time.isoformat()
         data['time_entry']['duration'] = (stop_time - start_time).seconds
-        
+
         url = "%s/time_entries/%d.json" % (TOGGL_URL, entry['id'])
-        
+
         global options
         if options.verbose:
             print url
-        
+
         headers = {'content-type': 'application/json'}
         r = requests.put(url, auth=AUTH, data=json.dumps(data), headers=headers)
         r.raise_for_status() # raise exception on error
-    
     else:
         print >> sys.stderr, "You're not working on anything right now."
         return 1
-    
+
     return 0
 
 def visit_web():
 	os.system(VISIT_WWW_COMMAND)	
 
+def create_default_cfg():
+    cfg = ConfigParser.RawConfigParser()
+    cfg.add_section('auth')
+    cfg.set('auth', 'username', 'user@example.com')
+    cfg.set('auth', 'password', 'secretpasswd')
+    cfg.add_section('options')
+    cfg.set('options', 'ignore_start_times', 'False')
+    cfg.set('options', 'timezone', 'UTC')
+    with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
+        cfg.write(cfgfile)
+
 def main(argv=None):
     """Program entry point."""
     
+    global toggl_cfg
+    toggl_cfg = ConfigParser.ConfigParser()
+    if toggl_cfg.read(os.path.expanduser('~/.togglrc')) == []:
+	    create_default_cfg()
+	    print "Missing ~/.togglrc. A default has been created for editing."
+	    return 1
+
+    global AUTH, IGNORE_START_TIMES
+    AUTH = (toggl_cfg.get('auth', 'username').strip(), toggl_cfg.get('auth', 'password').strip())
+    IGNORE_START_TIMES = toggl_cfg.getboolean('options', 'ignore_start_times')
+
     # Override the option parser epilog formatting rule.
     # See http://stackoverflow.com/questions/1857346/python-optparse-how-to-include-additional-info-in-usage-output
     optparse.OptionParser.format_epilog = lambda self, formatter: self.epilog
@@ -348,13 +416,14 @@ def main(argv=None):
     global parser, options
     parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
         epilog="\nActions:\n"
-        "  add ENTRY [@PROJECT] DURATION\tcreates a completed time entry\n"
-        "  ls\t\t\t\tlist recent time entries\n"
-        "  now\t\t\t\tprint what you're working on now\n"
-        "  projects\t\t\tlists all projects\n"
-        "  start ENTRY [@PROJECT]\tstarts a new entry\n"
-        "  stop\t\t\t\tstops the current entry\n"
-		"  www\t\t\t\tvisits toggl.com\n"
+        "  add ENTRY [@PROJECT] DURATION\t\tcreates a completed time entry\n"
+        "  ls\t\t\t\t\tlist recent time entries\n"
+        "  rm\t\t\t\t\tdelete a time entry by id\n"
+        "  now\t\t\t\t\tprint what you're working on now\n"
+        "  projects\t\t\t\tlists all projects\n"
+        "  start ENTRY [@PROJECT] [DATETIME]\tstarts a new entry\n"
+        "  stop [DATETIME]\t\t\tstops the current entry\n"
+	"  www\t\t\t\t\tvisits toggl.com\n"
         "\n"
         "  DURATION = [[Hours:]Minutes:]Seconds\n")
     parser.add_option("-v", "--verbose",
@@ -379,9 +448,14 @@ def main(argv=None):
     elif args[0] == "start":
         return start_time_entry(args[1:])
     elif args[0] == "stop":
-        return stop_time_entry()
+	if len(args) > 1:
+            return stop_time_entry(args[1:])
+        else:
+	    return stop_time_entry()
     elif args[0] == "www":
         return visit_web()
+    elif args[0] == "rm":
+	return delete_time_entry(args[1:])
     else:
         parser.print_help()
         return 1
