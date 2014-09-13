@@ -180,8 +180,10 @@ def get_time_entry_data():
     yesterday_at_midnight = datetime.datetime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0)
     
     # Fetch the data or die trying.
-    url = "%s/time_entries?start_date=%s&end_date=%s" % \
-        (TOGGL_URL, urllib.quote(str(yesterday_at_midnight)), urllib.quote(str(today_at_midnight)))
+    #url = "%s/time_entries?start_date=%s&end_date=%s" % \
+        #(TOGGL_URL, urllib.quote(str(yesterday_at_midnight)), urllib.quote(str(today_at_midnight)))
+    url = "%s/time_entries" % \
+        (TOGGL_URL)
     global options
     if options.verbose:
         print url
@@ -204,7 +206,7 @@ def list_projects():
     """List all projects."""
     response = get_projects()
     for project in response:
-        print "@%s" % project['name']
+        print "@%s" % (project['name'])
     return 0
 
 def find_project(proj):
@@ -282,11 +284,11 @@ def print_time_entry(entry):
         project_name = " @%s - %s" % ("Project name", entry['pid'])
     else:
 	project_name = " No project"
-    
+
     if options.verbose:
         print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'])
     else:
-        print "%s%s%s%s" % (is_running, entry['description'], project_name, e_time_str)
+        print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'])
 
     return e_time
 
@@ -423,7 +425,7 @@ def main(argv=None):
         epilog="\nActions:\n"
         "  add ENTRY [@PROJECT] DURATION\t\tcreates a completed time entry\n"
         "  ls\t\t\t\t\tlist recent time entries\n"
-        "  rm\t\t\t\t\tdelete a time entry by id\n"
+        "  rm ID\t\t\t\t\tdelete a time entry by id\n"
         "  now\t\t\t\t\tprint what you're working on now\n"
         "  projects\t\t\t\tlists all projects\n"
         "  start ENTRY [@PROJECT] [DATETIME]\tstarts a new entry\n"
