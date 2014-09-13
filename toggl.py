@@ -218,6 +218,15 @@ def find_project(proj):
     print "Could not find project!"
     sys.exit(1)
 
+def find_project_by_id(id):
+    """Find a project given the project id"""
+    response = get_projects()
+    for project in response:
+        if project['id'] ==id:
+		return project['name']
+    print "Could not find project!"
+    return None
+
 def list_time_entries():
 	"""Lists all of the time entries from yesterday and today along with
 	   the amount of time devoted to each.
@@ -281,7 +290,8 @@ def print_time_entry(entry):
     if 'pid' in entry:
         #project_name = " @%s" % entry['project']['name']
 	# This needs to look up the project by ID
-        project_name = " @%s - %s" % ("Project name", entry['pid'])
+	project_name = find_project_by_id(entry['pid'])
+        project_name = " @%s" % project_name
     else:
 	project_name = " No project"
 
