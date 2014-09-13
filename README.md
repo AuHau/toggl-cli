@@ -4,14 +4,15 @@ Overview
 toggl-cli is a command-line interface for toggl.com.
 
 It certainly does not implement the full toggl API, but rather those functions
-that I use all the time. The goal is to make using toggl quicker and more
+core functions. The goal is to make using toggl quicker and more
 efficient for those already familiar with command-line tools.
 
-toggl-cli is written in Python and uses version 8 of the toggl API.
+toggl-cli is written in Python and uses version 8 of the [toggl API](https://github.com/toggl/toggl_api_docs).
 
-There's another toggl CLI at https://github.com/joequery/Toggl-CLI, but I
-dislike CLIs with menus. This one is modeled after 
-[Todo.txt](http://todotxt.com/). Also, this one is state-less.
+This is forked from [drobertadams/toggl-cli](https://github.com/drobertadams/toggl-cli).
+
+The core code is as drobertadams wrote it, but upgraded to v8.
+
 
 Requirements
 ------------
@@ -29,5 +30,10 @@ Limitations
 
 * When creating a time entry for a given project, the project must already
   exist.
-* Clients, workspaces, project users, tasks, tags, and users aren't supported,
+* Project users, tasks, tags, and users aren't supported,
   simply because I don't use these features. I only use tasks and projects.
+
+Roadmap
+-------
+
+See the [issues tracker](https://github.com/beauraines/toggl-cli)
