@@ -112,7 +112,7 @@ def create_time_entry_json(description, project_name=None, duration=0):
         }
     }
     if project_id != None:
-        data['time_entry']['project'] = { 'id' : project_id }
+        data['time_entry']['pid'] = project_id 
     
     return data
 
