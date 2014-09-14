@@ -254,8 +254,9 @@ def list_time_entries():
 
 	# Sort the time entries into buckets based on "Month Day" of the entry.
 	days = { }
+	tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
 	for entry in response:
-		start_time = iso8601.parse_date(entry['start']).astimezone(pytz.utc).strftime("%b %d")
+		start_time = iso8601.parse_date(entry['start']).astimezone(tz).strftime("%b %d")
 		if start_time not in days:
 			days[start_time] = []
 		days[start_time].append(entry)
