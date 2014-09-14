@@ -160,8 +160,21 @@ def get_current_time_entry():
 def get_projects():
     """Fetches the projects as JSON objects."""
     
-	# Default workspace needs to be looked up
-    url = "%s/workspaces/%s/projects" % (TOGGL_URL,403916)
+    # Look up default workspace
+    user = get_user()
+    wid = user['data']['default_wid']
+    url = "%s/workspaces/%s/projects" % (TOGGL_URL,wid)
+    global options
+    if options.verbose:
+        print url
+    r = requests.get(url, auth=AUTH)
+    r.raise_for_status() # raise exception on error
+    return json.loads(r.text)
+
+def get_user():
+    """Fetches the user as JSON objects."""
+    
+    url = "%s/me" % (TOGGL_URL)
     global options
     if options.verbose:
         print url
@@ -300,7 +313,7 @@ def print_time_entry(entry):
 	project_name = " No project"
 
     if options.verbose:
-        print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'])
+        print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'], entry['wid'])
     else:
         print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'])
 
