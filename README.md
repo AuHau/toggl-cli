@@ -11,7 +11,7 @@ toggl-cli is written in Python and uses version 8 of the [toggl API](https://git
 
 This is forked from [drobertadams/toggl-cli](https://github.com/drobertadams/toggl-cli).
 
-The core code is as drobertadams wrote it, but upgraded to v8.
+The core code is primarily drobertadams wrote it, but upgraded to v8, including new functions to support the new API requirements.
 
 
 Requirements
