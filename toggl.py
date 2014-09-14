@@ -171,19 +171,23 @@ def get_projects():
 
 def get_time_entry_data():
     """Fetches time entry data and returns it as a Python array."""
-    
-    # Construct the start and end dates. Toggl seems to want these in UTC.
-    today = datetime.datetime.now(pytz.utc)
-    today_at_midnight = today.replace(hour=23, minute=59, second=59)
-    
+
+    # Construct the start and end dates. 
+    #Toggl can accept these in local tz, but must be IS08601 formatted
+    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+
+    today = datetime.datetime.now(tz)
+    today_at_midnight = today.replace(hour=23, minute=59, second=59, microsecond = 0)
+    today_at_midnight = today_at_midnight.isoformat('T')
+        
     yesterday = today - datetime.timedelta(days=1)
     yesterday_at_midnight = datetime.datetime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0)
-    
+    yesterday_at_midnight = tz.localize(yesterday_at_midnight)
+    yesterday_at_midnight = yesterday_at_midnight.isoformat('T')
+
     # Fetch the data or die trying.
-    #url = "%s/time_entries?start_date=%s&end_date=%s" % \
-        #(TOGGL_URL, urllib.quote(str(yesterday_at_midnight)), urllib.quote(str(today_at_midnight)))
-    url = "%s/time_entries" % \
-        (TOGGL_URL)
+    url = "%s/time_entries?start_date=%s&end_date=%s" % \
+        (TOGGL_URL, urllib.quote(str(yesterday_at_midnight)), urllib.quote(str(today_at_midnight)))
     global options
     if options.verbose:
         print url

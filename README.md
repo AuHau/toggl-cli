@@ -23,15 +23,19 @@ Requirements
 Configuration
 -------------
 
-A configuration file ~/.togglrc will be automatically created. Update that file with your API token and the password "api_token". Your API token can be found under "My Profile" in your toggl account.
+Upon first running the program, a configuration file ~/.togglrc will be automatically created. 
+
+1. Update that file with your API token and the password "api_token". Your API token can be found under "My Profile" in your toggl account.
+2. Update the timezone entry (e.g. US/Pacific)
 
 Limitations
 -----------
 
 * When creating a time entry for a given project, the project must already
   exist.
-* Project users, tasks, tags, and users aren't supported,
-  simply because I don't use these features. I only use tasks and projects.
+* Project users, tasks, tags, and users aren't supported.
+* Only the default workspace is supported.
+* Adding and removing clients is not supported, however, I would like to display clients.
 
 Roadmap
 -------
