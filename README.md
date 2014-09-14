@@ -40,4 +40,4 @@ Limitations
 Roadmap
 -------
 
-See the [issues tracker](https://github.com/beauraines/toggl-cli)
+See the [issues tracker](https://github.com/beauraines/toggl-cli/issues)
