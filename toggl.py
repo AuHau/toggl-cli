@@ -3,8 +3,9 @@
 toggl.py
 
 Created by Robert Adams on 2012-04-19.
-Last modified: Thu May 24, 2012 08:37PM
+Last modified: 2014-09-14
 Copyright (c) 2012 D. Robert Adams. All rights reserved.
+Modified for toggl API v8 by Beau Raines
 """
 
 #############################################################################
