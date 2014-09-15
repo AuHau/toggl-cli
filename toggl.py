@@ -3,8 +3,9 @@
 toggl.py
 
 Created by Robert Adams on 2012-04-19.
-Last modified: Thu May 24, 2012 08:37PM
+Last modified: 2014-09-14
 Copyright (c) 2012 D. Robert Adams. All rights reserved.
+Modified for toggl API v8 by Beau Raines
 """
 
 #############################################################################
@@ -37,7 +38,7 @@ import urllib
 import ConfigParser
 from dateutil.parser import *
 
-TOGGL_URL = "https://www.toggl.com/api/v6"
+TOGGL_URL = "https://www.toggl.com/api/v8"
 
 def add_time_entry(args):
     """
@@ -71,7 +72,7 @@ def add_time_entry(args):
     
     # Send the data.
     headers = {'content-type': 'application/json'}
-    r = requests.post("%s/time_entries.json" % TOGGL_URL, auth=AUTH,
+    r = requests.post("%s/time_entries" % TOGGL_URL, auth=AUTH,
         data=json.dumps(data), headers=headers)
     r.raise_for_status() # raise exception on error
     
@@ -88,7 +89,7 @@ def create_time_entry_json(description, project_name=None, duration=0):
     if project_name != None:
         # Look up the project from toggl to get the id.
         projects = get_projects()
-        for project in projects['data']:
+        for project in projects:
             if project['name'] == project_name:
                 project_id = project['id']
                 break
@@ -112,7 +113,7 @@ def create_time_entry_json(description, project_name=None, duration=0):
         }
     }
     if project_id != None:
-        data['time_entry']['project'] = { 'id' : project_id }
+        data['time_entry']['pid'] = project_id 
     
     return data
 
@@ -151,7 +152,7 @@ def get_current_time_entry():
     """Returns the current time entry JSON object, or None."""
     response = get_time_entry_data()
     
-    for entry in response['data']:
+    for entry in response:
         if int(entry['duration']) < 0:
             return entry
     
@@ -160,7 +161,21 @@ def get_current_time_entry():
 def get_projects():
     """Fetches the projects as JSON objects."""
     
-    url = "%s/projects.json" % TOGGL_URL
+    # Look up default workspace
+    user = get_user()
+    wid = user['data']['default_wid']
+    url = "%s/workspaces/%s/projects" % (TOGGL_URL,wid)
+    global options
+    if options.verbose:
+        print url
+    r = requests.get(url, auth=AUTH)
+    r.raise_for_status() # raise exception on error
+    return json.loads(r.text)
+
+def get_user():
+    """Fetches the user as JSON objects."""
+    
+    url = "%s/me" % (TOGGL_URL)
     global options
     if options.verbose:
         print url
@@ -170,16 +185,22 @@ def get_projects():
 
 def get_time_entry_data():
     """Fetches time entry data and returns it as a Python array."""
-    
-    # Construct the start and end dates. Toggl seems to want these in UTC.
-    today = datetime.datetime.now(pytz.utc)
-    today_at_midnight = today.replace(hour=23, minute=59, second=59)
-    
+
+    # Construct the start and end dates. 
+    #Toggl can accept these in local tz, but must be IS08601 formatted
+    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+
+    today = datetime.datetime.now(tz)
+    today_at_midnight = today.replace(hour=23, minute=59, second=59, microsecond = 0)
+    today_at_midnight = today_at_midnight.isoformat('T')
+        
     yesterday = today - datetime.timedelta(days=1)
     yesterday_at_midnight = datetime.datetime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0)
-    
+    yesterday_at_midnight = tz.localize(yesterday_at_midnight)
+    yesterday_at_midnight = yesterday_at_midnight.isoformat('T')
+
     # Fetch the data or die trying.
-    url = "%s/time_entries.json?start_date=%s&end_date=%s" % \
+    url = "%s/time_entries?start_date=%s&end_date=%s" % \
         (TOGGL_URL, urllib.quote(str(yesterday_at_midnight)), urllib.quote(str(today_at_midnight)))
     global options
     if options.verbose:
@@ -202,18 +223,27 @@ def list_current_time_entry():
 def list_projects():
     """List all projects."""
     response = get_projects()
-    for project in response['data']:
-        print "@%s" % project['name']
+    for project in response:
+        print "@%s" % (project['name'])
     return 0
 
 def find_project(proj):
     """Find a project given the unique prefix of the name"""
     response = get_projects()
-    for project in response['data']:
+    for project in response:
         if project['name'].startswith(proj):
 		return project['name']
     print "Could not find project!"
     sys.exit(1)
+
+def find_project_by_id(id):
+    """Find a project given the project id"""
+    response = get_projects()
+    for project in response:
+        if project['id'] ==id:
+		return project['name']
+    print "Could not find project!"
+    return None
 
 def list_time_entries():
 	"""Lists all of the time entries from yesterday and today along with
@@ -225,8 +255,9 @@ def list_time_entries():
 
 	# Sort the time entries into buckets based on "Month Day" of the entry.
 	days = { }
-	for entry in response['data']:
-		start_time = iso8601.parse_date(entry['start']).astimezone(pytz.utc).strftime("%b %d")
+	tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+	for entry in response:
+		start_time = iso8601.parse_date(entry['start']).astimezone(tz).strftime("%b %d")
 		if start_time not in days:
 			days[start_time] = []
 		days[start_time].append(entry)
@@ -275,13 +306,18 @@ def print_time_entry(entry):
     
     # Get the project name (if one exists).
     project_name = ''
-    if 'project' in entry:
-        project_name = " @%s" % entry['project']['name']
-    
-        if options.verbose:
-	    print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'])
-	else:
-	    print "%s%s%s%s" % (is_running, entry['description'], project_name, e_time_str)
+    if 'pid' in entry:
+        #project_name = " @%s" % entry['project']['name']
+	# This needs to look up the project by ID
+	project_name = find_project_by_id(entry['pid'])
+        project_name = " @%s" % project_name
+    else:
+	project_name = " No project"
+
+    if options.verbose:
+        print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'], entry['wid'])
+    else:
+        print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'])
 
     return e_time
 
@@ -295,12 +331,12 @@ def delete_time_entry(args):
 
     response = get_time_entry_data()
 
-    for entry in response['data']:
+    for entry in response:
 	if str(entry['id']) == entry_id:
             print "Deleting entry " + entry_id
 
             headers = {'content-type': 'application/json'}
-            r = requests.delete("%s/time_entries/%s.json" % (TOGGL_URL, entry_id), auth=AUTH,
+            r = requests.delete("%s/time_entries/%s" % (TOGGL_URL, entry_id), auth=AUTH,
                 data=None, headers=headers)
             r.raise_for_status() # raise exception on error
 
@@ -339,7 +375,7 @@ def start_time_entry(args):
         print json.dumps(data)
     
     headers = {'content-type': 'application/json'}
-    r = requests.post("%s/time_entries.json" % TOGGL_URL, auth=AUTH,
+    r = requests.post("%s/time_entries/start" % TOGGL_URL, auth=AUTH,
         data=json.dumps(data), headers=headers)
     r.raise_for_status() # raise exception on error
     
@@ -366,7 +402,7 @@ def stop_time_entry(args=None):
         data['time_entry']['stop'] = stop_time.isoformat()
         data['time_entry']['duration'] = (stop_time - start_time).seconds
 
-        url = "%s/time_entries/%d.json" % (TOGGL_URL, entry['id'])
+        url = "%s/time_entries/%d" % (TOGGL_URL, entry['id'])
 
         global options
         if options.verbose:
@@ -418,7 +454,7 @@ def main(argv=None):
         epilog="\nActions:\n"
         "  add ENTRY [@PROJECT] DURATION\t\tcreates a completed time entry\n"
         "  ls\t\t\t\t\tlist recent time entries\n"
-        "  rm\t\t\t\t\tdelete a time entry by id\n"
+        "  rm ID\t\t\t\t\tdelete a time entry by id\n"
         "  now\t\t\t\t\tprint what you're working on now\n"
         "  projects\t\t\t\tlists all projects\n"
         "  start ENTRY [@PROJECT] [DATETIME]\tstarts a new entry\n"
