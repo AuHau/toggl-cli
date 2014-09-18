@@ -315,9 +315,9 @@ def print_time_entry(entry):
 	project_name = " No project"
 
     if options.verbose:
-        print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'], entry['wid'])
-    else:
         print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'])
+    else:
+        print "%s%s%s%s" % (is_running, entry['description'], project_name, e_time_str)
 
     return e_time
 
