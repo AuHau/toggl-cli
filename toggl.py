@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/python
 """
 toggl.py
 
@@ -430,6 +430,7 @@ def create_default_cfg():
     cfg.set('options', 'timezone', 'UTC')
     with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
         cfg.write(cfgfile)
+    os.chmod(os.path.expanduser('~/.togglrc'), 0600)
 
 def main(argv=None):
     """Program entry point."""
