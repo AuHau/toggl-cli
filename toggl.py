@@ -276,6 +276,7 @@ def list_time_entries():
 
 	# Get an array of objects of recent time data.
 	response = get_time_entry_data()
+	projects = get_projects()
 
 	# Sort the time entries into buckets based on "Month Day" of the entry.
 	days = { }
@@ -285,6 +286,12 @@ def list_time_entries():
 		if start_time not in days:
 			days[start_time] = []
 		days[start_time].append(entry)
+		# Lookup the project if it exists
+        	project_name = "No project"
+    		if 'pid' in entry:
+	   	    for project in projects:
+	       	        if entry['pid'] == project['id']:
+	                    entry['project_name'] = '@' + project['name']
 
 	# For each day, print the entries, then sum the times.
 	for date in sorted(days.keys()):
@@ -328,20 +335,10 @@ def print_time_entry(entry):
         e_time = time.time() + int(entry['duration'])
     e_time_str = " %s" % elapsed_time(int(e_time), separator='')
     
-    # Get the project name (if one exists).
-    project_name = ''
-    if 'pid' in entry:
-        #project_name = " @%s" % entry['project']['name']
-	# This needs to look up the project by ID
-	project_name = find_project_by_id(entry['pid'])
-        project_name = " @%s" % project_name
-    else:
-	project_name = " No project"
-
     if options.verbose:
-        print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'])
+        print "%s%s%s%s [%s]" % (is_running, entry['description'], entry['project_name'], e_time_str, entry['id'])
     else:
-        print "%s%s%s%s" % (is_running, entry['description'], project_name, e_time_str)
+        print "%s%s %s%s" % (is_running, entry['description'], entry['project_name'], e_time_str)
 
     return e_time
 
