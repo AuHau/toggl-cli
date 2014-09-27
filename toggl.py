@@ -224,7 +224,15 @@ def get_time_entry_data():
 def list_current_time_entry():
     """Shows what the user is currently working on (duration is negative)."""
     entry = get_current_time_entry()
+
     if entry != None:
+        projects = get_projects()
+	# Lookup the project if it exists
+       	project_name = "No project"
+    	if 'pid' in entry:
+   	    for project in projects:
+       	        if entry['pid'] == project['id']:
+                    entry['project_name'] = '@' + project['name']
         print_time_entry(entry)
     else:
         print "You're not working on anything right now."
