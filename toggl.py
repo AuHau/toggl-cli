@@ -172,6 +172,17 @@ def get_projects():
     r.raise_for_status() # raise exception on error
     return json.loads(r.text)
 
+def get_clients():
+    """Fetches the clients as JSON objects."""
+    # Look up default workspace
+    url = "%s/clients" % (TOGGL_URL)
+    global options
+    if options.verbose:
+        print url
+    r = requests.get(url, auth=AUTH)
+    r.raise_for_status() # raise exception on error
+    return json.loads(r.text)
+
 def get_user():
     """Fetches the user as JSON objects."""
     
@@ -220,11 +231,24 @@ def list_current_time_entry():
     
     return 0
 
+def list_clients():
+    """List all clients."""
+    response = get_clients()
+    for client in response:
+        print "@%s" % (client['name'])
+    return 0
+
 def list_projects():
     """List all projects."""
     response = get_projects()
+    clients = get_clients()
     for project in response:
-        print "@%s" % (project['name'])
+        client_name = "No Client"
+    	if 'cid' in project:
+	   for client in clients:
+	       if project['cid'] == client['id']:
+	           client_name = client['name']
+        print "@%s - %s" % (project['name'], client_name)
     return 0
 
 def find_project(proj):
@@ -458,6 +482,7 @@ def main(argv=None):
         "  rm ID\t\t\t\t\tdelete a time entry by id\n"
         "  now\t\t\t\t\tprint what you're working on now\n"
         "  projects\t\t\t\tlists all projects\n"
+        "  clients\t\t\t\tlists all clients\n"
         "  start ENTRY [@PROJECT] [DATETIME]\tstarts a new entry\n"
         "  stop [DATETIME]\t\t\tstops the current entry\n"
 	"  www\t\t\t\t\tvisits toggl.com\n"
@@ -482,6 +507,8 @@ def main(argv=None):
         return list_current_time_entry()
     elif args[0] == "projects":
         return list_projects()
+    elif args[0] == "clients":
+        return list_clients()
     elif args[0] == "start":
         return start_time_entry(args[1:])
     elif args[0] == "stop":
