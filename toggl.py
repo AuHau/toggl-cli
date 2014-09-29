@@ -172,6 +172,17 @@ def get_projects():
     r.raise_for_status() # raise exception on error
     return json.loads(r.text)
 
+def get_clients():
+    """Fetches the clients as JSON objects."""
+    # Look up default workspace
+    url = "%s/clients" % (TOGGL_URL)
+    global options
+    if options.verbose:
+        print url
+    r = requests.get(url, auth=AUTH)
+    r.raise_for_status() # raise exception on error
+    return json.loads(r.text)
+
 def get_user():
     """Fetches the user as JSON objects."""
     
@@ -213,18 +224,39 @@ def get_time_entry_data():
 def list_current_time_entry():
     """Shows what the user is currently working on (duration is negative)."""
     entry = get_current_time_entry()
+
     if entry != None:
+        projects = get_projects()
+	# Lookup the project if it exists
+       	project_name = "No project"
+    	if 'pid' in entry:
+   	    for project in projects:
+       	        if entry['pid'] == project['id']:
+                    entry['project_name'] = '@' + project['name']
         print_time_entry(entry)
     else:
         print "You're not working on anything right now."
     
     return 0
 
+def list_clients():
+    """List all clients."""
+    response = get_clients()
+    for client in response:
+        print "@%s" % (client['name'])
+    return 0
+
 def list_projects():
     """List all projects."""
     response = get_projects()
+    clients = get_clients()
     for project in response:
-        print "@%s" % (project['name'])
+        client_name = "No Client"
+    	if 'cid' in project:
+	   for client in clients:
+	       if project['cid'] == client['id']:
+	           client_name = client['name']
+        print "@%s - %s" % (project['name'], client_name)
     return 0
 
 def find_project(proj):
@@ -252,6 +284,7 @@ def list_time_entries():
 
 	# Get an array of objects of recent time data.
 	response = get_time_entry_data()
+	projects = get_projects()
 
 	# Sort the time entries into buckets based on "Month Day" of the entry.
 	days = { }
@@ -261,6 +294,12 @@ def list_time_entries():
 		if start_time not in days:
 			days[start_time] = []
 		days[start_time].append(entry)
+		# Lookup the project if it exists
+        	project_name = "No project"
+    		if 'pid' in entry:
+	   	    for project in projects:
+	       	        if entry['pid'] == project['id']:
+	                    entry['project_name'] = '@' + project['name']
 
 	# For each day, print the entries, then sum the times.
 	for date in sorted(days.keys()):
@@ -304,20 +343,10 @@ def print_time_entry(entry):
         e_time = time.time() + int(entry['duration'])
     e_time_str = " %s" % elapsed_time(int(e_time), separator='')
     
-    # Get the project name (if one exists).
-    project_name = ''
-    if 'pid' in entry:
-        #project_name = " @%s" % entry['project']['name']
-	# This needs to look up the project by ID
-	project_name = find_project_by_id(entry['pid'])
-        project_name = " @%s" % project_name
-    else:
-	project_name = " No project"
-
     if options.verbose:
-        print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'], entry['wid'])
+        print "%s%s%s%s [%s]" % (is_running, entry['description'], entry['project_name'], e_time_str, entry['id'])
     else:
-        print "%s%s%s%s [%s]" % (is_running, entry['description'], project_name, e_time_str, entry['id'])
+        print "%s%s %s%s" % (is_running, entry['description'], entry['project_name'], e_time_str)
 
     return e_time
 
@@ -458,6 +487,7 @@ def main(argv=None):
         "  rm ID\t\t\t\t\tdelete a time entry by id\n"
         "  now\t\t\t\t\tprint what you're working on now\n"
         "  projects\t\t\t\tlists all projects\n"
+        "  clients\t\t\t\tlists all clients\n"
         "  start ENTRY [@PROJECT] [DATETIME]\tstarts a new entry\n"
         "  stop [DATETIME]\t\t\tstops the current entry\n"
 	"  www\t\t\t\t\tvisits toggl.com\n"
@@ -482,6 +512,8 @@ def main(argv=None):
         return list_current_time_entry()
     elif args[0] == "projects":
         return list_projects()
+    elif args[0] == "clients":
+        return list_clients()
     elif args[0] == "start":
         return start_time_entry(args[1:])
     elif args[0] == "stop":
