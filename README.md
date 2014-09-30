@@ -25,7 +25,7 @@ Configuration
 
 Upon first running the program, a configuration file ~/.togglrc will be automatically created. 
 
-1. Update that file with your API token and the password "api_token". Your API token can be found under "My Profile" in your toggl account.
+1. Update that file with your API token as the username, and the string "api_token" (without quotes) as the password. Your API token can be found under "My Profile" in your toggl account.
 2. Update the timezone entry (e.g. US/Pacific)
 
 Limitations
