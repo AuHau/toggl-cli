@@ -344,9 +344,9 @@ def print_time_entry(entry):
     e_time_str = " %s" % elapsed_time(int(e_time), separator='')
     
     if options.verbose:
-        print "%s%s%s%s [%s]" % (is_running, entry['description'], entry['project_name'], e_time_str, entry['id'])
+        print "%s%s%s%s [%s]" % (is_running, entry['description'] if 'description' in entry else "", entry['project_name'], e_time_str, entry['id'])
     else:
-        print "%s%s %s%s" % (is_running, entry['description'], entry['project_name'], e_time_str)
+        print "%s%s%s%s" % (is_running, entry['description'] + " " if 'description' in entry else "", entry['project_name'], e_time_str)
 
     return e_time
 
