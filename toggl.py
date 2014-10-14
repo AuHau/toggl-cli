@@ -101,15 +101,16 @@ def create_time_entry_json(description, project_name=None, duration=0):
     # epoch.
     if duration == 0:
         duration = 0-time.time()
+
+    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
     
     # Create JSON object to send to toggl.
     data = { 'time_entry' : \
-        { 'duration' : duration,
+	{ 'duration' : duration,
           'billable' : False,
-          'start' : datetime.datetime.utcnow().isoformat(),
+	  'start' :  tz.localize(datetime.datetime.now()).isoformat(),
           'description' : description,
           'created_with' : 'toggl-cli',
-          'ignore_start_and_stop' : options.ignore_start_and_stop
         }
     }
     if project_id != None:
@@ -397,14 +398,16 @@ def start_time_entry(args):
 
     if len(args) == 1:
 	tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
-	st = tz.localize(parse(args[0]))
-        data['time_entry']['start'] = st.astimezone(pytz.utc).isoformat()
+	dt = parse(args[0])
+	st = tz.localize(dt)
+        data['time_entry']['start'] = st.isoformat()
+	data['time_entry']['duration'] = 0 - int(dt.strftime('%s'))
     
     if options.verbose:
         print json.dumps(data)
     
     headers = {'content-type': 'application/json'}
-    r = requests.post("%s/time_entries/start" % TOGGL_URL, auth=AUTH,
+    r = requests.post("%s/time_entries" % TOGGL_URL, auth=AUTH,
         data=json.dumps(data), headers=headers)
     r.raise_for_status() # raise exception on error
     
