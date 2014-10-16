@@ -74,7 +74,6 @@ def add_time_entry(args):
     headers = {'content-type': 'application/json'}
     r = requests.post("%s/time_entries" % TOGGL_URL, auth=AUTH,
         data=json.dumps(data), headers=headers)
-    print r.response
     r.raise_for_status() # raise exception on error
     
     return 0
