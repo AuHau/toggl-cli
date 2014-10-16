@@ -74,6 +74,7 @@ def add_time_entry(args):
     headers = {'content-type': 'application/json'}
     r = requests.post("%s/time_entries" % TOGGL_URL, auth=AUTH,
         data=json.dumps(data), headers=headers)
+    print r.response
     r.raise_for_status() # raise exception on error
     
     return 0
@@ -296,7 +297,7 @@ def list_time_entries():
 			days[start_time] = []
 		days[start_time].append(entry)
 		# Lookup the project if it exists
-        	project_name = "No project"
+        	entry['project_name'] = "No project"
     		if 'pid' in entry:
 	   	    for project in projects:
 	       	        if entry['pid'] == project['id']:
