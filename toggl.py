@@ -43,7 +43,7 @@ TOGGL_URL = "https://www.toggl.com/api/v8"
 def add_time_entry(args):
     """
     Creates a completed time entry.
-    args should be: ENTRY [@PROJECT] DURATION
+    args should be: ENTRY [@PROJECT] START_DATE_TIME DURATION
     """
     
     # Make sure we have an entry description.
@@ -55,17 +55,28 @@ def add_time_entry(args):
     args = args[1:] # strip of the entry
     
     # See if we have a @project.
-    if len(args) == 2:
+    project_name = None
+    if len(args) >= 1 and args[0][0] == '@':
 	project_name = find_project(args[0][1:])
         args = args[1:] # strip off the project
+
+    #Get start time
+    tz = pytz.timezone(toggl_cfg.get('options', 'timezone')) 
+    dt = parse(args[0])
+    st = tz.localize(dt)
+    st = st.isoformat()
+    args = args[1:] # strip off the time
     
     # Get the duration.
     duration = parse_duration(args[0])
-    
+
     # Create the JSON object, or die trying.
     data = create_time_entry_json(entry, project_name, duration)
     if data == None:
         return 1
+
+    #Update the start time in the JSON object
+    data['time_entry']['start'] = st
     
     if options.verbose:
         print json.dumps(data)
@@ -74,7 +85,6 @@ def add_time_entry(args):
     headers = {'content-type': 'application/json'}
     r = requests.post("%s/time_entries" % TOGGL_URL, auth=AUTH,
         data=json.dumps(data), headers=headers)
-    print r.response
     r.raise_for_status() # raise exception on error
     
     return 0
@@ -486,15 +496,15 @@ def main(argv=None):
     global parser, options
     parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
         epilog="\nActions:\n"
-        "  add ENTRY [@PROJECT] DURATION\t\tcreates a completed time entry\n"
-        "  ls\t\t\t\t\tlist recent time entries\n"
-        "  rm ID\t\t\t\t\tdelete a time entry by id\n"
-        "  now\t\t\t\t\tprint what you're working on now\n"
-        "  projects\t\t\t\tlists all projects\n"
-        "  clients\t\t\t\tlists all clients\n"
-        "  start ENTRY [@PROJECT] [DATETIME]\tstarts a new entry\n"
-        "  stop [DATETIME]\t\t\tstops the current entry\n"
-	"  www\t\t\t\t\tvisits toggl.com\n"
+        "  add ENTRY [@PROJECT] START_DATETIME DURATION\tcreates a completed time entry\n"
+        "  ls\t\t\t\t\t\tlist recent time entries\n"
+        "  rm ID\t\t\t\t\t\tdelete a time entry by id\n"
+        "  now\t\t\t\t\t\tprint what you're working on now\n"
+        "  projects\t\t\t\t\tlists all projects\n"
+        "  clients\t\t\t\t\tlists all clients\n"
+        "  start ENTRY [@PROJECT] [DATETIME]\t\tstarts a new entry\n"
+        "  stop [DATETIME]\t\t\t\tstops the current entry\n"
+	"  www\t\t\t\t\t\tvisits toggl.com\n"
         "\n"
         "  DURATION = [[Hours:]Minutes:]Seconds\n")
     parser.add_option("-v", "--verbose",
