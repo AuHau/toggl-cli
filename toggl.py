@@ -78,12 +78,10 @@ def add_time_entry(args):
     
     # Check to see if duration passed.
     if len(args) >= 1 and args[0][0] == 'd':
-    	print 'Using duration.'
     	duration = parse_duration(args[0][1:])
 	#Update the duation in the JSON object
         data['time_entry']['duration'] = duration
     elif len(args) >= 1:
-    	print 'Using end time.'
 	dt = parse(args[0])
 	end_time = tz.localize(dt)
 	et = end_time.isoformat()
