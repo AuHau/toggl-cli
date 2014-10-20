@@ -3,7 +3,7 @@
 toggl.py
 
 Created by Robert Adams on 2012-04-19.
-Last modified: 2014-10-13
+Last modified: 2014-10-19
 Copyright (c) 2012 D. Robert Adams. All rights reserved.
 Modified for toggl API v8 by Beau Raines
 """
@@ -43,7 +43,7 @@ TOGGL_URL = "https://www.toggl.com/api/v8"
 def add_time_entry(args):
     """
     Creates a completed time entry.
-    args should be: ENTRY [@PROJECT] DURATION
+    args should be: ENTRY [@PROJECT] START_DATE_TIME 'd'DURATION | END_DATE_TIME
     """
     
     # Make sure we have an entry description.
@@ -55,18 +55,45 @@ def add_time_entry(args):
     args = args[1:] # strip of the entry
     
     # See if we have a @project.
-    if len(args) == 2:
+    project_name = None
+    if len(args) >= 1 and args[0][0] == '@':
 	project_name = find_project(args[0][1:])
         args = args[1:] # strip off the project
-    
-    # Get the duration.
-    duration = parse_duration(args[0])
-    
+
     # Create the JSON object, or die trying.
+    duration = 0 
     data = create_time_entry_json(entry, project_name, duration)
     if data == None:
         return 1
+
+    #Get start time
+    tz = pytz.timezone(toggl_cfg.get('options', 'timezone')) 
+    dt = parse(args[0])
+    start_time = tz.localize(dt)
+    st = start_time.isoformat()
+    args = args[1:] # strip off the time
     
+    #Update the start time in the JSON object
+    data['time_entry']['start'] = st
+    
+    # Check to see if duration passed.
+    if len(args) >= 1 and args[0][0] == 'd':
+    	duration = parse_duration(args[0][1:])
+	#Update the duation in the JSON object
+        data['time_entry']['duration'] = duration
+    elif len(args) >= 1:
+	dt = parse(args[0])
+	end_time = tz.localize(dt)
+	et = end_time.isoformat()
+	#Update the stop time in the JSON object
+    	data['time_entry']['stop'] = et
+	#Update the duration in the JSON object
+	duration = (end_time - start_time).seconds
+	data['time_entry']['duration'] = duration
+    else:
+        print 'Must specifiy duration or end time'
+	return 1
+
     if options.verbose:
         print json.dumps(data)
     
@@ -485,15 +512,15 @@ def main(argv=None):
     global parser, options
     parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
         epilog="\nActions:\n"
-        "  add ENTRY [@PROJECT] DURATION\t\tcreates a completed time entry\n"
-        "  ls\t\t\t\t\tlist recent time entries\n"
-        "  rm ID\t\t\t\t\tdelete a time entry by id\n"
-        "  now\t\t\t\t\tprint what you're working on now\n"
-        "  projects\t\t\t\tlists all projects\n"
-        "  clients\t\t\t\tlists all clients\n"
-        "  start ENTRY [@PROJECT] [DATETIME]\tstarts a new entry\n"
-        "  stop [DATETIME]\t\t\tstops the current entry\n"
-	"  www\t\t\t\t\tvisits toggl.com\n"
+        "  add ENTRY [@PROJECT] START_DATETIME 'd'DURATION | END_DATE_TIME\tcreates a completed time entry\n"
+        "  ls\t\t\t\t\t\t\t\t\tlist recent time entries\n"
+        "  rm ID\t\t\t\t\t\t\t\t\rdelete a time entry by id\n"
+        "  now\t\t\t\t\t\t\t\t\tprint what you're working on now\n"
+        "  projects\t\t\t\t\t\t\t\tlists all projects\n"
+        "  clients\t\t\t\t\t\t\t\tlists all clients\n"
+        "  start ENTRY [@PROJECT] [DATETIME]\t\t\t\t\tstarts a new entry\n"
+        "  stop [DATETIME]\t\t\t\t\t\t\tstops the current entry\n"
+	"  www\t\t\t\t\t\t\t\t\tvisits toggl.com\n"
         "\n"
         "  DURATION = [[Hours:]Minutes:]Seconds\n")
     parser.add_option("-v", "--verbose",
