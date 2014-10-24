@@ -3,7 +3,6 @@
 toggl.py
 
 Created by Robert Adams on 2012-04-19.
-Last modified: 2014-10-19
 Copyright (c) 2012 D. Robert Adams. All rights reserved.
 Modified for toggl API v8 by Beau Raines
 """
@@ -11,9 +10,6 @@ Modified for toggl API v8 by Beau Raines
 #############################################################################
 ### Configuration Section                                                 ###
 ###
-
-# How do you log into toggl.com?
-AUTH = ('', '')
 
 # Do you want to ignore starting times by default?
 IGNORE_START_TIMES = False
@@ -38,8 +34,10 @@ import urllib
 import ConfigParser
 from dateutil.parser import *
 
+AUTH = ('', '') # How do you log into toggl.com? Read from ~/.togglrc
 TOGGL_URL = "https://www.toggl.com/api/v8"
 
+#----------------------------------------------------------------------------
 def add_time_entry(args):
     """
     Creates a completed time entry.
@@ -105,6 +103,20 @@ def add_time_entry(args):
     
     return 0
 
+#----------------------------------------------------------------------------
+def create_default_cfg():
+    cfg = ConfigParser.RawConfigParser()
+    cfg.add_section('auth')
+    cfg.set('auth', 'username', 'user@example.com')
+    cfg.set('auth', 'password', 'secretpasswd')
+    cfg.add_section('options')
+    cfg.set('options', 'ignore_start_times', 'False')
+    cfg.set('options', 'timezone', 'UTC')
+    with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
+        cfg.write(cfgfile)
+    os.chmod(os.path.expanduser('~/.togglrc'), 0600)
+
+#----------------------------------------------------------------------------
 def create_time_entry_json(description, project_name=None, duration=0):
     """Creates a basic time entry JSON from the given arguments
        project_name should not have the '@' prefix.
@@ -145,6 +157,30 @@ def create_time_entry_json(description, project_name=None, duration=0):
     
     return data
 
+#----------------------------------------------------------------------------
+def delete_time_entry(args):
+    if len(args) == 0:
+        global parser
+        parser.print_help()
+        return 1
+
+    entry_id = args[0]
+
+    response = get_time_entry_data()
+
+    for entry in response:
+	if str(entry['id']) == entry_id:
+            print "Deleting entry " + entry_id
+
+            headers = {'content-type': 'application/json'}
+            r = requests.delete("%s/time_entries/%s" % (TOGGL_URL, entry_id), auth=AUTH,
+                data=None, headers=headers)
+            r.raise_for_status() # raise exception on error
+
+    return 0
+
+
+#----------------------------------------------------------------------------
 def elapsed_time(seconds, suffixes=['y','w','d','h','m','s'], add_s=False, separator=' '):
 	"""
 	Takes an amount of seconds and turns it into a human-readable amount of time.
@@ -175,7 +211,29 @@ def elapsed_time(seconds, suffixes=['y','w','d','h','m','s'], add_s=False, separ
 			break
 	
 	return separator.join(time)
+    
+#----------------------------------------------------------------------------
+def find_project(proj):
+    """Find a project given the unique prefix of the name"""
+    response = get_projects()
+    for project in response:
+        if project['name'].startswith(proj):
+		return project['name']
+    print "Could not find project!"
+    sys.exit(1)
 
+#----------------------------------------------------------------------------
+def find_project_by_id(id):
+    """Find a project given the project id"""
+    response = get_projects()
+    for project in response:
+        if project['id'] ==id:
+		return project['name']
+    print "Could not find project!"
+    return None
+
+
+#----------------------------------------------------------------------------
 def get_current_time_entry():
     """Returns the current time entry JSON object, or None."""
     response = get_time_entry_data()
@@ -186,6 +244,19 @@ def get_current_time_entry():
     
     return None
 
+#----------------------------------------------------------------------------
+def get_clients():
+    """Fetches the clients as JSON objects."""
+    # Look up default workspace
+    url = "%s/clients" % (TOGGL_URL)
+    global options
+    if options.verbose:
+        print url
+    r = requests.get(url, auth=AUTH)
+    r.raise_for_status() # raise exception on error
+    return json.loads(r.text)
+
+#----------------------------------------------------------------------------
 def get_projects():
     """Fetches the projects as JSON objects."""
     
@@ -200,28 +271,8 @@ def get_projects():
     r.raise_for_status() # raise exception on error
     return json.loads(r.text)
 
-def get_clients():
-    """Fetches the clients as JSON objects."""
-    # Look up default workspace
-    url = "%s/clients" % (TOGGL_URL)
-    global options
-    if options.verbose:
-        print url
-    r = requests.get(url, auth=AUTH)
-    r.raise_for_status() # raise exception on error
-    return json.loads(r.text)
 
-def get_user():
-    """Fetches the user as JSON objects."""
-    
-    url = "%s/me" % (TOGGL_URL)
-    global options
-    if options.verbose:
-        print url
-    r = requests.get(url, auth=AUTH)
-    r.raise_for_status() # raise exception on error
-    return json.loads(r.text)
-
+#----------------------------------------------------------------------------
 def get_time_entry_data():
     """Fetches time entry data and returns it as a Python array."""
 
@@ -249,6 +300,28 @@ def get_time_entry_data():
     
     return json.loads(r.text)
 
+#----------------------------------------------------------------------------
+def get_user():
+    """Fetches the user as JSON objects."""
+    
+    url = "%s/me" % (TOGGL_URL)
+    global options
+    if options.verbose:
+        print url
+    r = requests.get(url, auth=AUTH)
+    r.raise_for_status() # raise exception on error
+    return json.loads(r.text)
+
+#----------------------------------------------------------------------------
+def list_clients():
+    """List all clients."""
+    response = get_clients()
+    for client in response:
+        print "@%s" % (client['name'])
+    return 0
+
+
+#----------------------------------------------------------------------------
 def list_current_time_entry():
     """Shows what the user is currently working on (duration is negative)."""
     entry = get_current_time_entry()
@@ -267,13 +340,7 @@ def list_current_time_entry():
     
     return 0
 
-def list_clients():
-    """List all clients."""
-    response = get_clients()
-    for client in response:
-        print "@%s" % (client['name'])
-    return 0
-
+#----------------------------------------------------------------------------
 def list_projects():
     """List all projects."""
     response = get_projects()
@@ -287,24 +354,7 @@ def list_projects():
         print "@%s - %s" % (project['name'], client_name)
     return 0
 
-def find_project(proj):
-    """Find a project given the unique prefix of the name"""
-    response = get_projects()
-    for project in response:
-        if project['name'].startswith(proj):
-		return project['name']
-    print "Could not find project!"
-    sys.exit(1)
-
-def find_project_by_id(id):
-    """Find a project given the project id"""
-    response = get_projects()
-    for project in response:
-        if project['id'] ==id:
-		return project['name']
-    print "Could not find project!"
-    return None
-
+#----------------------------------------------------------------------------
 def list_time_entries():
 	"""Lists all of the time entries from yesterday and today along with
 	   the amount of time devoted to each.
@@ -340,6 +390,7 @@ def list_time_entries():
 
 	return 0
 
+#----------------------------------------------------------------------------
 def parse_duration(str):
     """Parses a string of the form [[Hours:]Minutes:]Seconds and returns
        the total time in seconds as an integer.
@@ -356,6 +407,7 @@ def parse_duration(str):
     
     return duration
         
+#----------------------------------------------------------------------------
 def print_time_entry(entry):
     """Utility function to print a time entry object and returns the
 	   integer duration for this entry."""
@@ -378,27 +430,7 @@ def print_time_entry(entry):
 
     return e_time
 
-def delete_time_entry(args):
-    if len(args) == 0:
-        global parser
-        parser.print_help()
-        return 1
-
-    entry_id = args[0]
-
-    response = get_time_entry_data()
-
-    for entry in response:
-	if str(entry['id']) == entry_id:
-            print "Deleting entry " + entry_id
-
-            headers = {'content-type': 'application/json'}
-            r = requests.delete("%s/time_entries/%s" % (TOGGL_URL, entry_id), auth=AUTH,
-                data=None, headers=headers)
-            r.raise_for_status() # raise exception on error
-
-    return 0
-
+#----------------------------------------------------------------------------
 def start_time_entry(args):
     """
        Starts a new time entry.
@@ -440,6 +472,7 @@ def start_time_entry(args):
     
     return 0
 
+#----------------------------------------------------------------------------
 def stop_time_entry(args=None):
     """Stops the current time entry (duration is negative)."""
     global toggl_cfg
@@ -476,30 +509,20 @@ def stop_time_entry(args=None):
 
     return 0
 
+#----------------------------------------------------------------------------
 def visit_web():
 	os.system(VISIT_WWW_COMMAND)	
 
-def create_default_cfg():
-    cfg = ConfigParser.RawConfigParser()
-    cfg.add_section('auth')
-    cfg.set('auth', 'username', 'user@example.com')
-    cfg.set('auth', 'password', 'secretpasswd')
-    cfg.add_section('options')
-    cfg.set('options', 'ignore_start_times', 'False')
-    cfg.set('options', 'timezone', 'UTC')
-    with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
-        cfg.write(cfgfile)
-    os.chmod(os.path.expanduser('~/.togglrc'), 0600)
-
+#----------------------------------------------------------------------------
 def main(argv=None):
     """Program entry point."""
     
     global toggl_cfg
     toggl_cfg = ConfigParser.ConfigParser()
     if toggl_cfg.read(os.path.expanduser('~/.togglrc')) == []:
-	    create_default_cfg()
-	    print "Missing ~/.togglrc. A default has been created for editing."
-	    return 1
+        create_default_cfg()
+        print "Missing ~/.togglrc. A default has been created for editing."
+        return 1
 
     global AUTH, IGNORE_START_TIMES
     AUTH = (toggl_cfg.get('auth', 'username').strip(), toggl_cfg.get('auth', 'password').strip())
@@ -512,15 +535,15 @@ def main(argv=None):
     global parser, options
     parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
         epilog="\nActions:\n"
-        "  add ENTRY [@PROJECT] START_DATETIME 'd'DURATION | END_DATE_TIME\tcreates a completed time entry\n"
-        "  ls\t\t\t\t\t\t\t\t\tlist recent time entries\n"
-        "  rm ID\t\t\t\t\t\t\t\t\rdelete a time entry by id\n"
-        "  now\t\t\t\t\t\t\t\t\tprint what you're working on now\n"
-        "  projects\t\t\t\t\t\t\t\tlists all projects\n"
-        "  clients\t\t\t\t\t\t\t\tlists all clients\n"
-        "  start ENTRY [@PROJECT] [DATETIME]\t\t\t\t\tstarts a new entry\n"
-        "  stop [DATETIME]\t\t\t\t\t\t\tstops the current entry\n"
-	"  www\t\t\t\t\t\t\t\t\tvisits toggl.com\n"
+        "  add ENTRY [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
+        "  clients\n\tlists all clients\n"
+        "  ls\n\tlist recent time entries\n"
+        "  now\n\tprint what you're working on now\n"
+        "  projects\n\tlists all projects\n"
+        "  rm ID\n\tdelete a time entry by id\n"
+        "  start ENTRY [@PROJECT] [DATETIME]\n\tstarts a new entry\n"
+        "  stop [DATETIME]\n\tstops the current entry\n"
+	"  www\n\tvisits toggl.com\n"
         "\n"
         "  DURATION = [[Hours:]Minutes:]Seconds\n")
     parser.add_option("-v", "--verbose",
@@ -538,12 +561,14 @@ def main(argv=None):
         return list_time_entries()
     elif args[0] == "add":
         return add_time_entry(args[1:])
+    elif args[0] == "clients":
+        return list_clients()
     elif args[0] == "now":
         return list_current_time_entry()
     elif args[0] == "projects":
         return list_projects()
-    elif args[0] == "clients":
-        return list_clients()
+    elif args[0] == "rm":
+	return delete_time_entry(args[1:])
     elif args[0] == "start":
         return start_time_entry(args[1:])
     elif args[0] == "stop":
@@ -553,8 +578,6 @@ def main(argv=None):
 	    return stop_time_entry()
     elif args[0] == "www":
         return visit_web()
-    elif args[0] == "rm":
-	return delete_time_entry(args[1:])
     else:
         parser.print_help()
         return 1
