@@ -41,7 +41,7 @@ TOGGL_URL = "https://www.toggl.com/api/v8"
 def add_time_entry(args):
     """
     Creates a completed time entry.
-    args should be: ENTRY [@PROJECT] START_DATE_TIME 'd'DURATION | END_DATE_TIME
+    args should be: DESCR [@PROJECT] START_DATE_TIME 'd'DURATION | END_DATE_TIME
     """
     
     # Make sure we have an entry description.
@@ -102,6 +102,42 @@ def add_time_entry(args):
     r.raise_for_status() # raise exception on error
     
     return 0
+
+#----------------------------------------------------------------------------
+def continue_entry(args):
+    """ Continues a time entry. args[0] should be the description of the entry
+    to restart. Assumes that the entry appears in the list returned by
+    get_time_entry_data().
+    """
+    if len(args) == 0:
+        global parser
+        parser.print_help()
+        return 1
+
+    description = args[0]
+
+    entries = get_time_entry_data()
+
+    # There may be multiple entries with the same description. We restart
+    # the most recent one by iterating through the responses backwards
+    # (newest to oldest), and restart the first one we find.
+    for entry in reversed(entries):
+	if str(entry['description']) == description:
+            print "Continuing entry '%s'" % description 
+
+            # To continue an entry, set duration to 0-(current_time-duration).
+            entry['duration'] = 0-(time.time()-int(entry['duration']))
+            entry['duronly'] = True # ignore start/stop times from now on
+
+            # Send the data.
+            headers = {'content-type': 'application/json'}
+            r = requests.put("%s/time_entries/%s" % (TOGGL_URL, entry['id']), auth=AUTH,
+                data='{"time_entry":%s}' % json.dumps(entry), headers=headers)
+            r.raise_for_status() # raise exception on error
+            return 0
+
+    print "Did not find '%s' in list of entries." % description
+    return 1
 
 #----------------------------------------------------------------------------
 def create_default_cfg():
@@ -179,7 +215,6 @@ def delete_time_entry(args):
 
     return 0
 
-
 #----------------------------------------------------------------------------
 def elapsed_time(seconds, suffixes=['y','w','d','h','m','s'], add_s=False, separator=' '):
 	"""
@@ -232,18 +267,6 @@ def find_project_by_id(id):
     print "Could not find project!"
     return None
 
-
-#----------------------------------------------------------------------------
-def get_current_time_entry():
-    """Returns the current time entry JSON object, or None."""
-    response = get_time_entry_data()
-    
-    for entry in response:
-        if int(entry['duration']) < 0:
-            return entry
-    
-    return None
-
 #----------------------------------------------------------------------------
 def get_clients():
     """Fetches the clients as JSON objects."""
@@ -255,6 +278,17 @@ def get_clients():
     r = requests.get(url, auth=AUTH)
     r.raise_for_status() # raise exception on error
     return json.loads(r.text)
+
+#----------------------------------------------------------------------------
+def get_current_time_entry():
+    """Returns the current time entry JSON object, or None."""
+    response = get_time_entry_data()
+    
+    for entry in response:
+        if int(entry['duration']) < 0:
+            return entry
+    
+    return None
 
 #----------------------------------------------------------------------------
 def get_projects():
@@ -277,7 +311,7 @@ def get_time_entry_data():
     """Fetches time entry data and returns it as a Python array."""
 
     # Construct the start and end dates. 
-    #Toggl can accept these in local tz, but must be IS08601 formatted
+    # Toggl can accept these in local tz, but must be IS08601 formatted
     tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
 
     today = datetime.datetime.now(tz)
@@ -434,7 +468,7 @@ def print_time_entry(entry):
 def start_time_entry(args):
     """
        Starts a new time entry.
-       args should be: ENTRY [@PROJECT]
+       args should be: DESCR [@PROJECT]
     """
     
     global toggl_cfg
@@ -455,7 +489,7 @@ def start_time_entry(args):
     # Create JSON object to send to toggl.
     data = create_time_entry_json(entry, project_name, 0)
 
-    if len(args) == 1:
+    if len(args) == 1: # we have a specific start datetime
 	tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
 	dt = parse(args[0])
 	st = tz.localize(dt)
@@ -535,13 +569,14 @@ def main(argv=None):
     global parser, options
     parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
         epilog="\nActions:\n"
-        "  add ENTRY [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
+        "  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
         "  clients\n\tlists all clients\n"
+        "  continue DESCR\n\trestarts the given entry\n"
         "  ls\n\tlist recent time entries\n"
         "  now\n\tprint what you're working on now\n"
         "  projects\n\tlists all projects\n"
         "  rm ID\n\tdelete a time entry by id\n"
-        "  start ENTRY [@PROJECT] [DATETIME]\n\tstarts a new entry\n"
+        "  start DESCR [@PROJECT] [DATETIME]\n\tstarts a new entry\n"
         "  stop [DATETIME]\n\tstops the current entry\n"
 	"  www\n\tvisits toggl.com\n"
         "\n"
@@ -563,6 +598,8 @@ def main(argv=None):
         return add_time_entry(args[1:])
     elif args[0] == "clients":
         return list_clients()
+    elif args[0] == "continue":
+        return continue_entry(args[1:])
     elif args[0] == "now":
         return list_current_time_entry()
     elif args[0] == "projects":
