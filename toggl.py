@@ -41,7 +41,8 @@ TOGGL_URL = "https://www.toggl.com/api/v8"
 def add_time_entry(args):
     """
     Creates a completed time entry.
-    args should be: DESCR [@PROJECT] START_DATE_TIME 'd'DURATION | END_DATE_TIME
+    args should be: DESCR [@PROJECT] START_DATE_TIME 
+        'd'DURATION | END_DATE_TIME
     """
     
     # Make sure we have an entry description.
@@ -105,10 +106,10 @@ def add_time_entry(args):
 
 #----------------------------------------------------------------------------
 def continue_entry(args):
-    """ Continues a time entry. args[0] should be the description of the entry
+    """Continues a time entry. args[0] should be the description of the entry
     to restart. Assumes that the entry appears in the list returned by
-    get_time_entry_data().
-    """
+    get_time_entry_data()."""
+
     if len(args) == 0:
         global parser
         parser.print_help()
@@ -123,18 +124,34 @@ def continue_entry(args):
     # (newest to oldest), and restart the first one we find.
     for entry in reversed(entries):
 	if str(entry['description']) == description:
-            print "Continuing entry '%s'" % description 
 
-            # To continue an entry, set duration to 0-(current_time-duration).
-            entry['duration'] = 0-(time.time()-int(entry['duration']))
-            entry['duronly'] = True # ignore start/stop times from now on
+            # Check when the entry was started, today or previously?
+            tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+            start_time = iso8601.parse_date(entry['start']).astimezone(tz)
+            #print start_time
+            #print midnight()
+            #print start_time < midnight()
+            if start_time <= midnight():
+                # If the entry was from a previous day, then we simply start
+                # a new entry.
+                print "Continuing entry '%s' from before." % description
+                start_time_entry( [description, '@%s' % find_project_by_id(entry['pid']) ] )
+                return 0
+            else:
+                print "Continuing entry '%s' from today." % description
 
-            # Send the data.
-            headers = {'content-type': 'application/json'}
-            r = requests.put("%s/time_entries/%s" % (TOGGL_URL, entry['id']), auth=AUTH,
-                data='{"time_entry":%s}' % json.dumps(entry), headers=headers)
-            r.raise_for_status() # raise exception on error
-            return 0
+                # To continue an entry, set duration to 
+                # 0-(current_time-duration).
+                entry['duration'] = 0-(time.time()-int(entry['duration']))
+                entry['duronly'] = True # ignore start/stop times from now on
+
+                # Send the data.
+                headers = {'content-type': 'application/json'}
+                r = requests.put("%s/time_entries/%s" % (TOGGL_URL, entry['id']), 
+                    auth=AUTH, 
+                    data='{"time_entry":%s}' % json.dumps(entry), headers=headers)
+                r.raise_for_status() # raise exception on error
+                return 0
 
     print "Did not find '%s' in list of entries." % description
     return 1
@@ -305,27 +322,15 @@ def get_projects():
     r.raise_for_status() # raise exception on error
     return json.loads(r.text)
 
-
 #----------------------------------------------------------------------------
 def get_time_entry_data():
     """Fetches time entry data and returns it as a Python array."""
 
-    # Construct the start and end dates. 
-    # Toggl can accept these in local tz, but must be IS08601 formatted
-    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
-
-    today = datetime.datetime.now(tz)
-    today_at_midnight = today.replace(hour=23, minute=59, second=59, microsecond = 0)
-    today_at_midnight = today_at_midnight.isoformat('T')
-        
-    yesterday = today - datetime.timedelta(days=1)
-    yesterday_at_midnight = datetime.datetime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0)
-    yesterday_at_midnight = tz.localize(yesterday_at_midnight)
-    yesterday_at_midnight = yesterday_at_midnight.isoformat('T')
-
-    # Fetch the data or die trying.
+    # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
     url = "%s/time_entries?start_date=%s&end_date=%s" % \
-        (TOGGL_URL, urllib.quote(str(yesterday_at_midnight)), urllib.quote(str(today_at_midnight)))
+        (TOGGL_URL, urllib.quote(yesterday().isoformat('T')), \
+        urllib.quote(last_minute_today().isoformat('T')))
+
     global options
     if options.verbose:
         print url
@@ -345,6 +350,16 @@ def get_user():
     r = requests.get(url, auth=AUTH)
     r.raise_for_status() # raise exception on error
     return json.loads(r.text)
+
+#----------------------------------------------------------------------------
+def last_minute_today():
+    """
+    Returns 23:59:59 today as a localized datetime object.
+    """
+    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+    today = datetime.datetime.now(tz)
+    last_minute = today.replace(hour=23, minute=59, second=59, microsecond=0)
+    return last_minute
 
 #----------------------------------------------------------------------------
 def list_clients():
@@ -425,6 +440,16 @@ def list_time_entries():
 	return 0
 
 #----------------------------------------------------------------------------
+def midnight():
+    """
+    Returns 00:00:00 today as a localized datetime object.
+    """
+    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+    today = datetime.datetime.now(tz).date()
+    midnight = tz.localize(datetime.datetime.combine(today, datetime.time(0,0)))
+    return midnight
+
+#----------------------------------------------------------------------------
 def parse_duration(str):
     """Parses a string of the form [[Hours:]Minutes:]Seconds and returns
        the total time in seconds as an integer.
@@ -468,17 +493,16 @@ def print_time_entry(entry):
 def start_time_entry(args):
     """
        Starts a new time entry.
-       args should be: DESCR [@PROJECT]
+       args should be: DESCR [@PROJECT] [DATETIME]
     """
     
-    global toggl_cfg
     # Make sure we have an entry description.
     if len(args) == 0:
         global parser
         parser.print_help()
         return 1
-    entry = args[0]
-    args = args[1:] # strip off the entry description
+    description = args[0]
+    args = args[1:] # strip off the description
     
     # See if we have a @project.
     project_name = None
@@ -487,14 +511,15 @@ def start_time_entry(args):
         args = args[1:] # strip off the project
 
     # Create JSON object to send to toggl.
-    data = create_time_entry_json(entry, project_name, 0)
+    data = create_time_entry_json(description, project_name, 0)
 
+    global toggl_cfg
     if len(args) == 1: # we have a specific start datetime
 	tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
 	dt = parse(args[0])
 	st = tz.localize(dt)
-        data['time_entry']['start'] = st.isoformat()
-	data['time_entry']['duration'] = 0 - int(dt.strftime('%s'))
+        data['time_description']['start'] = st.isoformat()
+	data['time_description']['duration'] = 0 - int(dt.strftime('%s'))
     
     if options.verbose:
         print json.dumps(data)
@@ -545,7 +570,18 @@ def stop_time_entry(args=None):
 
 #----------------------------------------------------------------------------
 def visit_web():
-	os.system(VISIT_WWW_COMMAND)	
+    os.system(VISIT_WWW_COMMAND)	
+
+#----------------------------------------------------------------------------
+def yesterday():
+    """
+    Returns 00:00:00 yesterday as a localized datetime object.
+    """
+    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+    yesterday = datetime.datetime.now(tz) - datetime.timedelta(days=1)
+    yesterday_at_midnight = datetime.datetime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0)
+    yesterday_at_midnight = tz.localize(yesterday_at_midnight)
+    return yesterday_at_midnight
 
 #----------------------------------------------------------------------------
 def main(argv=None):
