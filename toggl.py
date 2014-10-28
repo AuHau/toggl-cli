@@ -518,8 +518,8 @@ def start_time_entry(args):
 	tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
 	dt = parse(args[0])
 	st = tz.localize(dt)
-        data['time_description']['start'] = st.isoformat()
-	data['time_description']['duration'] = 0 - int(dt.strftime('%s'))
+        data['time_entry']['start'] = st.isoformat()
+	data['time_entry']['duration'] = 0 - int(dt.strftime('%s'))
     
     if options.verbose:
         print json.dumps(data)
