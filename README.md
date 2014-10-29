@@ -46,8 +46,6 @@ Usage
 	Options:
 	  -h, --help       show this help message and exit
 	  -v, --verbose    print debugging output
-	  -i, --ignore     ignore starting and ending times
-	  -n, --no_ignore  don't ignore starting and ending times
 
 	Actions:
 	  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)
