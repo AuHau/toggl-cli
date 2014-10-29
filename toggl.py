@@ -533,7 +533,10 @@ def start_time_entry(args):
 
 #----------------------------------------------------------------------------
 def stop_time_entry(args=None):
-    """Stops the current time entry (duration is negative)."""
+    """
+    Stops the current time entry (duration is currently negative).
+    args contains an optional end time.
+    """
     global toggl_cfg
 
     entry = get_current_time_entry()
@@ -545,7 +548,7 @@ def stop_time_entry(args=None):
 	    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
 	    stop_time = tz.localize(parse(args[0])).astimezone(pytz.utc)
         else:
-            # Get stop time(now) in UTC.
+            # Get stop time (now) in UTC.
             stop_time = datetime.datetime.now(pytz.utc)
 
         # Create the payload.
@@ -558,6 +561,7 @@ def stop_time_entry(args=None):
         global options
         if options.verbose:
             print url
+            print json.dumps(data)
 
         headers = {'content-type': 'application/json'}
         r = requests.put(url, auth=AUTH, data=json.dumps(data), headers=headers)
