@@ -11,9 +11,6 @@ Modified for toggl API v8 by Beau Raines
 ### Configuration Section                                                 ###
 ###
 
-# Do you want to ignore starting times by default?
-IGNORE_START_TIMES = False
-
 # Command to visit toggl.com
 VISIT_WWW_COMMAND = "open http://www.toggl.com"
 
@@ -163,7 +160,6 @@ def create_default_cfg():
     cfg.set('auth', 'username', 'user@example.com')
     cfg.set('auth', 'password', 'secretpasswd')
     cfg.add_section('options')
-    cfg.set('options', 'ignore_start_times', 'False')
     cfg.set('options', 'timezone', 'UTC')
     with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
         cfg.write(cfgfile)
@@ -598,9 +594,8 @@ def main(argv=None):
         print "Missing ~/.togglrc. A default has been created for editing."
         return 1
 
-    global AUTH, IGNORE_START_TIMES
+    global AUTH
     AUTH = (toggl_cfg.get('auth', 'username').strip(), toggl_cfg.get('auth', 'password').strip())
-    IGNORE_START_TIMES = toggl_cfg.getboolean('options', 'ignore_start_times')
 
     # Override the option parser epilog formatting rule.
     # See http://stackoverflow.com/questions/1857346/python-optparse-how-to-include-additional-info-in-usage-output
@@ -624,12 +619,6 @@ def main(argv=None):
     parser.add_option("-v", "--verbose",
                           action="store_true", dest="verbose", default=False,
                           help="print debugging output")
-    parser.add_option("-i", "--ignore",
-                        action="store_true", dest="ignore_start_and_stop", default=IGNORE_START_TIMES,
-                        help="ignore starting and ending times")
-    parser.add_option("-n", "--no_ignore",
-                        action="store_false", dest="ignore_start_and_stop", default=IGNORE_START_TIMES,
-                        help="don't ignore starting and ending times")
     (options, args) = parser.parse_args()
     
     if len(args) == 0 or args[0] == "ls":
