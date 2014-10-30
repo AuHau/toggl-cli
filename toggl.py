@@ -2,9 +2,10 @@
 """
 toggl.py
 
-Created by Robert Adams on 2012-04-19.
-Copyright (c) 2012 D. Robert Adams. All rights reserved.
+Copyright (c) 2014 D. Robert Adams. All rights reserved.
 Modified for toggl API v8 by Beau Raines
+
+ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard&t=TEXTGOESHERE
 """
 
 #############################################################################
@@ -31,8 +32,37 @@ import urllib
 import ConfigParser
 from dateutil.parser import *
 
-AUTH = ('', '') # How do you log into toggl.com? Read from ~/.togglrc
+# Global variables initialized by main().
 TOGGL_URL = "https://www.toggl.com/api/v8"
+AUTH = ('', '') # Login credentials from ~/.togglrc
+
+#----------------------------------------------------------------------------
+#     ____ _ _            _   _     _     _   
+#    / ___| (_) ___ _ __ | |_| |   (_)___| |_ 
+#   | |   | | |/ _ \ '_ \| __| |   | / __| __|
+#   | |___| | |  __/ | | | |_| |___| \__ \ |_ 
+#    \____|_|_|\___|_| |_|\__|_____|_|___/\__|
+#                                             
+#----------------------------------------------------------------------------
+class ClientList(object):
+    """A list of clients."""
+
+    def __init__(self):
+        """Fetches the list of clients from toggl."""
+        url = "%s/clients" % (TOGGL_URL)
+        global options
+        if options.verbose:
+            print url
+        r = requests.get(url, auth=AUTH)
+        r.raise_for_status() # raise exception on error
+        self.client_list = json.loads(r.text)
+
+    def __str__(self):
+        """Formats the list of clients as a string."""
+        s = ""
+        for client in self.client_list:
+            s = s + "@%s" % (client['name'])
+        return s
 
 #----------------------------------------------------------------------------
 def add_time_entry(args):
@@ -293,18 +323,6 @@ def format_time(time):
     return time.strftime(format)
 
 #----------------------------------------------------------------------------
-def get_clients():
-    """Fetches the clients as JSON objects."""
-    # Look up default workspace
-    url = "%s/clients" % (TOGGL_URL)
-    global options
-    if options.verbose:
-        print url
-    r = requests.get(url, auth=AUTH)
-    r.raise_for_status() # raise exception on error
-    return json.loads(r.text)
-
-#----------------------------------------------------------------------------
 def get_current_time_entry():
     """Returns the current time entry JSON object, or None."""
     response = get_time_entry_data()
@@ -370,15 +388,6 @@ def last_minute_today():
     return last_minute
 
 #----------------------------------------------------------------------------
-def list_clients():
-    """List all clients."""
-    response = get_clients()
-    for client in response:
-        print "@%s" % (client['name'])
-    return 0
-
-
-#----------------------------------------------------------------------------
 def list_current_time_entry():
     """Shows what the user is currently working on (duration is negative)."""
     entry = get_current_time_entry()
@@ -401,7 +410,7 @@ def list_current_time_entry():
 def list_projects():
     """List all projects."""
     response = get_projects()
-    clients = get_clients()
+    clients = ClientList()
     for project in response:
         client_name = "No Client"
     	if 'cid' in project:
@@ -646,7 +655,8 @@ def main(argv=None):
     elif args[0] == "add":
         return add_time_entry(args[1:])
     elif args[0] == "clients":
-        return list_clients()
+        print ClientList()
+        return 0
     elif args[0] == "continue":
         return continue_entry(args[1:])
     elif args[0] == "now":
