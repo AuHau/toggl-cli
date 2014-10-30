@@ -131,12 +131,8 @@ def continue_entry(args):
             if start_time <= midnight():
                 # If the entry was from a previous day, then we simply start
                 # a new entry.
-                print "Continuing entry '%s' from before." % description
                 start_time_entry( [description, '@%s' % find_project_by_id(entry['pid']) ] )
-                return 0
             else:
-                print "Continuing entry '%s' from today." % description
-
                 # To continue an entry, set duration to 
                 # 0-(current_time-duration).
                 entry['duration'] = 0-(time.time()-int(entry['duration']))
@@ -148,7 +144,13 @@ def continue_entry(args):
                     auth=AUTH, 
                     data='{"time_entry":%s}' % json.dumps(entry), headers=headers)
                 r.raise_for_status() # raise exception on error
-                return 0
+
+                print "%s continued at %s" % (description, format_time(datetime.datetime.now()))
+
+            if options.verbose:
+                print json.dumps(entry)
+
+            return 0
 
     print "Did not find '%s' in list of entries." % description
     return 1
@@ -161,6 +163,7 @@ def create_default_cfg():
     cfg.set('auth', 'password', 'secretpasswd')
     cfg.add_section('options')
     cfg.set('options', 'timezone', 'UTC')
+    cfg.set('options', 'time_format', '%I:%M%p')
     with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
         cfg.write(cfgfile)
     os.chmod(os.path.expanduser('~/.togglrc'), 0600)
@@ -279,6 +282,15 @@ def find_project_by_id(id):
 		return project['name']
     print "Could not find project!"
     return None
+
+#----------------------------------------------------------------------------
+def format_time(time):
+    """
+    Formats the given time/datetime object according to the strftime() options
+    from the configuration file.
+    """
+    format = toggl_cfg.get('options', 'time_format')
+    return time.strftime(format)
 
 #----------------------------------------------------------------------------
 def get_clients():
@@ -516,7 +528,9 @@ def start_time_entry(args):
 	st = tz.localize(dt)
         data['time_entry']['start'] = st.isoformat()
 	data['time_entry']['duration'] = 0 - int(dt.strftime('%s'))
-    
+    else:
+        st = datetime.datetime.now()
+
     if options.verbose:
         print json.dumps(data)
     
@@ -524,6 +538,8 @@ def start_time_entry(args):
     r = requests.post("%s/time_entries" % TOGGL_URL, auth=AUTH,
         data=json.dumps(data), headers=headers)
     r.raise_for_status() # raise exception on error
+
+    print '%s started at %s' % (description, format_time(st))
     
     return 0
 
@@ -540,17 +556,19 @@ def stop_time_entry(args=None):
         # Get the start time from the entry, converted to UTC.
         start_time = iso8601.parse_date(entry['start']).astimezone(pytz.utc)
 
+	tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
         if args != None and len(args) == 1:
-	    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
-	    stop_time = tz.localize(parse(args[0])).astimezone(pytz.utc)
+	    stop_time_local = tz.localize(parse(args[0]))
+	    stop_time_utc = stop_time_local.astimezone(pytz.utc)
         else:
             # Get stop time (now) in UTC.
-            stop_time = datetime.datetime.now(pytz.utc)
+            stop_time_local = datetime.datetime.now()
+            stop_time_utc = pytz.utc.localize(datetime.datetime.utcnow())
 
         # Create the payload.
         data = { 'time_entry' : entry }
-        data['time_entry']['stop'] = stop_time.isoformat()
-        data['time_entry']['duration'] = (stop_time - start_time).seconds
+        data['time_entry']['stop'] = stop_time_utc.isoformat()
+        data['time_entry']['duration'] = (stop_time_utc - start_time).seconds
 
         url = "%s/time_entries/%d" % (TOGGL_URL, entry['id'])
 
@@ -562,6 +580,8 @@ def stop_time_entry(args=None):
         headers = {'content-type': 'application/json'}
         r = requests.put(url, auth=AUTH, data=json.dumps(data), headers=headers)
         r.raise_for_status() # raise exception on error
+
+        print '%s stopped at %s' % (entry['description'], format_time(stop_time_local))
     else:
         print >> sys.stderr, "You're not working on anything right now."
         return 1

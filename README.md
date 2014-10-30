@@ -11,6 +11,15 @@ toggl-cli is written in Python and uses version 8 of the [toggl
 API](https://github.com/toggl/toggl_api_docs) (thanks to beauraines for the
 help).
 
+Latest Update
+-------------
+
+**30 Oct 2014**: Added a feature that starting, stopping, and continuing an
+entry prints out the time it started or stopped. This requires a new option in
+~/.togglrc: `time_format = %I:%M%p` is the default.  See
+[strftime()](https://docs.python.org/2/library/datetime.html#strftime-and-strptime-behavior)
+for more options.
+
 Requirements
 ------------
 
