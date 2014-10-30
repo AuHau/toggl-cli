@@ -541,7 +541,11 @@ def start_time_entry(args):
     # See if we have a @project.
     project_name = None
     if len(args) >= 1 and args[0][0] == '@':
-	project_name = ProjectList().find_by_name(args[0][1:])['name']
+	project = ProjectList().find_by_name(args[0][1:])
+        if project == None:
+            print >> sys.stderr, "Project '%s' not found." % args[0]
+            return 1
+        project_name = project['name']
         args = args[1:] # strip off the project
 
     # Create JSON object to send to toggl.
