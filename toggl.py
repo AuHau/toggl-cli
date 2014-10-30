@@ -61,8 +61,74 @@ class ClientList(object):
         """Formats the list of clients as a string."""
         s = ""
         for client in self.client_list:
-            s = s + "@%s" % (client['name'])
-        return s
+            s = s + "@%s\n" % (client['name'])
+        return s.rstrip() # strip trailing \n
+
+#----------------------------------------------------------------------------
+#    ____            _           _   _     _     _   
+#   |  _ \ _ __ ___ (_) ___  ___| |_| |   (_)___| |_ 
+#   | |_) | '__/ _ \| |/ _ \/ __| __| |   | / __| __|
+#   |  __/| | | (_) | |  __/ (__| |_| |___| \__ \ |_ 
+#   |_|   |_|  \___// |\___|\___|\__|_____|_|___/\__|
+#                 |__/                               
+#----------------------------------------------------------------------------
+class ProjectList(object):
+    """
+    A list of projects. A project object is a dictionary as documented
+    at https://github.com/toggl/toggl_api_docs/blob/master/chapters/projects.md
+    """
+
+    def __init__(self):
+        """Fetches the list of projects from toggl."""
+        user = get_user()
+        wid = user['data']['default_wid']
+        url = "%s/workspaces/%s/projects" % (TOGGL_URL,wid)
+        global options
+        if options.verbose:
+            print url
+        r = requests.get(url, auth=AUTH)
+        r.raise_for_status() # raise exception on error
+        self.project_list = json.loads(r.text)
+
+    def find_by_id(self, pid):
+        """Returns the project object with the given id, or None."""
+        for project in self:
+            if project['id'] == pid:
+                return project
+        return None
+
+    def find_by_name(self, name_prefix):
+        """Returns the project object with the given name (or prefix), or None."""
+        for project in self:
+            if project['name'].startswith(name_prefix):
+                return project
+        return None
+
+    def __iter__(self):
+        """Start iterating over the projects."""
+        self.iter_index = 0
+        return self
+
+    def next(self):
+        """Returns the next project."""
+        if self.iter_index >= len(self.project_list):
+            raise StopIteration
+        else:
+            self.iter_index += 1
+            return self.project_list[self.iter_index-1]
+
+    def __str__(self):
+        """Formats the project list as a string."""
+        s = ""
+        clients = ClientList()
+        for project in self:
+            client_name = "No Client"
+            if 'cid' in project:
+               for client in clients:
+                   if project['cid'] == client['id']:
+                       client_name = client['name']
+            s = s + "@%s - %s\n" % (project['name'], client_name)
+        return s.rstrip() # strip trailing \n
 
 #----------------------------------------------------------------------------
 def add_time_entry(args):
@@ -83,8 +149,12 @@ def add_time_entry(args):
     # See if we have a @project.
     project_name = None
     if len(args) >= 1 and args[0][0] == '@':
-	project_name = find_project(args[0][1:])
+        project_name = args[0][1:]
         args = args[1:] # strip off the project
+        project = ProjectList().find_by_name(project_name)
+        if project == None:
+            print >> sys.stderr, "Project '%s' not found." % project_name
+            return 1
 
     # Create the JSON object, or die trying.
     duration = 0 
@@ -161,7 +231,7 @@ def continue_entry(args):
             if start_time <= midnight():
                 # If the entry was from a previous day, then we simply start
                 # a new entry.
-                start_time_entry( [description, '@%s' % find_project_by_id(entry['pid']) ] )
+                start_time_entry( [description, '@%s' % ProjectList().find_by_id(entry['pid'])['name'] ])
             else:
                 # To continue an entry, set duration to 
                 # 0-(current_time-duration).
@@ -209,14 +279,11 @@ def create_time_entry_json(description, project_name=None, duration=0):
     project_id = None
     if project_name != None:
         # Look up the project from toggl to get the id.
-        projects = get_projects()
-        for project in projects:
-            if project['name'] == project_name:
-                project_id = project['id']
-                break
-        if project_id == None:
-            print >> sys.stderr, "Project not found '%s'" % project_name
+        project = ProjectList().find_by_name(project_name)
+        if project == None:
+            print >> sys.stderr, "Project '%s' not found." % project_name
             return None
+        project_id = project['id']
     
     # If duration is 0, then we calculate the number of seconds since the
     # epoch.
@@ -294,26 +361,6 @@ def elapsed_time(seconds, suffixes=['y','w','d','h','m','s'], add_s=False, separ
 	return separator.join(time)
     
 #----------------------------------------------------------------------------
-def find_project(proj):
-    """Find a project given the unique prefix of the name"""
-    response = get_projects()
-    for project in response:
-        if project['name'].startswith(proj):
-		return project['name']
-    print "Could not find project!"
-    sys.exit(1)
-
-#----------------------------------------------------------------------------
-def find_project_by_id(id):
-    """Find a project given the project id"""
-    response = get_projects()
-    for project in response:
-        if project['id'] ==id:
-		return project['name']
-    print "Could not find project!"
-    return None
-
-#----------------------------------------------------------------------------
 def format_time(time):
     """
     Formats the given time/datetime object according to the strftime() options
@@ -332,21 +379,6 @@ def get_current_time_entry():
             return entry
     
     return None
-
-#----------------------------------------------------------------------------
-def get_projects():
-    """Fetches the projects as JSON objects."""
-    
-    # Look up default workspace
-    user = get_user()
-    wid = user['data']['default_wid']
-    url = "%s/workspaces/%s/projects" % (TOGGL_URL,wid)
-    global options
-    if options.verbose:
-        print url
-    r = requests.get(url, auth=AUTH)
-    r.raise_for_status() # raise exception on error
-    return json.loads(r.text)
 
 #----------------------------------------------------------------------------
 def get_time_entry_data():
@@ -389,35 +421,17 @@ def last_minute_today():
 
 #----------------------------------------------------------------------------
 def list_current_time_entry():
-    """Shows what the user is currently working on (duration is negative)."""
+    """Shows what the user is currently working on."""
     entry = get_current_time_entry()
 
     if entry != None:
-        projects = get_projects()
-	# Lookup the project if it exists
-       	project_name = "No project"
+	# Lookup the project name, if it exists.
     	if 'pid' in entry:
-   	    for project in projects:
-       	        if entry['pid'] == project['id']:
-                    entry['project_name'] = '@' + project['name']
+            entry['project_name'] = '@' + ProjectList().find_by_id(entry['pid'])['name']
         print_time_entry(entry)
     else:
         print "You're not working on anything right now."
     
-    return 0
-
-#----------------------------------------------------------------------------
-def list_projects():
-    """List all projects."""
-    response = get_projects()
-    clients = ClientList()
-    for project in response:
-        client_name = "No Client"
-    	if 'cid' in project:
-	   for client in clients:
-	       if project['cid'] == client['id']:
-	           client_name = client['name']
-        print "@%s - %s" % (project['name'], client_name)
     return 0
 
 #----------------------------------------------------------------------------
@@ -428,22 +442,19 @@ def list_time_entries():
 
 	# Get an array of objects of recent time data.
 	response = get_time_entry_data()
-	projects = get_projects()
 
 	# Sort the time entries into buckets based on "Month Day" of the entry.
 	days = { }
 	tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+        projects = ProjectList()
 	for entry in response:
 		start_time = iso8601.parse_date(entry['start']).astimezone(tz).strftime("%b %d")
 		if start_time not in days:
 			days[start_time] = []
 		days[start_time].append(entry)
-		# Lookup the project if it exists
-        	entry['project_name'] = "No project"
+                # If the entry has a project, get it's name.
     		if 'pid' in entry:
-	   	    for project in projects:
-	       	        if entry['pid'] == project['id']:
-	                    entry['project_name'] = '@' + project['name']
+	            entry['project_name'] = '@' + projects.find_by_id(entry['pid'])['name']
 
 	# For each day, print the entries, then sum the times.
 	for date in sorted(days.keys()):
@@ -495,14 +506,20 @@ def print_time_entry(entry):
     if entry['duration'] > 0:
         e_time = int(entry['duration'])
     else:
-        is_running = '* '
+        is_running = '*'
         e_time = time.time() + int(entry['duration'])
-    e_time_str = " %s" % elapsed_time(int(e_time), separator='')
+    e_time_str = "%s" % elapsed_time(int(e_time), separator='')
     
+    print is_running,
+    print entry['description'],
+    if 'project_name' in entry:
+        print entry['project_name'],
+    print e_time_str,
+
     if options.verbose:
-        print "%s%s%s%s [%s]" % (is_running, entry['description'] if 'description' in entry else "", entry['project_name'], e_time_str, entry['id'])
+        print "[%s]" % entry['id']
     else:
-        print "%s%s%s%s" % (is_running, entry['description'] + " " if 'description' in entry else "", entry['project_name'], e_time_str)
+        print
 
     return e_time
 
@@ -524,7 +541,7 @@ def start_time_entry(args):
     # See if we have a @project.
     project_name = None
     if len(args) >= 1 and args[0][0] == '@':
-	project_name = find_project(args[0][1:])
+	project_name = ProjectList().find_by_name(args[0][1:])['name']
         args = args[1:] # strip off the project
 
     # Create JSON object to send to toggl.
@@ -662,7 +679,8 @@ def main(argv=None):
     elif args[0] == "now":
         return list_current_time_entry()
     elif args[0] == "projects":
-        return list_projects()
+        print ProjectList()
+        return 0
     elif args[0] == "rm":
 	return delete_time_entry(args[1:])
     elif args[0] == "start":
