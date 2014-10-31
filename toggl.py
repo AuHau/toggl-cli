@@ -5,7 +5,7 @@ toggl.py
 Copyright (c) 2014 D. Robert Adams. All rights reserved.
 Modified for toggl API v8 by Beau Raines
 
-ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard&t=TEXTGOESHERE
+ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 """
 
 #############################################################################
@@ -33,6 +33,7 @@ import ConfigParser
 from dateutil.parser import *
 
 TOGGL_URL = "https://www.toggl.com/api/v8"
+VERBOSE = False
 
 #----------------------------------------------------------------------------
 #    ____  _             _      _              
@@ -73,9 +74,7 @@ class ClientList(object):
     def __init__(self):
         """Fetches the list of clients from toggl."""
         url = "%s/clients" % (TOGGL_URL)
-        global options
-        if options.verbose:
-            print url
+        Logger.debug(url)
         r = requests.get(url, auth=Config().auth)
         r.raise_for_status() # raise exception on error
         self.client_list = json.loads(r.text)
@@ -135,6 +134,39 @@ class Config(object):
         os.chmod(os.path.expanduser('~/.togglrc'), 0600)
 
 #----------------------------------------------------------------------------
+#    _                                
+#   | |    ___   __ _  __ _  ___ _ __ 
+#   | |   / _ \ / _` |/ _` |/ _ \ '__|
+#   | |__| (_) | (_| | (_| |  __/ |   
+#   |_____\___/ \__, |\__, |\___|_|   
+#               |___/ |___/           
+#----------------------------------------------------------------------------
+class Logger(object):
+    """
+    Custom logger class. Created because I got tired of trying to limit 
+    logging messages from this file only using the builtin Python logging 
+    module.
+    """
+
+    # Logging levels.
+    NONE = 0
+    INFO = 1
+    DEBUG = 2
+
+    # Current level.
+    level = NONE
+
+    @staticmethod
+    def debug(str, end="\n"):
+        if Logger.level >= Logger.DEBUG:
+            print str+end,
+
+    @staticmethod
+    def info(str, end="\n"):
+        if Logger.level >= Logger.INFO:
+            print str+end,
+
+#----------------------------------------------------------------------------
 #    ____            _           _   _     _     _   
 #   |  _ \ _ __ ___ (_) ___  ___| |_| |   (_)___| |_ 
 #   | |_) | '__/ _ \| |/ _ \/ __| __| |   | / __| __|
@@ -151,9 +183,7 @@ class ProjectList(object):
     def __init__(self):
         """Fetches the list of projects from toggl."""
         url = "%s/workspaces/%s/projects" % (TOGGL_URL, User().default_wid)
-        global options
-        if options.verbose:
-            print url
+        Logger.debug(url)
         r = requests.get(url, auth=Config().auth)
         r.raise_for_status() # raise exception on error
         self.project_list = json.loads(r.text)
@@ -207,7 +237,7 @@ class ProjectList(object):
 #                        
 #----------------------------------------------------------------------------
 class User(object):
-    """Toggl user data as a singleton."""
+    """Singleon. Toggl user data."""
 
     __metaclass__ = Singleton
 
@@ -215,9 +245,7 @@ class User(object):
         """Fetches user data from toggl."""
         
         url = "%s/me" % (TOGGL_URL)
-        global options
-        if options.verbose:
-            print url
+        Logger.debug(url)
         r = requests.get(url, auth=Config().auth)
         r.raise_for_status() # raise exception on error
         self.user_data = json.loads(r.text)
@@ -260,8 +288,7 @@ def add_time_entry(args):
         args = args[1:] # strip off the project
         project = ProjectList().find_by_name(project_name)
         if project == None:
-            print >> sys.stderr, "Project '%s' not found." % project_name
-            return 1
+            raise RuntimeError("Project '%s' not found." % project_name)
 
     # Create the JSON object, or die trying.
     duration = 0 
@@ -294,11 +321,9 @@ def add_time_entry(args):
 	duration = (end_time - start_time).seconds
 	data['time_entry']['duration'] = duration
     else:
-        print 'Must specifiy duration or end time'
-	return 1
+        raise RuntimeError('Must specifiy duration or end time')
 
-    if options.verbose:
-        print json.dumps(data)
+    Logger.debug(json.dumps(data))
     
     # Send the data.
     headers = {'content-type': 'application/json'}
@@ -332,9 +357,6 @@ def continue_entry(args):
             # Check when the entry was started, today or previously?
             tz = pytz.timezone(Config().get('options', 'timezone'))
             start_time = iso8601.parse_date(entry['start']).astimezone(tz)
-            #print start_time
-            #print midnight()
-            #print start_time < midnight()
             if start_time <= midnight():
                 # If the entry was from a previous day, then we simply start
                 # a new entry.
@@ -352,15 +374,13 @@ def continue_entry(args):
                     data='{"time_entry":%s}' % json.dumps(entry), headers=headers)
                 r.raise_for_status() # raise exception on error
 
-                print "%s continued at %s" % (description, format_time(datetime.datetime.now()))
+                Logger.info("%s continued at %s" % (description, format_time(datetime.datetime.now())))
 
-            if options.verbose:
-                print json.dumps(entry)
+                Logger.debug(json.dumps(entry))
 
             return 0
 
-    print "Did not find '%s' in list of entries." % description
-    return 1
+    raise RuntimeError("Did not find '%s' in list of entries." % description)
 
 #----------------------------------------------------------------------------
 def create_time_entry_json(description, project_name=None, duration=0):
@@ -375,8 +395,7 @@ def create_time_entry_json(description, project_name=None, duration=0):
         # Look up the project from toggl to get the id.
         project = ProjectList().find_by_name(project_name)
         if project == None:
-            print >> sys.stderr, "Project '%s' not found." % project_name
-            return None
+            raise RuntimeError("Project '%s' not found." % project_name)
         project_id = project['id']
     
     # If duration is 0, then we calculate the number of seconds since the
@@ -413,7 +432,7 @@ def delete_time_entry(args):
 
     for entry in response:
 	if str(entry['id']) == entry_id:
-            print "Deleting entry " + entry_id
+            Logger.info("Deleting entry " + entry_id)
 
             headers = {'content-type': 'application/json'}
             r = requests.delete("%s/time_entries/%s" % (TOGGL_URL, entry_id), auth=Config().auth,
@@ -483,9 +502,7 @@ def get_time_entry_data():
         (TOGGL_URL, urllib.quote(yesterday().isoformat('T')), \
         urllib.quote(last_minute_today().isoformat('T')))
 
-    global options
-    if options.verbose:
-        print url
+    Logger.debug(url)
     r = requests.get(url, auth=Config().auth)
     r.raise_for_status() # raise exception on error
     
@@ -512,7 +529,7 @@ def list_current_time_entry():
             entry['project_name'] = '@' + ProjectList().find_by_id(entry['pid'])['name']
         print_time_entry(entry)
     else:
-        print "You're not working on anything right now."
+        Logger.info("You're not working on anything right now.")
     
     return 0
 
@@ -540,12 +557,12 @@ def list_time_entries():
 
 	# For each day, print the entries, then sum the times.
 	for date in sorted(days.keys()):
-		print date
+		Logger.info(date)
 		duration = 0
 		for entry in days[date]:
-			print "  ",
+			Logger.info("  ", end="")
 			duration += print_time_entry(entry)
-		print "   (%s)" % elapsed_time(int(duration))
+		Logger.info("   (%s)" % elapsed_time(int(duration)))
 
 	return 0
 
@@ -592,16 +609,16 @@ def print_time_entry(entry):
         e_time = time.time() + int(entry['duration'])
     e_time_str = "%s" % elapsed_time(int(e_time), separator='')
     
-    print is_running,
-    print entry['description'],
+    Logger.info(is_running, end="")
+    Logger.info(entry['description'], end="")
     if 'project_name' in entry:
-        print entry['project_name'],
-    print e_time_str,
+        Logger.info(entry['project_name'], end="")
+    Logger.info(e_time_str, end="")
 
-    if options.verbose:
-        print "[%s]" % entry['id']
+    if VERBOSE:
+        Logger.info("[%s]" % entry['id'])
     else:
-        print
+        Logger.info("")
 
     return e_time
 
@@ -625,8 +642,7 @@ def start_time_entry(args):
     if len(args) >= 1 and args[0][0] == '@':
 	project = ProjectList().find_by_name(args[0][1:])
         if project == None:
-            print >> sys.stderr, "Project '%s' not found." % args[0]
-            return 1
+            raise RuntimeError("Project '%s' not found." % args[0])
         project_name = project['name']
         args = args[1:] # strip off the project
 
@@ -642,15 +658,14 @@ def start_time_entry(args):
     else:
         st = datetime.datetime.now()
 
-    if options.verbose:
-        print json.dumps(data)
+    Logger.debug(json.dumps(data))
     
     headers = {'content-type': 'application/json'}
     r = requests.post("%s/time_entries" % TOGGL_URL, auth=Config().auth,
         data=json.dumps(data), headers=headers)
     r.raise_for_status() # raise exception on error
 
-    print '%s started at %s' % (description, format_time(st))
+    Logger.info('%s started at %s' % (description, format_time(st)))
     
     return 0
 
@@ -682,18 +697,16 @@ def stop_time_entry(args=None):
 
         url = "%s/time_entries/%d" % (TOGGL_URL, entry['id'])
 
-        global options
-        if options.verbose:
-            print url
-            print json.dumps(data)
+        Logger.debug(url)
+        Logger.debug(json.dumps(data))
 
         headers = {'content-type': 'application/json'}
         r = requests.put(url, auth=Config().auth, data=json.dumps(data), headers=headers)
         r.raise_for_status() # raise exception on error
 
-        print '%s stopped at %s' % (entry['description'], format_time(stop_time_local))
+        Logger.info('%s stopped at %s' % (entry['description'], format_time(stop_time_local)))
     else:
-        print >> sys.stderr, "You're not working on anything right now."
+        Logger.info("You're not working on anything right now.")
         return 1
 
     return 0
@@ -721,7 +734,7 @@ def main(argv=None):
     # See http://stackoverflow.com/questions/1857346/python-optparse-how-to-include-additional-info-in-usage-output
     optparse.OptionParser.format_epilog = lambda self, formatter: self.epilog
     
-    global parser, options
+    global parser
     parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
         epilog="\nActions:\n"
         "  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
@@ -736,25 +749,40 @@ def main(argv=None):
 	"  www\n\tvisits toggl.com\n"
         "\n"
         "  DURATION = [[Hours:]Minutes:]Seconds\n")
+    parser.add_option("-q", "--quiet",
+                          action="store_true", dest="quiet", default=False,
+                          help="don't print anything")
     parser.add_option("-v", "--verbose",
                           action="store_true", dest="verbose", default=False,
+                          help="print additional info")
+    parser.add_option("-d", "--debug",
+                          action="store_true", dest="debug", default=False,
                           help="print debugging output")
+
     (options, args) = parser.parse_args()
+
+    # Set the general level of verbosity.
+    Logger.level = Logger.INFO
+    if options.quiet:
+        Logger.level = Logger.NONE
+    if options.debug:
+        Logger.level = Logger.DEBUG
+    if options.verbose:
+        global VERBOSE 
+        VERBOSE = True
     
     if len(args) == 0 or args[0] == "ls":
         return list_time_entries()
     elif args[0] == "add":
         return add_time_entry(args[1:])
     elif args[0] == "clients":
-        print ClientList()
-        return 0
+        Logger.info( ClientList() )
     elif args[0] == "continue":
         return continue_entry(args[1:])
     elif args[0] == "now":
         return list_current_time_entry()
     elif args[0] == "projects":
-        print ProjectList()
-        return 0
+        Logger.info( ProjectList() )
     elif args[0] == "rm":
 	return delete_time_entry(args[1:])
     elif args[0] == "start":
@@ -769,6 +797,8 @@ def main(argv=None):
     else:
         parser.print_help()
         return 1
+
+    return 0
 
 if __name__ == "__main__":
 	sys.exit(main())
