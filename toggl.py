@@ -32,9 +32,32 @@ import urllib
 import ConfigParser
 from dateutil.parser import *
 
-# Global variables initialized by main().
 TOGGL_URL = "https://www.toggl.com/api/v8"
-AUTH = ('', '') # Login credentials from ~/.togglrc
+
+#----------------------------------------------------------------------------
+#    ____  _             _      _              
+#   / ___|(_)_ __   __ _| | ___| |_ ___  _ __  
+#   \___ \| | '_ \ / _` | |/ _ \ __/ _ \| '_ \ 
+#    ___) | | | | | (_| | |  __/ || (_) | | | |
+#   |____/|_|_| |_|\__, |_|\___|\__\___/|_| |_|
+#                  |___/                       
+#----------------------------------------------------------------------------
+class Singleton(type):
+    """
+    Defines a way to implement the singleton pattern in Python.
+    From: http://stackoverflow.com/questions/31875/is-there-a-simple-elegant-way-to-define-singletons-in-python/33201#33201
+
+    To use, simply put the following line in your class definition:
+        __metaclass__ = Singleton
+    """
+    def __init__(cls, name, bases, dict):
+        super(Singleton, cls).__init__(name, bases, dict)
+        cls.instance = None 
+
+    def __call__(cls,*args,**kw):
+        if cls.instance is None:
+            cls.instance = super(Singleton, cls).__call__(*args, **kw)
+        return cls.instance
 
 #----------------------------------------------------------------------------
 #     ____ _ _            _   _     _     _   
@@ -53,7 +76,7 @@ class ClientList(object):
         global options
         if options.verbose:
             print url
-        r = requests.get(url, auth=AUTH)
+        r = requests.get(url, auth=Config().auth)
         r.raise_for_status() # raise exception on error
         self.client_list = json.loads(r.text)
 
@@ -63,6 +86,53 @@ class ClientList(object):
         for client in self.client_list:
             s = s + "@%s\n" % (client['name'])
         return s.rstrip() # strip trailing \n
+
+#----------------------------------------------------------------------------
+#     ____             __ _       
+#    / ___|___  _ __  / _(_) __ _ 
+#   | |   / _ \| '_ \| |_| |/ _` |
+#   | |__| (_) | | | |  _| | (_| |
+#    \____\___/|_| |_|_| |_|\__, |
+#                           |___/ 
+#----------------------------------------------------------------------------
+class Config(object):
+    """
+    Singleton. toggl configuration data, read from ~/.togglrc.
+    Properties:
+        auth - (username, password) tuple.
+    """
+
+    __metaclass__ = Singleton
+
+    def __init__(self):
+        """Reads configuration data from ~/.togglrc."""
+        self.cfg = ConfigParser.ConfigParser()
+        if self.cfg.read(os.path.expanduser('~/.togglrc')) == []:
+            self._create_empty_config()
+            raise IOError("Missing ~/.togglrc. A default has been created for editing.")
+
+        self.auth = (self.get('auth', 'username'), self.get('auth', 'password'))
+    
+    def get(self, section, key):
+        """
+        Returns the value of the configuration variable identified by the
+        given key within the given section of the configuration file. Raises
+        ConfigParser exceptions if the section or key are invalid.
+        """
+        return self.cfg.get(section, key).strip()
+
+    def _create_empty_config(self):
+        """Creates a blank ~/.togglrc."""
+        cfg = ConfigParser.RawConfigParser()
+        cfg.add_section('auth')
+        cfg.set('auth', 'username', 'user@example.com')
+        cfg.set('auth', 'password', 'toggl_password')
+        cfg.add_section('options')
+        cfg.set('options', 'timezone', 'UTC')
+        cfg.set('options', 'time_format', '%I:%M%p')
+        with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
+            cfg.write(cfgfile)
+        os.chmod(os.path.expanduser('~/.togglrc'), 0600)
 
 #----------------------------------------------------------------------------
 #    ____            _           _   _     _     _   
@@ -80,13 +150,11 @@ class ProjectList(object):
 
     def __init__(self):
         """Fetches the list of projects from toggl."""
-        user = get_user()
-        wid = user['data']['default_wid']
-        url = "%s/workspaces/%s/projects" % (TOGGL_URL,wid)
+        url = "%s/workspaces/%s/projects" % (TOGGL_URL, User().default_wid)
         global options
         if options.verbose:
             print url
-        r = requests.get(url, auth=AUTH)
+        r = requests.get(url, auth=Config().auth)
         r.raise_for_status() # raise exception on error
         self.project_list = json.loads(r.text)
 
@@ -131,6 +199,45 @@ class ProjectList(object):
         return s.rstrip() # strip trailing \n
 
 #----------------------------------------------------------------------------
+#    _   _               
+#   | | | |___  ___ _ __ 
+#   | | | / __|/ _ \ '__|
+#   | |_| \__ \  __/ |   
+#    \___/|___/\___|_|   
+#                        
+#----------------------------------------------------------------------------
+class User(object):
+    """Toggl user data as a singleton."""
+
+    __metaclass__ = Singleton
+
+    def __init__(self):
+        """Fetches user data from toggl."""
+        
+        url = "%s/me" % (TOGGL_URL)
+        global options
+        if options.verbose:
+            print url
+        r = requests.get(url, auth=Config().auth)
+        r.raise_for_status() # raise exception on error
+        self.user_data = json.loads(r.text)
+
+    def __getattr__(self, property):
+        """
+        Usage: user.PROPERTY
+        Return the given toggl user property. User properties are
+        documented at https://github.com/toggl/toggl_api_docs/blob/master/chapters/users.md
+        """
+        if property == 'since':
+            # 'since' lives at the root of the user_data dict.
+            return self.user_data['since']
+        elif property in self.user_data['data']:
+            # All other properties live within user_data['data'].
+            return self.user_data['data'][property]
+        else:
+            raise AttributeError("toggl user object has no property '%s'" % property)
+
+#----------------------------------------------------------------------------
 def add_time_entry(args):
     """
     Creates a completed time entry.
@@ -163,7 +270,7 @@ def add_time_entry(args):
         return 1
 
     #Get start time
-    tz = pytz.timezone(toggl_cfg.get('options', 'timezone')) 
+    tz = pytz.timezone(Config().get('options', 'timezone')) 
     dt = parse(args[0])
     start_time = tz.localize(dt)
     st = start_time.isoformat()
@@ -195,7 +302,7 @@ def add_time_entry(args):
     
     # Send the data.
     headers = {'content-type': 'application/json'}
-    r = requests.post("%s/time_entries" % TOGGL_URL, auth=AUTH,
+    r = requests.post("%s/time_entries" % TOGGL_URL, auth=Config().auth,
         data=json.dumps(data), headers=headers)
     r.raise_for_status() # raise exception on error
     
@@ -223,7 +330,7 @@ def continue_entry(args):
 	if str(entry['description']) == description:
 
             # Check when the entry was started, today or previously?
-            tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+            tz = pytz.timezone(Config().get('options', 'timezone'))
             start_time = iso8601.parse_date(entry['start']).astimezone(tz)
             #print start_time
             #print midnight()
@@ -241,7 +348,7 @@ def continue_entry(args):
                 # Send the data.
                 headers = {'content-type': 'application/json'}
                 r = requests.put("%s/time_entries/%s" % (TOGGL_URL, entry['id']), 
-                    auth=AUTH, 
+                    auth=Config().auth, 
                     data='{"time_entry":%s}' % json.dumps(entry), headers=headers)
                 r.raise_for_status() # raise exception on error
 
@@ -254,19 +361,6 @@ def continue_entry(args):
 
     print "Did not find '%s' in list of entries." % description
     return 1
-
-#----------------------------------------------------------------------------
-def create_default_cfg():
-    cfg = ConfigParser.RawConfigParser()
-    cfg.add_section('auth')
-    cfg.set('auth', 'username', 'user@example.com')
-    cfg.set('auth', 'password', 'secretpasswd')
-    cfg.add_section('options')
-    cfg.set('options', 'timezone', 'UTC')
-    cfg.set('options', 'time_format', '%I:%M%p')
-    with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
-        cfg.write(cfgfile)
-    os.chmod(os.path.expanduser('~/.togglrc'), 0600)
 
 #----------------------------------------------------------------------------
 def create_time_entry_json(description, project_name=None, duration=0):
@@ -290,7 +384,7 @@ def create_time_entry_json(description, project_name=None, duration=0):
     if duration == 0:
         duration = 0-time.time()
 
-    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+    tz = pytz.timezone(Config().get('options', 'timezone'))
     
     # Create JSON object to send to toggl.
     data = { 'time_entry' : \
@@ -322,7 +416,7 @@ def delete_time_entry(args):
             print "Deleting entry " + entry_id
 
             headers = {'content-type': 'application/json'}
-            r = requests.delete("%s/time_entries/%s" % (TOGGL_URL, entry_id), auth=AUTH,
+            r = requests.delete("%s/time_entries/%s" % (TOGGL_URL, entry_id), auth=Config().auth,
                 data=None, headers=headers)
             r.raise_for_status() # raise exception on error
 
@@ -366,7 +460,7 @@ def format_time(time):
     Formats the given time/datetime object according to the strftime() options
     from the configuration file.
     """
-    format = toggl_cfg.get('options', 'time_format')
+    format = Config().get('options', 'time_format')
     return time.strftime(format)
 
 #----------------------------------------------------------------------------
@@ -392,21 +486,9 @@ def get_time_entry_data():
     global options
     if options.verbose:
         print url
-    r = requests.get(url, auth=AUTH)
+    r = requests.get(url, auth=Config().auth)
     r.raise_for_status() # raise exception on error
     
-    return json.loads(r.text)
-
-#----------------------------------------------------------------------------
-def get_user():
-    """Fetches the user as JSON objects."""
-    
-    url = "%s/me" % (TOGGL_URL)
-    global options
-    if options.verbose:
-        print url
-    r = requests.get(url, auth=AUTH)
-    r.raise_for_status() # raise exception on error
     return json.loads(r.text)
 
 #----------------------------------------------------------------------------
@@ -414,7 +496,7 @@ def last_minute_today():
     """
     Returns 23:59:59 today as a localized datetime object.
     """
-    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+    tz = pytz.timezone(Config().get('options', 'timezone'))
     today = datetime.datetime.now(tz)
     last_minute = today.replace(hour=23, minute=59, second=59, microsecond=0)
     return last_minute
@@ -445,7 +527,7 @@ def list_time_entries():
 
 	# Sort the time entries into buckets based on "Month Day" of the entry.
 	days = { }
-	tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+	tz = pytz.timezone(Config().get('options', 'timezone'))
         projects = ProjectList()
 	for entry in response:
 		start_time = iso8601.parse_date(entry['start']).astimezone(tz).strftime("%b %d")
@@ -472,7 +554,7 @@ def midnight():
     """
     Returns 00:00:00 today as a localized datetime object.
     """
-    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+    tz = pytz.timezone(Config().get('options', 'timezone'))
     today = datetime.datetime.now(tz).date()
     midnight = tz.localize(datetime.datetime.combine(today, datetime.time(0,0)))
     return midnight
@@ -551,9 +633,8 @@ def start_time_entry(args):
     # Create JSON object to send to toggl.
     data = create_time_entry_json(description, project_name, 0)
 
-    global toggl_cfg
     if len(args) == 1: # we have a specific start datetime
-	tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+	tz = pytz.timezone(Config().get('options', 'timezone'))
 	dt = parse(args[0])
 	st = tz.localize(dt)
         data['time_entry']['start'] = st.isoformat()
@@ -565,7 +646,7 @@ def start_time_entry(args):
         print json.dumps(data)
     
     headers = {'content-type': 'application/json'}
-    r = requests.post("%s/time_entries" % TOGGL_URL, auth=AUTH,
+    r = requests.post("%s/time_entries" % TOGGL_URL, auth=Config().auth,
         data=json.dumps(data), headers=headers)
     r.raise_for_status() # raise exception on error
 
@@ -579,14 +660,13 @@ def stop_time_entry(args=None):
     Stops the current time entry (duration is currently negative).
     args contains an optional end time.
     """
-    global toggl_cfg
 
     entry = get_current_time_entry()
     if entry != None:
         # Get the start time from the entry, converted to UTC.
         start_time = iso8601.parse_date(entry['start']).astimezone(pytz.utc)
 
-	tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+	tz = pytz.timezone(Config().get('options', 'timezone'))
         if args != None and len(args) == 1:
 	    stop_time_local = tz.localize(parse(args[0]))
 	    stop_time_utc = stop_time_local.astimezone(pytz.utc)
@@ -608,7 +688,7 @@ def stop_time_entry(args=None):
             print json.dumps(data)
 
         headers = {'content-type': 'application/json'}
-        r = requests.put(url, auth=AUTH, data=json.dumps(data), headers=headers)
+        r = requests.put(url, auth=Config().auth, data=json.dumps(data), headers=headers)
         r.raise_for_status() # raise exception on error
 
         print '%s stopped at %s' % (entry['description'], format_time(stop_time_local))
@@ -627,7 +707,7 @@ def yesterday():
     """
     Returns 00:00:00 yesterday as a localized datetime object.
     """
-    tz = pytz.timezone(toggl_cfg.get('options', 'timezone'))
+    tz = pytz.timezone(Config().get('options', 'timezone'))
     yesterday = datetime.datetime.now(tz) - datetime.timedelta(days=1)
     yesterday_at_midnight = datetime.datetime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0)
     yesterday_at_midnight = tz.localize(yesterday_at_midnight)
@@ -637,16 +717,6 @@ def yesterday():
 def main(argv=None):
     """Program entry point."""
     
-    global toggl_cfg
-    toggl_cfg = ConfigParser.ConfigParser()
-    if toggl_cfg.read(os.path.expanduser('~/.togglrc')) == []:
-        create_default_cfg()
-        print "Missing ~/.togglrc. A default has been created for editing."
-        return 1
-
-    global AUTH
-    AUTH = (toggl_cfg.get('auth', 'username').strip(), toggl_cfg.get('auth', 'password').strip())
-
     # Override the option parser epilog formatting rule.
     # See http://stackoverflow.com/questions/1857346/python-optparse-how-to-include-additional-info-in-usage-output
     optparse.OptionParser.format_epilog = lambda self, formatter: self.epilog
