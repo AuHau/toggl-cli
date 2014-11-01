@@ -34,6 +34,7 @@ from dateutil.parser import *
 
 TOGGL_URL = "https://www.toggl.com/api/v8"
 VERBOSE = False
+Parser = None   # OptionParser initialized by main()
 
 #----------------------------------------------------------------------------
 #    ____  _             _      _              
@@ -143,9 +144,9 @@ class Config(object):
 #----------------------------------------------------------------------------
 class Logger(object):
     """
-    Custom logger class. Created because I got tired of trying to limit 
-    logging messages from this file only using the builtin Python logging 
-    module.
+    Custom logger class. Created because I got tired of seeing logging message
+    from all the modules imported here. There's no easy way to limit logging
+    to this file only.
     """
 
     # Logging levels.
@@ -157,14 +158,16 @@ class Logger(object):
     level = NONE
 
     @staticmethod
-    def debug(str, end="\n"):
+    def debug(msg, end="\n"):
+        """Prints msg if the current logging level >= DEBUG.""" 
         if Logger.level >= Logger.DEBUG:
-            print str+end,
+            print msg+end,
 
     @staticmethod
-    def info(str, end="\n"):
+    def info(msg, end="\n"):
+        """Prints msg if the current logging level >= INFO.""" 
         if Logger.level >= Logger.INFO:
-            print str+end,
+            print msg+end,
 
 #----------------------------------------------------------------------------
 #    ____            _           _   _     _     _   
@@ -176,7 +179,7 @@ class Logger(object):
 #----------------------------------------------------------------------------
 class ProjectList(object):
     """
-    A list of projects. A project object is a dictionary as documented
+    A list of projects. A "project object" is a dictionary as documented
     at https://github.com/toggl/toggl_api_docs/blob/master/chapters/projects.md
     """
 
@@ -275,8 +278,7 @@ def add_time_entry(args):
     
     # Make sure we have an entry description.
     if len(args) < 2:
-        global parser
-        parser.print_help()
+        Parser.print_help()
         return 1
     entry = args[0]
     args = args[1:] # strip of the entry
@@ -340,8 +342,7 @@ def continue_entry(args):
     get_time_entry_data()."""
 
     if len(args) == 0:
-        global parser
-        parser.print_help()
+        Parser.print_help()
         return 1
 
     description = args[0]
@@ -422,8 +423,7 @@ def create_time_entry_json(description, project_name=None, duration=0):
 #----------------------------------------------------------------------------
 def delete_time_entry(args):
     if len(args) == 0:
-        global parser
-        parser.print_help()
+        Parser.print_help()
         return 1
 
     entry_id = args[0]
@@ -631,8 +631,7 @@ def start_time_entry(args):
     
     # Make sure we have an entry description.
     if len(args) == 0:
-        global parser
-        parser.print_help()
+        Parser.print_help()
         return 1
     description = args[0]
     args = args[1:] # strip off the description
@@ -734,8 +733,8 @@ def main(argv=None):
     # See http://stackoverflow.com/questions/1857346/python-optparse-how-to-include-additional-info-in-usage-output
     optparse.OptionParser.format_epilog = lambda self, formatter: self.epilog
     
-    global parser
-    parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
+    global Parser
+    Parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
         epilog="\nActions:\n"
         "  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
         "  clients\n\tlists all clients\n"
@@ -749,17 +748,17 @@ def main(argv=None):
 	"  www\n\tvisits toggl.com\n"
         "\n"
         "  DURATION = [[Hours:]Minutes:]Seconds\n")
-    parser.add_option("-q", "--quiet",
+    Parser.add_option("-q", "--quiet",
                           action="store_true", dest="quiet", default=False,
                           help="don't print anything")
-    parser.add_option("-v", "--verbose",
+    Parser.add_option("-v", "--verbose",
                           action="store_true", dest="verbose", default=False,
                           help="print additional info")
-    parser.add_option("-d", "--debug",
+    Parser.add_option("-d", "--debug",
                           action="store_true", dest="debug", default=False,
                           help="print debugging output")
 
-    (options, args) = parser.parse_args()
+    (options, args) = Parser.parse_args()
 
     # Set the general level of verbosity.
     Logger.level = Logger.INFO
@@ -795,7 +794,7 @@ def main(argv=None):
     elif args[0] == "www":
         return visit_web()
     else:
-        parser.print_help()
+        Parser.print_help()
         return 1
 
     return 0
