@@ -33,7 +33,7 @@ import ConfigParser
 from dateutil.parser import *
 
 TOGGL_URL = "https://www.toggl.com/api/v8"
-VERBOSE = False
+VERBOSE = False # verbose output?
 Parser = None   # OptionParser initialized by main()
 
 #----------------------------------------------------------------------------
@@ -281,7 +281,7 @@ def add_time_entry(args):
         Parser.print_help()
         return 1
     entry = args[0]
-    args = args[1:] # strip of the entry
+    args = args[1:] # strip off the entry description
     
     # See if we have a @project.
     project_name = None
@@ -298,7 +298,7 @@ def add_time_entry(args):
     if data == None:
         return 1
 
-    #Get start time
+    # Get start time
     tz = pytz.timezone(Config().get('options', 'timezone')) 
     dt = parse(args[0])
     start_time = tz.localize(dt)
