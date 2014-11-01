@@ -32,7 +32,7 @@ Configuration
 Upon first running the program, a configuration file `~/.togglrc` will be
 automatically created. 
 
-1. Update that file with your toggl username and password.
+1. Update that file with your toggl username and password. If you are using the API token, enter that as your username and `api_token` for the password.
 2. Update the timezone entry (e.g. US/Pacific).
 
 Limitations
