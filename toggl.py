@@ -31,9 +31,10 @@ import time
 import urllib
 import ConfigParser
 from dateutil.parser import *
+import dateutil.parser
 
 TOGGL_URL = "https://www.toggl.com/api/v8"
-VERBOSE = False
+VERBOSE = False # verbose output?
 Parser = None   # OptionParser initialized by main()
 
 #----------------------------------------------------------------------------
@@ -133,6 +134,121 @@ class Config(object):
         with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
             cfg.write(cfgfile)
         os.chmod(os.path.expanduser('~/.togglrc'), 0600)
+
+#----------------------------------------------------------------------------
+#    ____        _          _              _ _____ _                
+#   |  _ \  __ _| |_ ___   / \   _ __   __| |_   _(_)_ __ ___   ___ 
+#   | | | |/ _` | __/ _ \ / _ \ | '_ \ / _` | | | | | '_ ` _ \ / _ \
+#   | |_| | (_| | ||  __// ___ \| | | | (_| | | | | | | | | | |  __/
+#   |____/ \__,_|\__\___/_/   \_\_| |_|\__,_| |_| |_|_| |_| |_|\___|
+#                                                                   
+#----------------------------------------------------------------------------
+class DateAndTime(object):
+    """
+    Singleton date and time functions. Mostly utility functions. All
+    the timezone and datetime functionality is localized here.
+    """
+
+    __metaclass__ = Singleton
+
+    def __init__(self):
+        self.tz = pytz.timezone( Config().get('options', 'timezone') ) 
+
+    def duration_str_to_seconds(self, duration_str):
+        """
+        Parses a string of the form [[Hours:]Minutes:]Seconds and returns
+        the total time in seconds.
+        """
+        elements = duration_str.split(':')
+        duration = 0
+        if len(elements) == 3:
+            duration += int(elements[0]) * 3600
+            elements = elements[1:]
+        if len(elements) == 2:
+            duration += int(elements[0]) * 60
+            elements = elements[1:]
+        duration += int(elements[0])
+        
+        return duration
+
+    def elapsed_time(self, seconds, suffixes=['y','w','d','h','m','s'], add_s=False, separator=' '):
+        """
+        Takes an amount of seconds and turns it into a human-readable amount of time.
+        From http://snipplr.com/view.php?codeview&id=5713
+        """
+        # the formatted time string to be returned
+        time = []
+        
+        # the pieces of time to iterate over (days, hours, minutes, etc)
+        # - the first piece in each tuple is the suffix (d, h, w)
+        # - the second piece is the length in seconds (a day is 60s * 60m * 24h)
+        parts = [(suffixes[0], 60 * 60 * 24 * 7 * 52),
+                  (suffixes[1], 60 * 60 * 24 * 7),
+                  (suffixes[2], 60 * 60 * 24),
+                  (suffixes[3], 60 * 60),
+                  (suffixes[4], 60),
+                  (suffixes[5], 1)]
+        
+        # for each time piece, grab the value and remaining seconds, and add it to
+        # the time string
+        for suffix, length in parts:
+            value = seconds / length
+            if value > 0:
+                seconds = seconds % length
+                time.append('%s%s' % (str(value),
+                    (suffix, (suffix, suffix + 's')[value > 1])[add_s]))
+            if seconds < 1:
+                break
+        
+        return separator.join(time)
+
+    def format_time(self, time):
+        """
+        Formats the given datetime object according to the strftime() options
+        from the configuration file.
+        """
+        format = Config().get('options', 'time_format')
+        return time.strftime(format)
+
+    def last_minute_today(self):
+        """
+        Returns 23:59:59 today as a localized datetime object.
+        """
+        return datetime.datetime.now(self.tz) \
+            .replace(hour=23, minute=59, second=59, microsecond=0)
+
+    def now(self):
+        """Returns "now" as a localized datetime object."""
+        return self.tz.localize( datetime.datetime.now() ) 
+ 
+    def parse_local_datetime_str(self, datetime_str):
+        """
+        Parses a local datetime string (e.g., "2:00pm") and returns
+        a localized datetime object.
+        """
+        return self.tz.localize( dateutil.parser.parse(datetime_str) )
+
+    def parse_iso_str(self, iso_str):
+        """
+        Parses an ISO 8601 datetime string and returns a localized datetime 
+        object.
+        """
+        return iso8601.parse_date(iso_str).astimezone(self.tz)
+
+    def start_of_today(self):
+        """ Returns 00:00:00 today as a localized datetime object."""
+        return self.tz.localize(
+            datetime.datetime.combine( datetime.date.today(), datetime.time.min) 
+        )
+
+    def start_of_yesterday(self):
+        """
+        Returns 00:00:00 yesterday as a localized datetime object.
+        """
+        return self.tz.localize(
+            datetime.datetime.combine( datetime.date.today(), datetime.time.min) - 
+            datetime.timedelta(days=1) # subtract one day from today at midnight
+        )
 
 #----------------------------------------------------------------------------
 #    _                                
@@ -269,6 +385,8 @@ class User(object):
             raise AttributeError("toggl user object has no property '%s'" % property)
 
 #----------------------------------------------------------------------------
+#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------
 def add_time_entry(args):
     """
     Creates a completed time entry.
@@ -281,7 +399,7 @@ def add_time_entry(args):
         Parser.print_help()
         return 1
     entry = args[0]
-    args = args[1:] # strip of the entry
+    args = args[1:] # strip off the entry description
     
     # See if we have a @project.
     project_name = None
@@ -298,30 +416,18 @@ def add_time_entry(args):
     if data == None:
         return 1
 
-    #Get start time
-    tz = pytz.timezone(Config().get('options', 'timezone')) 
-    dt = parse(args[0])
-    start_time = tz.localize(dt)
-    st = start_time.isoformat()
+    # Get start time
+    start_time = DateAndTime().parse_local_datetime_str(args[0])
+    data['time_entry']['start'] = start_time.isoformat()
     args = args[1:] # strip off the time
     
-    #Update the start time in the JSON object
-    data['time_entry']['start'] = st
-    
-    # Check to see if duration passed.
+    # Get end time or duration.
     if len(args) >= 1 and args[0][0] == 'd':
-    	duration = parse_duration(args[0][1:])
-	#Update the duation in the JSON object
-        data['time_entry']['duration'] = duration
+        data['time_entry']['duration'] = DateAndTime().duration_str_to_seconds(args[0][1:])
     elif len(args) >= 1:
-	dt = parse(args[0])
-	end_time = tz.localize(dt)
-	et = end_time.isoformat()
-	#Update the stop time in the JSON object
-    	data['time_entry']['stop'] = et
-	#Update the duration in the JSON object
-	duration = (end_time - start_time).seconds
-	data['time_entry']['duration'] = duration
+        end_time = DateAndTime().parse_local_datetime_str(args[0])
+    	data['time_entry']['stop'] = end_time.isoformat()
+	data['time_entry']['duration'] = (end_time - start_time).seconds
     else:
         raise RuntimeError('Must specifiy duration or end time')
 
@@ -356,14 +462,13 @@ def continue_entry(args):
 	if str(entry['description']) == description:
 
             # Check when the entry was started, today or previously?
-            tz = pytz.timezone(Config().get('options', 'timezone'))
-            start_time = iso8601.parse_date(entry['start']).astimezone(tz)
-            if start_time <= midnight():
+            start_time = DateAndTime().parse_iso_str(entry['start'])
+            if start_time <= DateAndTime().start_of_today():
                 # If the entry was from a previous day, then we simply start
                 # a new entry.
                 start_time_entry( [description, '@%s' % ProjectList().find_by_id(entry['pid'])['name'] ])
             else:
-                # To continue an entry, set duration to 
+                # To continue an entry from today, set duration to 
                 # 0-(current_time-duration).
                 entry['duration'] = 0-(time.time()-int(entry['duration']))
                 entry['duronly'] = True # ignore start/stop times from now on
@@ -375,7 +480,7 @@ def continue_entry(args):
                     data='{"time_entry":%s}' % json.dumps(entry), headers=headers)
                 r.raise_for_status() # raise exception on error
 
-                Logger.info("%s continued at %s" % (description, format_time(datetime.datetime.now())))
+                Logger.info("%s continued at %s" % (description, DateAndTime().format_time(datetime.datetime.now())))
 
                 Logger.debug(json.dumps(entry))
 
@@ -404,13 +509,11 @@ def create_time_entry_json(description, project_name=None, duration=0):
     if duration == 0:
         duration = 0-time.time()
 
-    tz = pytz.timezone(Config().get('options', 'timezone'))
-    
     # Create JSON object to send to toggl.
     data = { 'time_entry' : \
 	{ 'duration' : duration,
           'billable' : False,
-	  'start' :  tz.localize(datetime.datetime.now()).isoformat(),
+	  'start' :  DateAndTime().now(),
           'description' : description,
           'created_with' : 'toggl-cli',
         }
@@ -440,48 +543,7 @@ def delete_time_entry(args):
             r.raise_for_status() # raise exception on error
 
     return 0
-
-#----------------------------------------------------------------------------
-def elapsed_time(seconds, suffixes=['y','w','d','h','m','s'], add_s=False, separator=' '):
-	"""
-	Takes an amount of seconds and turns it into a human-readable amount of time.
-	From http://snipplr.com/view.php?codeview&id=5713
-	"""
-	# the formatted time string to be returned
-	time = []
-	
-	# the pieces of time to iterate over (days, hours, minutes, etc)
-	# - the first piece in each tuple is the suffix (d, h, w)
-	# - the second piece is the length in seconds (a day is 60s * 60m * 24h)
-	parts = [(suffixes[0], 60 * 60 * 24 * 7 * 52),
-		  (suffixes[1], 60 * 60 * 24 * 7),
-		  (suffixes[2], 60 * 60 * 24),
-		  (suffixes[3], 60 * 60),
-		  (suffixes[4], 60),
-		  (suffixes[5], 1)]
-	
-	# for each time piece, grab the value and remaining seconds, and add it to
-	# the time string
-	for suffix, length in parts:
-		value = seconds / length
-		if value > 0:
-			seconds = seconds % length
-			time.append('%s%s' % (str(value),
-					       (suffix, (suffix, suffix + 's')[value > 1])[add_s]))
-		if seconds < 1:
-			break
-	
-	return separator.join(time)
     
-#----------------------------------------------------------------------------
-def format_time(time):
-    """
-    Formats the given time/datetime object according to the strftime() options
-    from the configuration file.
-    """
-    format = Config().get('options', 'time_format')
-    return time.strftime(format)
-
 #----------------------------------------------------------------------------
 def get_current_time_entry():
     """Returns the current time entry JSON object, or None."""
@@ -499,24 +561,14 @@ def get_time_entry_data():
 
     # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
     url = "%s/time_entries?start_date=%s&end_date=%s" % \
-        (TOGGL_URL, urllib.quote(yesterday().isoformat('T')), \
-        urllib.quote(last_minute_today().isoformat('T')))
+        (TOGGL_URL, urllib.quote(DateAndTime().start_of_yesterday().isoformat('T')), \
+        urllib.quote(DateAndTime().last_minute_today().isoformat('T')))
 
     Logger.debug(url)
     r = requests.get(url, auth=Config().auth)
     r.raise_for_status() # raise exception on error
     
     return json.loads(r.text)
-
-#----------------------------------------------------------------------------
-def last_minute_today():
-    """
-    Returns 23:59:59 today as a localized datetime object.
-    """
-    tz = pytz.timezone(Config().get('options', 'timezone'))
-    today = datetime.datetime.now(tz)
-    last_minute = today.replace(hour=23, minute=59, second=59, microsecond=0)
-    return last_minute
 
 #----------------------------------------------------------------------------
 def list_current_time_entry():
@@ -544,10 +596,9 @@ def list_time_entries():
 
 	# Sort the time entries into buckets based on "Month Day" of the entry.
 	days = { }
-	tz = pytz.timezone(Config().get('options', 'timezone'))
         projects = ProjectList()
 	for entry in response:
-		start_time = iso8601.parse_date(entry['start']).astimezone(tz).strftime("%b %d")
+		start_time = DateAndTime().parse_iso_str(entry['start']).strftime("%b %d")
 		if start_time not in days:
 			days[start_time] = []
 		days[start_time].append(entry)
@@ -557,42 +608,15 @@ def list_time_entries():
 
 	# For each day, print the entries, then sum the times.
 	for date in sorted(days.keys()):
-		Logger.info(date)
-		duration = 0
-		for entry in days[date]:
-			Logger.info("  ", end="")
-			duration += print_time_entry(entry)
-		Logger.info("   (%s)" % elapsed_time(int(duration)))
+            Logger.info(date)
+            duration = 0
+            for entry in days[date]:
+                    Logger.info("  ", end="")
+                    duration += print_time_entry(entry)
+            Logger.info("   (%s)" % DateAndTime().elapsed_time(int(duration)))
 
 	return 0
 
-#----------------------------------------------------------------------------
-def midnight():
-    """
-    Returns 00:00:00 today as a localized datetime object.
-    """
-    tz = pytz.timezone(Config().get('options', 'timezone'))
-    today = datetime.datetime.now(tz).date()
-    midnight = tz.localize(datetime.datetime.combine(today, datetime.time(0,0)))
-    return midnight
-
-#----------------------------------------------------------------------------
-def parse_duration(str):
-    """Parses a string of the form [[Hours:]Minutes:]Seconds and returns
-       the total time in seconds as an integer.
-    """
-    elements = str.split(':')
-    duration = 0
-    if len(elements) == 3:
-        duration += int(elements[0]) * 3600
-        elements = elements[1:]
-    if len(elements) == 2:
-        duration += int(elements[0]) * 60
-        elements = elements[1:]
-    duration += int(elements[0])
-    
-    return duration
-        
 #----------------------------------------------------------------------------
 def print_time_entry(entry):
     """Utility function to print a time entry object and returns the
@@ -607,7 +631,7 @@ def print_time_entry(entry):
     else:
         is_running = '*'
         e_time = time.time() + int(entry['duration'])
-    e_time_str = "%s" % elapsed_time(int(e_time), separator='')
+    e_time_str = "%s" % DateAndTime().elapsed_time(int(e_time), separator='')
     
     Logger.info(is_running, end="")
     Logger.info(entry['description'], end="")
@@ -649,13 +673,11 @@ def start_time_entry(args):
     data = create_time_entry_json(description, project_name, 0)
 
     if len(args) == 1: # we have a specific start datetime
-	tz = pytz.timezone(Config().get('options', 'timezone'))
-	dt = parse(args[0])
-	st = tz.localize(dt)
-        data['time_entry']['start'] = st.isoformat()
-	data['time_entry']['duration'] = 0 - int(dt.strftime('%s'))
+        start_time = DateAndTime().parse_local_datetime_str(args[0])
     else:
-        st = datetime.datetime.now()
+        start_time = DateAndTime().now()
+    data['time_entry']['start'] = start_time.isoformat()
+    data['time_entry']['duration'] = 0 - int(start_time.strftime('%s'))
 
     Logger.debug(json.dumps(data))
     
@@ -664,7 +686,7 @@ def start_time_entry(args):
         data=json.dumps(data), headers=headers)
     r.raise_for_status() # raise exception on error
 
-    Logger.info('%s started at %s' % (description, format_time(st)))
+    Logger.info('%s started at %s' % (description, DateAndTime().format_time(start_time)))
     
     return 0
 
@@ -677,22 +699,19 @@ def stop_time_entry(args=None):
 
     entry = get_current_time_entry()
     if entry != None:
-        # Get the start time from the entry, converted to UTC.
-        start_time = iso8601.parse_date(entry['start']).astimezone(pytz.utc)
+        # Get the start time from the entry.
+        start_time = DateAndTime().parse_iso_str(entry['start'])
 
-	tz = pytz.timezone(Config().get('options', 'timezone'))
         if args != None and len(args) == 1:
-	    stop_time_local = tz.localize(parse(args[0]))
-	    stop_time_utc = stop_time_local.astimezone(pytz.utc)
+	    stop_time = DateAndTime().parse_local_datetime_str(args[0])
         else:
             # Get stop time (now) in UTC.
-            stop_time_local = datetime.datetime.now()
-            stop_time_utc = pytz.utc.localize(datetime.datetime.utcnow())
+            stop_time = DateAndTime().now()
 
         # Create the payload.
         data = { 'time_entry' : entry }
-        data['time_entry']['stop'] = stop_time_utc.isoformat()
-        data['time_entry']['duration'] = (stop_time_utc - start_time).seconds
+        data['time_entry']['stop'] = stop_time.isoformat()
+        data['time_entry']['duration'] = (stop_time - start_time).seconds
 
         url = "%s/time_entries/%d" % (TOGGL_URL, entry['id'])
 
@@ -703,7 +722,7 @@ def stop_time_entry(args=None):
         r = requests.put(url, auth=Config().auth, data=json.dumps(data), headers=headers)
         r.raise_for_status() # raise exception on error
 
-        Logger.info('%s stopped at %s' % (entry['description'], format_time(stop_time_local)))
+        Logger.info('%s stopped at %s' % (entry['description'], DateAndTime().format_time(stop_time)))
     else:
         Logger.info("You're not working on anything right now.")
         return 1
@@ -713,17 +732,6 @@ def stop_time_entry(args=None):
 #----------------------------------------------------------------------------
 def visit_web():
     os.system(VISIT_WWW_COMMAND)	
-
-#----------------------------------------------------------------------------
-def yesterday():
-    """
-    Returns 00:00:00 yesterday as a localized datetime object.
-    """
-    tz = pytz.timezone(Config().get('options', 'timezone'))
-    yesterday = datetime.datetime.now(tz) - datetime.timedelta(days=1)
-    yesterday_at_midnight = datetime.datetime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0)
-    yesterday_at_midnight = tz.localize(yesterday_at_midnight)
-    return yesterday_at_midnight
 
 #----------------------------------------------------------------------------
 def main(argv=None):
