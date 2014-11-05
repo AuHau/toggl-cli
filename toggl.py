@@ -13,7 +13,7 @@ ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 ###
 
 # Command to visit toggl.com
-VISIT_WWW_COMMAND = "open http://www.toggl.com"
+VISIT_WWW_COMMAND = "open http://www.toggl.com/app/timer"
 
 ###                                                                       ###
 ### End of Configuration Section                                          ###
@@ -348,6 +348,60 @@ class ProjectList(object):
         return s.rstrip() # strip trailing \n
 
 #----------------------------------------------------------------------------
+#    _____ _                _____       _              
+#   |_   _(_)_ __ ___   ___| ____|_ __ | |_ _ __ _   _ 
+#     | | | | '_ ` _ \ / _ \  _| | '_ \| __| '__| | | |
+#     | | | | | | | | |  __/ |___| | | | |_| |  | |_| |
+#     |_| |_|_| |_| |_|\___|_____|_| |_|\__|_|   \__, |
+#                                                |___/ 
+#----------------------------------------------------------------------------
+class TimeEntry(object):
+    """Represents a single toggl time entry."""
+
+    def __init__(self, description, project_name, start_time):
+        """
+        Constructor. description(str) is the time entry description,
+        project_name(str) is the name of the project without the @ prefix (or None),
+        start_time(datetime) is the start time.
+        """
+        self.start_time = start_time # start time in datetime format
+
+        self.data = {}  # toggl time entry data
+        self.data['description'] = description
+        self.data['start'] = start_time.isoformat()
+        self.data['duration'] = 0 - int(start_time.strftime('%s'))
+        self.data['billable'] = False
+        self.data['created_with'] = 'toggl-cli'
+
+        # See if we have a valid project name.
+        if project_name != None:
+            # Look up the project from toggl to get the id.
+            project = ProjectList().find_by_name(project_name)
+            if project == None:
+                raise RuntimeError("Project '%s' not found." % project_name)
+            self.data['pid'] = project['id']
+ 
+    def start(self):
+        """Starts this time entry by telling toggl."""
+        try:
+            Logger.debug(str(self))
+            r = requests.post("%s/time_entries" % TOGGL_URL, 
+                auth=Config().auth,
+                data=str(self), 
+                headers={'content-type': 'application/json'}
+            )
+            r.raise_for_status() # raise exception on error
+        except HTTPError:
+            print 'Sent: ' + self
+            print 'Received: ' + r.text
+        else:
+            Logger.info('%s started at %s' % (self.data['description'], DateAndTime().format_time(self.start_time)))
+
+    def __str__(self):
+        """Returns a JSON dump of this entire object as toggl payload."""
+        return '{"time_entry": %s}' % json.dumps(self.data)
+
+#----------------------------------------------------------------------------
 #    _   _               
 #   | | | |___  ___ _ __ 
 #   | | | / __|/ _ \ '__|
@@ -489,41 +543,6 @@ def continue_entry(args):
     raise RuntimeError("Did not find '%s' in list of entries." % description)
 
 #----------------------------------------------------------------------------
-def create_time_entry_json(description, project_name=None, duration=0):
-    """Creates a basic time entry JSON from the given arguments
-       project_name should not have the '@' prefix.
-       duration should be an integer seconds.
-    """
-    
-    # See if we have a @project.
-    project_id = None
-    if project_name != None:
-        # Look up the project from toggl to get the id.
-        project = ProjectList().find_by_name(project_name)
-        if project == None:
-            raise RuntimeError("Project '%s' not found." % project_name)
-        project_id = project['id']
-    
-    # If duration is 0, then we calculate the number of seconds since the
-    # epoch.
-    if duration == 0:
-        duration = 0-time.time()
-
-    # Create JSON object to send to toggl.
-    data = { 'time_entry' : \
-	{ 'duration' : duration,
-          'billable' : False,
-	  'start' :  DateAndTime().now(),
-          'description' : description,
-          'created_with' : 'toggl-cli',
-        }
-    }
-    if project_id != None:
-        data['time_entry']['pid'] = project_id 
-    
-    return data
-
-#----------------------------------------------------------------------------
 def delete_time_entry(args):
     if len(args) == 0:
         Parser.print_help()
@@ -647,50 +666,6 @@ def print_time_entry(entry):
     return e_time
 
 #----------------------------------------------------------------------------
-def start_time_entry(args):
-    """
-       Starts a new time entry.
-       args should be: DESCR [@PROJECT] [DATETIME]
-    """
-    
-    # Make sure we have an entry description.
-    if len(args) == 0:
-        Parser.print_help()
-        return 1
-    description = args[0]
-    args = args[1:] # strip off the description
-    
-    # See if we have a @project.
-    project_name = None
-    if len(args) >= 1 and args[0][0] == '@':
-	project = ProjectList().find_by_name(args[0][1:])
-        if project == None:
-            raise RuntimeError("Project '%s' not found." % args[0])
-        project_name = project['name']
-        args = args[1:] # strip off the project
-
-    # Create JSON object to send to toggl.
-    data = create_time_entry_json(description, project_name, 0)
-
-    if len(args) == 1: # we have a specific start datetime
-        start_time = DateAndTime().parse_local_datetime_str(args[0])
-    else:
-        start_time = DateAndTime().now()
-    data['time_entry']['start'] = start_time.isoformat()
-    data['time_entry']['duration'] = 0 - int(start_time.strftime('%s'))
-
-    Logger.debug(json.dumps(data))
-    
-    headers = {'content-type': 'application/json'}
-    r = requests.post("%s/time_entries" % TOGGL_URL, auth=Config().auth,
-        data=json.dumps(data), headers=headers)
-    r.raise_for_status() # raise exception on error
-
-    Logger.info('%s started at %s' % (description, DateAndTime().format_time(start_time)))
-    
-    return 0
-
-#----------------------------------------------------------------------------
 def stop_time_entry(args=None):
     """
     Stops the current time entry (duration is currently negative).
@@ -730,82 +705,158 @@ def stop_time_entry(args=None):
     return 0
 
 #----------------------------------------------------------------------------
-def visit_web():
-    os.system(VISIT_WWW_COMMAND)	
-
+#       _        _   _                 
+#      / \   ___| |_(_) ___  _ __  ___ 
+#     / _ \ / __| __| |/ _ \| '_ \/ __|
+#    / ___ \ (__| |_| | (_) | | | \__ \
+#   /_/   \_\___|\__|_|\___/|_| |_|___/
+#                                                                                             
 #----------------------------------------------------------------------------
-def main(argv=None):
-    """Program entry point."""
-    
-    # Override the option parser epilog formatting rule.
-    # See http://stackoverflow.com/questions/1857346/python-optparse-how-to-include-additional-info-in-usage-output
-    optparse.OptionParser.format_epilog = lambda self, formatter: self.epilog
-    
-    global Parser
-    Parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
-        epilog="\nActions:\n"
-        "  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
-        "  clients\n\tlists all clients\n"
-        "  continue DESCR\n\trestarts the given entry\n"
-        "  ls\n\tlist recent time entries\n"
-        "  now\n\tprint what you're working on now\n"
-        "  projects\n\tlists all projects\n"
-        "  rm ID\n\tdelete a time entry by id\n"
-        "  start DESCR [@PROJECT] [DATETIME]\n\tstarts a new entry\n"
-        "  stop [DATETIME]\n\tstops the current entry\n"
-	"  www\n\tvisits toggl.com\n"
-        "\n"
-        "  DURATION = [[Hours:]Minutes:]Seconds\n")
-    Parser.add_option("-q", "--quiet",
-                          action="store_true", dest="quiet", default=False,
-                          help="don't print anything")
-    Parser.add_option("-v", "--verbose",
-                          action="store_true", dest="verbose", default=False,
-                          help="print additional info")
-    Parser.add_option("-d", "--debug",
-                          action="store_true", dest="debug", default=False,
-                          help="print debugging output")
+class Actions(object):
+    """Processes command-line actions."""
 
-    (options, args) = Parser.parse_args()
+    __metaclass__ = Singleton
 
-    # Set the general level of verbosity.
-    Logger.level = Logger.INFO
-    if options.quiet:
-        Logger.level = Logger.NONE
-    if options.debug:
-        Logger.level = Logger.DEBUG
-    if options.verbose:
-        global VERBOSE 
-        VERBOSE = True
-    
-    if len(args) == 0 or args[0] == "ls":
-        return list_time_entries()
-    elif args[0] == "add":
-        return add_time_entry(args[1:])
-    elif args[0] == "clients":
-        Logger.info( ClientList() )
-    elif args[0] == "continue":
-        return continue_entry(args[1:])
-    elif args[0] == "now":
-        return list_current_time_entry()
-    elif args[0] == "projects":
-        Logger.info( ProjectList() )
-    elif args[0] == "rm":
-	return delete_time_entry(args[1:])
-    elif args[0] == "start":
-        return start_time_entry(args[1:])
-    elif args[0] == "stop":
-	if len(args) > 1:
-            return stop_time_entry(args[1:])
+    def __init__(self):
+        """Constructor."""
+
+        # Override the option parser epilog formatting rule.
+        # See http://stackoverflow.com/questions/1857346/python-optparse-how-to-include-additional-info-in-usage-output
+        optparse.OptionParser.format_epilog = lambda self, formatter: self.epilog
+        
+        self.parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
+            epilog="\nActions:\n"
+            "  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
+            "  clients\n\tlists all clients\n"
+            "  continue DESCR\n\trestarts the given entry\n"
+            "  ls\n\tlist recent time entries\n"
+            "  now\n\tprint what you're working on now\n"
+            "  projects\n\tlists all projects\n"
+            "  rm ID\n\tdelete a time entry by id\n"
+            "  start DESCR [@PROJECT] [DATETIME]\n\tstarts a new entry\n"
+            "  stop [DATETIME]\n\tstops the current entry\n"
+            "  www\n\tvisits toggl.com\n"
+            "\n"
+            "  DURATION = [[Hours:]Minutes:]Seconds\n")
+        self.parser.add_option("-q", "--quiet",
+                              action="store_true", dest="quiet", default=False,
+                              help="don't print anything")
+        self.parser.add_option("-v", "--verbose",
+                              action="store_true", dest="verbose", default=False,
+                              help="print additional info")
+        self.parser.add_option("-d", "--debug",
+                              action="store_true", dest="debug", default=False,
+                              help="print debugging output")
+
+        (options, args) = self.parser.parse_args()
+
+        # Process command-line options.
+        Logger.level = Logger.INFO
+        if options.quiet:
+            Logger.level = Logger.NONE
+        if options.debug:
+            Logger.level = Logger.DEBUG
+        if options.verbose:
+            global VERBOSE 
+            VERBOSE = True
+
+    def act(self, args):
+        """
+        Performs the actions described by the list of args. args should be
+        the command line arguments except for the name of the executable
+        program sys.argv[0].
+        """
+        if len(args) == 0 or args[0] == "ls":
+            return list_time_entries()
+        elif args[0] == "add":
+            return add_time_entry(args[1:])
+        elif args[0] == "clients":
+            Logger.info( ClientList() )
+        elif args[0] == "continue":
+            return continue_entry(args[1:])
+        elif args[0] == "now":
+            return list_current_time_entry()
+        elif args[0] == "projects":
+            Logger.info( ProjectList() )
+        elif args[0] == "rm":
+            return delete_time_entry(args[1:])
+        elif args[0] == "start":
+            self.start_time_entry(args[1:])
+        elif args[0] == "stop":
+            if len(args) > 1:
+                return stop_time_entry(args[1:])
+            else:
+                return stop_time_entry()
+        elif args[0] == "www":
+            os.system(VISIT_WWW_COMMAND)	
         else:
-	    return stop_time_entry()
-    elif args[0] == "www":
-        return visit_web()
-    else:
-        Parser.print_help()
-        return 1
+            self.help()
 
-    return 0
+    def get_datetime_arg(self, args, optional=False):
+        """
+        If the first entry in args is a datetime then return it as a
+        localized datetime object, or None.
+        """
+        if len(args) == 0:
+            if optional:
+                return None
+            else:
+                self.help()
+                sys.exit(1)
+        else:
+            return DateAndTime().parse_local_datetime_str(args.pop(0))
 
+    def get_project_arg(self, args, optional=False):
+        """
+        If the first entry in args is a project name (e.g., '@project')
+        then return the name of the project, or None.
+        """
+        if len(args) == 0:
+            if optional:
+                return None
+            else:
+                self.help()
+        elif args[0][0] != '@':
+            if optional:
+                return None
+            else:
+                self.help()
+        else:
+            return args.pop(0)
+
+    def get_str_arg(self, args, optional=False):
+        """
+        Helper method to return the first entry in args as a string, 
+        or None.
+        """
+        if len(args) == 0:
+            if optional:
+                return None
+            else:
+                self.help()
+        else:
+            return args.pop(0)
+
+    def help(self):
+        """Prints the usage message and exits."""
+        self.parser.print_help()
+        sys.exit(1)
+
+    def start_time_entry(self, args):
+        """
+           Starts a new time entry.
+           args should be: DESCR [@PROJECT] [DATETIME]
+        """
+        description = self.get_str_arg(args, optional=False)
+        project_name = self.get_project_arg(args, optional=True)
+        start_time = self.get_datetime_arg(args, optional=True)
+        if start_time is None:
+            start_time = DateAndTime().now()
+
+        # Create the time entry.
+        entry = TimeEntry(description, project_name, start_time)
+        entry.start()
+        
 if __name__ == "__main__":
-	sys.exit(main())
+    Actions().act(sys.argv[1:])
+    sys.exit(0)
