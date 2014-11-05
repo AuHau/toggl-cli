@@ -380,7 +380,23 @@ class TimeEntry(object):
             if project == None:
                 raise RuntimeError("Project '%s' not found." % project_name)
             self.data['pid'] = project['id']
- 
+
+    def add(self):
+        """Adds this time entry as a completed entry."""
+        try:
+            Logger.debug(str(self))
+            r = requests.post("%s/time_entries" % TOGGL_URL, 
+                auth=Config().auth,
+                data=str(self), 
+                headers={'content-type': 'application/json'}
+            )
+            r.raise_for_status() # raise exception on error
+        except HTTPError:
+            print 'Sent: ' + self
+            print 'Received: ' + r.text
+        else:
+            Logger.info('%s added' % self.data['description'])
+
     def start(self):
         """Starts this time entry by telling toggl."""
         try:
@@ -396,6 +412,13 @@ class TimeEntry(object):
             print 'Received: ' + r.text
         else:
             Logger.info('%s started at %s' % (self.data['description'], DateAndTime().format_time(self.start_time)))
+
+    def set(self, prop, value):
+        """
+        Sets the given toggl time entry property to the given value as documented at 
+        https://github.com/toggl/toggl_api_docs/blob/master/chapters/time_entries.md
+        """
+        self.data[prop] = value
 
     def __str__(self):
         """Returns a JSON dump of this entire object as toggl payload."""
@@ -441,60 +464,6 @@ class User(object):
 #----------------------------------------------------------------------------
 #----------------------------------------------------------------------------
 #----------------------------------------------------------------------------
-def add_time_entry(args):
-    """
-    Creates a completed time entry.
-    args should be: DESCR [@PROJECT] START_DATE_TIME 
-        'd'DURATION | END_DATE_TIME
-    """
-    
-    # Make sure we have an entry description.
-    if len(args) < 2:
-        Parser.print_help()
-        return 1
-    entry = args[0]
-    args = args[1:] # strip off the entry description
-    
-    # See if we have a @project.
-    project_name = None
-    if len(args) >= 1 and args[0][0] == '@':
-        project_name = args[0][1:]
-        args = args[1:] # strip off the project
-        project = ProjectList().find_by_name(project_name)
-        if project == None:
-            raise RuntimeError("Project '%s' not found." % project_name)
-
-    # Create the JSON object, or die trying.
-    duration = 0 
-    data = create_time_entry_json(entry, project_name, duration)
-    if data == None:
-        return 1
-
-    # Get start time
-    start_time = DateAndTime().parse_local_datetime_str(args[0])
-    data['time_entry']['start'] = start_time.isoformat()
-    args = args[1:] # strip off the time
-    
-    # Get end time or duration.
-    if len(args) >= 1 and args[0][0] == 'd':
-        data['time_entry']['duration'] = DateAndTime().duration_str_to_seconds(args[0][1:])
-    elif len(args) >= 1:
-        end_time = DateAndTime().parse_local_datetime_str(args[0])
-    	data['time_entry']['stop'] = end_time.isoformat()
-	data['time_entry']['duration'] = (end_time - start_time).seconds
-    else:
-        raise RuntimeError('Must specifiy duration or end time')
-
-    Logger.debug(json.dumps(data))
-    
-    # Send the data.
-    headers = {'content-type': 'application/json'}
-    r = requests.post("%s/time_entries" % TOGGL_URL, auth=Config().auth,
-        data=json.dumps(data), headers=headers)
-    r.raise_for_status() # raise exception on error
-    
-    return 0
-
 #----------------------------------------------------------------------------
 def continue_entry(args):
     """Continues a time entry. args[0] should be the description of the entry
@@ -748,6 +717,7 @@ class Actions(object):
                               action="store_true", dest="debug", default=False,
                               help="print debugging output")
 
+
         (options, args) = self.parser.parse_args()
 
         # Process command-line options.
@@ -760,6 +730,37 @@ class Actions(object):
             global VERBOSE 
             VERBOSE = True
 
+        self.act(args)
+
+    def add_time_entry(self, args):
+        """
+        Creates a completed time entry.
+        args should be: DESCR [@PROJECT] START_DATE_TIME 'd'DURATION | END_DATE_TIME
+        """
+        # Process the args.
+        description = self.get_str_arg(args)
+
+        project_name = self.get_project_arg(args, optional=True)
+        if project_name is not None:
+            project = ProjectList().find_by_name(project_name)
+            if project == None:
+                raise RuntimeError("Project '%s' not found." % project_name)
+
+        start_time = self.get_datetime_arg(args, optional=False)
+        end_time = None
+        duration = self.get_duration_arg(args, optional=True)
+        if duration is None:
+            end_time = self.get_datetime_arg(args, optional=False)
+            duration = (end_time - start_time).seconds
+
+        # Create a time entry.
+        entry = TimeEntry(description, project_name, start_time)
+        entry.set('duration', duration)
+        if end_time is not None:
+            entry.set('stop', end_time.isoformat())
+
+        entry.add()
+        
     def act(self, args):
         """
         Performs the actions described by the list of args. args should be
@@ -769,7 +770,7 @@ class Actions(object):
         if len(args) == 0 or args[0] == "ls":
             return list_time_entries()
         elif args[0] == "add":
-            return add_time_entry(args[1:])
+            self.add_time_entry(args[1:])
         elif args[0] == "clients":
             Logger.info( ClientList() )
         elif args[0] == "continue":
@@ -799,6 +800,24 @@ class Actions(object):
         return DateAndTime().parse_local_datetime_str(
             self.get_str_arg(args, optional)
         )
+
+    def get_duration_arg(self, args, optional=False):
+        """
+        Returns args[0] (e.g. 'dHH:MM:SS') as an integer number of
+        seconds, or None.
+        """
+        if len(args) == 0:
+            if optional:
+                return None
+            else:
+                self.help()
+        elif args[0][0] != 'd':
+            if optional:
+                return None
+            else:
+                self.help()
+        else:
+            return DateAndTime().duration_str_to_seconds( args.pop(0)[1:] )
 
     def get_project_arg(self, args, optional=False):
         """
@@ -851,5 +870,5 @@ class Actions(object):
         entry.start()
         
 if __name__ == "__main__":
-    Actions().act(sys.argv[1:])
+    Actions()
     sys.exit(0)
