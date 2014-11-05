@@ -470,6 +470,9 @@ def continue_entry(args):
     to restart. Assumes that the entry appears in the list returned by
     get_time_entry_data()."""
 
+# Continuing an entry from earlier today, then stopping it sometimes (always?) messes up the time. It seems
+# to count the entire interval from when it was first stopped until the continuation stopped.
+
     if len(args) == 0:
         Parser.print_help()
         return 1
@@ -797,9 +800,15 @@ class Actions(object):
         """
         Returns args[0] as a localized datetime object, or None.
         """
-        return DateAndTime().parse_local_datetime_str(
-            self.get_str_arg(args, optional)
-        )
+        if len(args) == 0:
+            if optional:
+                return None
+            else:
+                self.help()
+        else:
+            return DateAndTime().parse_local_datetime_str(
+                self.get_str_arg(args.pop(0))
+            )
 
     def get_duration_arg(self, args, optional=False):
         """
