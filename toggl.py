@@ -713,7 +713,7 @@ def stop_time_entry(args=None):
 #                                                                                             
 #----------------------------------------------------------------------------
 class Actions(object):
-    """Processes command-line actions."""
+    """Singleton class to process command-line actions."""
 
     __metaclass__ = Singleton
 
@@ -764,7 +764,7 @@ class Actions(object):
         """
         Performs the actions described by the list of args. args should be
         the command line arguments except for the name of the executable
-        program sys.argv[0].
+        program. So typical usage is Actions().act(sys.argv[1:])
         """
         if len(args) == 0 or args[0] == "ls":
             return list_time_entries()
@@ -794,17 +794,11 @@ class Actions(object):
 
     def get_datetime_arg(self, args, optional=False):
         """
-        If the first entry in args is a datetime then return it as a
-        localized datetime object, or None.
+        Returns args[0] as a localized datetime object, or None.
         """
-        if len(args) == 0:
-            if optional:
-                return None
-            else:
-                self.help()
-                sys.exit(1)
-        else:
-            return DateAndTime().parse_local_datetime_str(args.pop(0))
+        return DateAndTime().parse_local_datetime_str(
+            self.get_str_arg(args, optional)
+        )
 
     def get_project_arg(self, args, optional=False):
         """
@@ -822,12 +816,11 @@ class Actions(object):
             else:
                 self.help()
         else:
-            return args.pop(0)
+            return args.pop(0)[1:]
 
     def get_str_arg(self, args, optional=False):
         """
-        Helper method to return the first entry in args as a string, 
-        or None.
+        Returns the first entry in args as a string, or None.
         """
         if len(args) == 0:
             if optional:
