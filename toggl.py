@@ -8,18 +8,31 @@ Modified for toggl API v8 by Beau Raines
 ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 """
 
-#############################################################################
-### Configuration Section                                                 ###
-###
+# NOTES
+#
+# Actions that need to be refactored:
+#  clients
+#  projects
+#  start DESCR [@PROJECT] [DATETIME]
+#  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)
+#  ls
+#  continue DESCR
+#  now
+#  rm ID
+#  stop [DATETIME]
+#  www
 
-# Command to visit toggl.com
-VISIT_WWW_COMMAND = "open http://www.toggl.com/app/timer"
+#
+# Negative duration (seconds since epoch) should be in UTC. If you localize it,
+# it will be off by however far you are from GMT.
+#
+# Need to add some sanity checks to TimeEntry().start() and add(). For example
+# start() should ensure that duration is negative. add() should ensure duration
+# is positive.
 
-###                                                                       ###
-### End of Configuration Section                                          ###
-#############################################################################
-
+import ConfigParser
 import datetime
+import dateutil.parser
 import iso8601
 import json
 import optparse
@@ -29,21 +42,23 @@ import requests
 import sys
 import time
 import urllib
-import ConfigParser
-from dateutil.parser import *
-import dateutil.parser
 
 TOGGL_URL = "https://www.toggl.com/api/v8"
 VERBOSE = False # verbose output?
 Parser = None   # OptionParser initialized by main()
+VISIT_WWW_COMMAND = "open http://www.toggl.com/app/timer"
+
+#############################################################################
+#    _   _ _   _ _ _ _            ____ _                         
+#   | | | | |_(_) (_) |_ _   _   / ___| | __ _ ___ ___  ___  ___ 
+#   | | | | __| | | | __| | | | | |   | |/ _` / __/ __|/ _ \/ __|
+#   | |_| | |_| | | | |_| |_| | | |___| | (_| \__ \__ \  __/\__ \
+#    \___/ \__|_|_|_|\__|\__, |  \____|_|\__,_|___/___/\___||___/
+#                        |___/                                   
+#############################################################################
 
 #----------------------------------------------------------------------------
-#    ____  _             _      _              
-#   / ___|(_)_ __   __ _| | ___| |_ ___  _ __  
-#   \___ \| | '_ \ / _` | |/ _ \ __/ _ \| '_ \ 
-#    ___) | | | | | (_| | |  __/ || (_) | | | |
-#   |____/|_|_| |_|\__, |_|\___|\__\___/|_| |_|
-#                  |___/                       
+# Singleton
 #----------------------------------------------------------------------------
 class Singleton(type):
     """
@@ -63,38 +78,7 @@ class Singleton(type):
         return cls.instance
 
 #----------------------------------------------------------------------------
-#     ____ _ _            _   _     _     _   
-#    / ___| (_) ___ _ __ | |_| |   (_)___| |_ 
-#   | |   | | |/ _ \ '_ \| __| |   | / __| __|
-#   | |___| | |  __/ | | | |_| |___| \__ \ |_ 
-#    \____|_|_|\___|_| |_|\__|_____|_|___/\__|
-#                                             
-#----------------------------------------------------------------------------
-class ClientList(object):
-    """A list of clients."""
-
-    def __init__(self):
-        """Fetches the list of clients from toggl."""
-        url = "%s/clients" % (TOGGL_URL)
-        Logger.debug(url)
-        r = requests.get(url, auth=Config().auth)
-        r.raise_for_status() # raise exception on error
-        self.client_list = json.loads(r.text)
-
-    def __str__(self):
-        """Formats the list of clients as a string."""
-        s = ""
-        for client in self.client_list:
-            s = s + "@%s\n" % (client['name'])
-        return s.rstrip() # strip trailing \n
-
-#----------------------------------------------------------------------------
-#     ____             __ _       
-#    / ___|___  _ __  / _(_) __ _ 
-#   | |   / _ \| '_ \| |_| |/ _` |
-#   | |__| (_) | | | |  _| | (_| |
-#    \____\___/|_| |_|_| |_|\__, |
-#                           |___/ 
+# Config
 #----------------------------------------------------------------------------
 class Config(object):
     """
@@ -106,7 +90,9 @@ class Config(object):
     __metaclass__ = Singleton
 
     def __init__(self):
-        """Reads configuration data from ~/.togglrc."""
+        """
+        Reads configuration data from ~/.togglrc.
+        """
         self.cfg = ConfigParser.ConfigParser()
         if self.cfg.read(os.path.expanduser('~/.togglrc')) == []:
             self._create_empty_config()
@@ -114,16 +100,10 @@ class Config(object):
 
         self.auth = (self.get('auth', 'username'), self.get('auth', 'password'))
     
-    def get(self, section, key):
-        """
-        Returns the value of the configuration variable identified by the
-        given key within the given section of the configuration file. Raises
-        ConfigParser exceptions if the section or key are invalid.
-        """
-        return self.cfg.get(section, key).strip()
-
     def _create_empty_config(self):
-        """Creates a blank ~/.togglrc."""
+        """
+        Creates a blank ~/.togglrc.
+        """
         cfg = ConfigParser.RawConfigParser()
         cfg.add_section('auth')
         cfg.set('auth', 'username', 'user@example.com')
@@ -135,13 +115,16 @@ class Config(object):
             cfg.write(cfgfile)
         os.chmod(os.path.expanduser('~/.togglrc'), 0600)
 
+    def get(self, section, key):
+        """
+        Returns the value of the configuration variable identified by the
+        given key within the given section of the configuration file. Raises
+        ConfigParser exceptions if the section or key are invalid.
+        """
+        return self.cfg.get(section, key).strip()
+
 #----------------------------------------------------------------------------
-#    ____        _          _              _ _____ _                
-#   |  _ \  __ _| |_ ___   / \   _ __   __| |_   _(_)_ __ ___   ___ 
-#   | | | |/ _` | __/ _ \ / _ \ | '_ \ / _` | | | | | '_ ` _ \ / _ \
-#   | |_| | (_| | ||  __// ___ \| | | | (_| | | | | | | | | | |  __/
-#   |____/ \__,_|\__\___/_/   \_\_| |_|\__,_| |_| |_|_| |_| |_|\___|
-#                                                                   
+# DateAndTime
 #----------------------------------------------------------------------------
 class DateAndTime(object):
     """
@@ -153,7 +136,14 @@ class DateAndTime(object):
 
     def __init__(self):
         self.tz = pytz.timezone( Config().get('options', 'timezone') ) 
+        self.epoch = self.tz.localize( datetime.datetime(1970, 1, 1) ) 
 
+    def datetime_to_epoch(self, dt):
+        """
+        Returns the given localizd datetime as the number of seconds since the epoch.
+        """
+        return (dt - self.epoch).total_seconds()
+    
     def duration_str_to_seconds(self, duration_str):
         """
         Parses a string of the form [[Hours:]Minutes:]Seconds and returns
@@ -218,7 +208,9 @@ class DateAndTime(object):
             .replace(hour=23, minute=59, second=59, microsecond=0)
 
     def now(self):
-        """Returns "now" as a localized datetime object."""
+        """
+        Returns "now" as a localized datetime object.
+        """
         return self.tz.localize( datetime.datetime.now() ) 
  
     def parse_local_datetime_str(self, datetime_str):
@@ -236,7 +228,9 @@ class DateAndTime(object):
         return iso8601.parse_date(iso_str).astimezone(self.tz)
 
     def start_of_today(self):
-        """ Returns 00:00:00 today as a localized datetime object."""
+        """
+        Returns 00:00:00 today as a localized datetime object.
+        """
         return self.tz.localize(
             datetime.datetime.combine( datetime.date.today(), datetime.time.min) 
         )
@@ -251,12 +245,7 @@ class DateAndTime(object):
         )
 
 #----------------------------------------------------------------------------
-#    _                                
-#   | |    ___   __ _  __ _  ___ _ __ 
-#   | |   / _ \ / _` |/ _` |/ _ \ '__|
-#   | |__| (_) | (_| | (_| |  __/ |   
-#   |_____\___/ \__, |\__, |\___|_|   
-#               |___/ |___/           
+# Logger 
 #----------------------------------------------------------------------------
 class Logger(object):
     """
@@ -275,23 +264,88 @@ class Logger(object):
 
     @staticmethod
     def debug(msg, end="\n"):
-        """Prints msg if the current logging level >= DEBUG.""" 
+        """
+        Prints msg if the current logging level >= DEBUG.
+        """ 
         if Logger.level >= Logger.DEBUG:
-            print msg+end,
+            print ("%s%s" % (msg, end)),
 
     @staticmethod
     def info(msg, end="\n"):
-        """Prints msg if the current logging level >= INFO.""" 
+        """
+        Prints msg if the current logging level >= INFO.
+        """ 
         if Logger.level >= Logger.INFO:
-            print msg+end,
+            print ("%s%s" % (msg, end)),
 
 #----------------------------------------------------------------------------
-#    ____            _           _   _     _     _   
-#   |  _ \ _ __ ___ (_) ___  ___| |_| |   (_)___| |_ 
-#   | |_) | '__/ _ \| |/ _ \/ __| __| |   | / __| __|
-#   |  __/| | | (_) | |  __/ (__| |_| |___| \__ \ |_ 
-#   |_|   |_|  \___// |\___|\___|\__|_____|_|___/\__|
-#                 |__/                               
+# toggl
+#----------------------------------------------------------------------------
+def toggl(url, method, data=None, headers={'content-type' : 'application/json'}):
+    """
+    Makes an HTTP request to toggl.com. Returns the data received from them.
+    """
+    if method == 'get':
+        r = requests.get(url, auth=Config().auth, data=data, headers=headers)
+    elif method == 'post':
+        r = requests.post(url, auth=Config().auth, data=data, headers=headers)
+    else:
+        raise NotImplementedError('HTTP method "%s" not implemented.' % method)
+    r.raise_for_status() # raise exception on error
+    return r.text
+
+#############################################################################
+#    _                    _   __  __           _      _     
+#   | |_ ___   __ _  __ _| | |  \/  | ___   __| | ___| |___ 
+#   | __/ _ \ / _` |/ _` | | | |\/| |/ _ \ / _` |/ _ \ / __|
+#   | || (_) | (_| | (_| | | | |  | | (_) | (_| |  __/ \__ \
+#    \__\___/ \__, |\__, |_| |_|  |_|\___/ \__,_|\___|_|___/
+#             |___/ |___/                                   
+#############################################################################
+
+#----------------------------------------------------------------------------
+# ClientList
+#----------------------------------------------------------------------------
+class ClientList(object):
+    """
+    A list of clients.
+    """
+
+    def __init__(self):
+        """
+        Fetches the list of clients from toggl.
+        """
+        result = toggl("%s/clients" % TOGGL_URL, 'get')
+        self.client_list = json.loads(result)
+
+    def __iter__(self):
+        """
+        Start iterating over the clients.
+        """
+        self.iter_index = 0
+        return self
+
+    def next(self):
+        """
+        Returns the next client.
+        """
+        if self.iter_index >= len(self.client_list):
+            raise StopIteration
+        else:
+            self.iter_index += 1
+            return self.client_list[self.iter_index-1]
+
+    def __str__(self):
+        """
+        Formats the list of clients as a string.
+        """
+        s = ""
+        for client in self.client_list:
+            s = s + "%s\n" % client['name']
+        return s.rstrip() # strip trailing \n
+
+#----------------------------------------------------------------------------
+# ProjectList
 #----------------------------------------------------------------------------
 class ProjectList(object):
     """
@@ -300,34 +354,41 @@ class ProjectList(object):
     """
 
     def __init__(self):
-        """Fetches the list of projects from toggl."""
-        url = "%s/workspaces/%s/projects" % (TOGGL_URL, User().default_wid)
-        Logger.debug(url)
-        r = requests.get(url, auth=Config().auth)
-        r.raise_for_status() # raise exception on error
-        self.project_list = json.loads(r.text)
+        """
+        Fetches the list of projects from toggl.
+        """
+        result = toggl("%s/workspaces/%s/projects" % (TOGGL_URL, User().default_wid), 'get')
+        self.project_list = json.loads(result)
 
     def find_by_id(self, pid):
-        """Returns the project object with the given id, or None."""
+        """
+        Returns the project object with the given id, or None.
+        """
         for project in self:
             if project['id'] == pid:
                 return project
         return None
 
     def find_by_name(self, name_prefix):
-        """Returns the project object with the given name (or prefix), or None."""
+        """
+        Returns the project object with the given name (or prefix), or None.
+        """
         for project in self:
             if project['name'].startswith(name_prefix):
                 return project
         return None
 
     def __iter__(self):
-        """Start iterating over the projects."""
+        """
+        Start iterating over the projects.
+        """
         self.iter_index = 0
         return self
 
     def next(self):
-        """Returns the next project."""
+        """
+        Returns the next project.
+        """
         if self.iter_index >= len(self.project_list):
             raise StopIteration
         else:
@@ -339,41 +400,44 @@ class ProjectList(object):
         s = ""
         clients = ClientList()
         for project in self:
-            client_name = "No Client"
+            client_name = ''
             if 'cid' in project:
                for client in clients:
                    if project['cid'] == client['id']:
-                       client_name = client['name']
-            s = s + "@%s - %s\n" % (project['name'], client_name)
+                       client_name = " - %s" % client['name']
+            s = s + "@%s%s\n" % (project['name'], client_name)
         return s.rstrip() # strip trailing \n
 
 #----------------------------------------------------------------------------
-#    _____ _                _____       _              
-#   |_   _(_)_ __ ___   ___| ____|_ __ | |_ _ __ _   _ 
-#     | | | | '_ ` _ \ / _ \  _| | '_ \| __| '__| | | |
-#     | | | | | | | | |  __/ |___| | | | |_| |  | |_| |
-#     |_| |_|_| |_| |_|\___|_____|_| |_|\__|_|   \__, |
-#                                                |___/ 
+# TimeEntry
 #----------------------------------------------------------------------------
 class TimeEntry(object):
-    """Represents a single toggl time entry."""
+    """
+    Represents a single toggl time entry. An entry can represent a completed
+    time entry, or a currently running entry on depending on the values of
+    the duration and end_time properties.
 
-    def __init__(self, description, project_name, start_time):
+    NB: If duration is negative, it represents the amount of elapsed time
+    since the epoch. It's not well documented, but toggl expects this duration
+    to be in UTC.
+    """
+
+    def __init__(self, description, start_time, project_name=None):
         """
         Constructor. description(str) is the time entry description,
-        project_name(str) is the name of the project without the @ prefix (or None),
-        start_time(datetime) is the start time.
+        project_name(str) is the optional name of the project without the @ prefix.
+        start_time(datetime) is the time this entry started.
+        end_time(datetime) is the optional time this entry was stopped.
         """
         self.start_time = start_time # start time in datetime format
+        self.project_name = project_name 
 
         self.data = {}  # toggl time entry data
         self.data['description'] = description
         self.data['start'] = start_time.isoformat()
-        self.data['duration'] = 0 - int(start_time.strftime('%s'))
         self.data['billable'] = False
         self.data['created_with'] = 'toggl-cli'
 
-        # See if we have a valid project name.
         if project_name != None:
             # Look up the project from toggl to get the id.
             project = ProjectList().find_by_name(project_name)
@@ -382,32 +446,42 @@ class TimeEntry(object):
             self.data['pid'] = project['id']
 
     def add(self):
-        """Adds this time entry as a completed entry."""
+        """
+        Adds this time entry as a completed entry.
+        """
         try:
             Logger.debug(str(self))
             r = requests.post("%s/time_entries" % TOGGL_URL, 
                 auth=Config().auth,
-                data=str(self), 
+                data=self.json(), 
                 headers={'content-type': 'application/json'}
             )
             r.raise_for_status() # raise exception on error
-        except HTTPError:
-            print 'Sent: ' + self
+        except requests.HTTPError:
+            print 'Sent: ' + self.json()
             print 'Received: ' + r.text
-        else:
-            Logger.info('%s added' % self.data['description'])
+            
+    def json(self):
+        """
+        Returns a JSON dump of this entire object as toggl payload.
+        """
+        return '{"time_entry": %s}' % json.dumps(self.data)
 
     def start(self):
-        """Starts this time entry by telling toggl."""
+        """
+        Starts this time entry by telling toggl.
+        """
+        self.data['duration'] = 0 - DateAndTime().datetime_to_epoch(self.start_time)
+
         try:
             Logger.debug(str(self))
             r = requests.post("%s/time_entries" % TOGGL_URL, 
                 auth=Config().auth,
-                data=str(self), 
+                data=self.json(), 
                 headers={'content-type': 'application/json'}
             )
             r.raise_for_status() # raise exception on error
-        except HTTPError:
+        except requests.HTTPError:
             print 'Sent: ' + self
             print 'Received: ' + r.text
         else:
@@ -415,56 +489,277 @@ class TimeEntry(object):
 
     def set(self, prop, value):
         """
-        Sets the given toggl time entry property to the given value as documented at 
+        Sets the given toggl time entry property to the given value. Properties
+        are documented at 
         https://github.com/toggl/toggl_api_docs/blob/master/chapters/time_entries.md
         """
         self.data[prop] = value
 
     def __str__(self):
-        """Returns a JSON dump of this entire object as toggl payload."""
-        return '{"time_entry": %s}' % json.dumps(self.data)
+        """
+        Returns a human-friendly string representation of this time entry.
+        """
+        # Make a human-friendly elapsed time.
+        elapsed_seconds = 0
+        if self.data['duration'] > 0:
+            is_running = '  '
+            elapsed_seconds = int(self.data['duration'])
+        else:
+            is_running = '* '
+            elapsed_seconds = time.time() + int(self.data['duration'])
+        elapsed_time_str = "%s" % DateAndTime().elapsed_time(int(elapsed_seconds), separator='')
+        
+        # Get the project name, if it exists.
+        if self.project_name is not None:
+            project_name = " @%s " % self.project_name 
+        else:
+            project_name = " "
+
+        s = "%s%s%s%s" % (is_running, self.data['description'], project_name, elapsed_time_str)
+
+        if VERBOSE:
+            s += " [%s]" % self.data['id']
+
+        return s
 
 #----------------------------------------------------------------------------
-#    _   _               
-#   | | | |___  ___ _ __ 
-#   | | | / __|/ _ \ '__|
-#   | |_| \__ \  __/ |   
-#    \___/|___/\___|_|   
-#                        
+# User
 #----------------------------------------------------------------------------
 class User(object):
-    """Singleon. Toggl user data."""
+    """
+    Singleon. Toggl user data.
+    """
 
     __metaclass__ = Singleton
 
     def __init__(self):
-        """Fetches user data from toggl."""
-        
-        url = "%s/me" % (TOGGL_URL)
-        Logger.debug(url)
-        r = requests.get(url, auth=Config().auth)
-        r.raise_for_status() # raise exception on error
-        self.user_data = json.loads(r.text)
+        """
+        Fetches user data from toggl.
+        """
+        result = toggl("%s/me" % TOGGL_URL, 'get')
+        self.__dict__['user_data'] = json.loads(result)
 
     def __getattr__(self, property):
         """
-        Usage: user.PROPERTY
+        Usage: User().PROPERTY
         Return the given toggl user property. User properties are
         documented at https://github.com/toggl/toggl_api_docs/blob/master/chapters/users.md
         """
-        if property == 'since':
-            # 'since' lives at the root of the user_data dict.
-            return self.user_data['since']
-        elif property in self.user_data['data']:
-            # All other properties live within user_data['data'].
-            return self.user_data['data'][property]
+        if property == 'since': # 'since' lives at the root of the user_data dict.
+            return self.__dict__['user_data']['since']
+        elif property in self.__dict__['user_data']['data']:
+            return self.__dict__['user_data']['data'][property]
         else:
             raise AttributeError("toggl user object has no property '%s'" % property)
 
+#############################################################################
+#     ____                                          _   _     _            
+#    / ___|___  _ __ ___  _ __ ___   __ _ _ __   __| | | |   (_)_ __   ___ 
+#   | |   / _ \| '_ ` _ \| '_ ` _ \ / _` | '_ \ / _` | | |   | | '_ \ / _ \
+#   | |__| (_) | | | | | | | | | | | (_| | | | | (_| | | |___| | | | |  __/
+#    \____\___/|_| |_| |_|_| |_| |_|\__,_|_| |_|\__,_| |_____|_|_| |_|\___|
+#                                                                          
+#############################################################################
+
 #----------------------------------------------------------------------------
+# CLI
 #----------------------------------------------------------------------------
-#----------------------------------------------------------------------------
-#----------------------------------------------------------------------------
+class CLI(object):
+    """
+    Singleton class to process command-line actions.
+    """
+    __metaclass__ = Singleton
+
+    def __init__(self):
+        """
+        Initializes the command-line parser and handles the command-line options.
+        """
+
+        # Override the option parser epilog formatting rule.
+        # See http://stackoverflow.com/questions/1857346/python-optparse-how-to-include-additional-info-in-usage-output
+        optparse.OptionParser.format_epilog = lambda self, formatter: self.epilog
+        
+        self.parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
+            epilog="\nActions:\n"
+            "  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
+            "  clients\n\tlists all clients\n"
+            "  continue DESCR\n\trestarts the given entry\n"
+            "  ls\n\tlist recent time entries\n"
+            "  now\n\tprint what you're working on now\n"
+            "  projects\n\tlists all projects\n"
+            "  rm ID\n\tdelete a time entry by id\n"
+            "  start DESCR [@PROJECT] [DATETIME]\n\tstarts a new entry\n"
+            "  stop [DATETIME]\n\tstops the current entry\n"
+            "  www\n\tvisits toggl.com\n"
+            "\n"
+            "  DURATION = [[Hours:]Minutes:]Seconds\n")
+        self.parser.add_option("-q", "--quiet",
+                              action="store_true", dest="quiet", default=False,
+                              help="don't print anything")
+        self.parser.add_option("-v", "--verbose",
+                              action="store_true", dest="verbose", default=False,
+                              help="print additional info")
+        self.parser.add_option("-d", "--debug",
+                              action="store_true", dest="debug", default=False,
+                              help="print debugging output")
+
+        # self.args stores the remaining command line args.
+        (options, self.args) = self.parser.parse_args()
+
+        # Process command-line options.
+        Logger.level = Logger.INFO
+        if options.quiet:
+            Logger.level = Logger.NONE
+        if options.debug:
+            Logger.level = Logger.DEBUG
+        if options.verbose:
+            global VERBOSE 
+            VERBOSE = True
+
+    def add_time_entry(self, args):
+        """
+        Creates a completed time entry.
+        args should be: DESCR [@PROJECT] START_DATE_TIME 'd'DURATION | END_DATE_TIME
+        """
+        # Process the args.
+        description = self.get_str_arg(args)
+
+        project_name = self.get_project_arg(args, optional=True)
+        if project_name is not None:
+            project = ProjectList().find_by_name(project_name)
+            if project == None:
+                raise RuntimeError("Project '%s' not found." % project_name)
+
+        start_time = self.get_datetime_arg(args, optional=False)
+        end_time = None
+        duration = self.get_duration_arg(args, optional=True)
+        if duration is None:
+            end_time = self.get_datetime_arg(args, optional=False)
+            duration = (end_time - start_time).seconds
+
+        # Create a time entry.
+        entry = TimeEntry(description, start_time, project_name)
+        entry.set('duration', duration)
+        if end_time is not None:
+            entry.set('stop', end_time.isoformat())
+
+        entry.add()
+        Logger.info('%s added' % description)
+        
+    def act(self):
+        """
+        Performs the actions described by the list of arguments in self.args.
+        """
+        if len(self.args) == 0 or self.args[0] == "ls":
+            return list_time_entries()
+        elif self.args[0] == "add":
+            self.add_time_entry(self.args[1:])
+        elif self.args[0] == "clients":
+            print ClientList()
+        elif self.args[0] == "continue":
+            return continue_entry(self.args[1:])
+        elif self.args[0] == "now":
+            return list_current_time_entry()
+        elif self.args[0] == "projects":
+            print ProjectList()
+        elif self.args[0] == "rm":
+            return delete_time_entry(self.args[1:])
+        elif self.args[0] == "start":
+            self.start_time_entry(self.args[1:])
+        elif self.args[0] == "stop":
+            if len(self.args) > 1:
+                return stop_time_entry(self.args[1:])
+            else:
+                return stop_time_entry()
+        elif self.args[0] == "www":
+            os.system(VISIT_WWW_COMMAND)	
+        else:
+            self.print_help()
+
+    def get_datetime_arg(self, args, optional=False):
+        """
+        Returns args[0] as a localized datetime object, or None.
+        """
+        if len(args) == 0:
+            if optional:
+                return None
+            else:
+                self.print_help()
+        else:
+            return DateAndTime().parse_local_datetime_str(args.pop(0))
+
+    def get_duration_arg(self, args, optional=False):
+        """
+        Returns args[0] (e.g. 'dHH:MM:SS') as an integer number of
+        seconds, or None.
+        """
+        if len(args) == 0:
+            if optional:
+                return None
+            else:
+                self.print_help()
+        elif args[0][0] != 'd':
+            if optional:
+                return None
+            else:
+                self.print_help()
+        else:
+            return DateAndTime().duration_str_to_seconds( args.pop(0)[1:] )
+
+    def get_project_arg(self, args, optional=False):
+        """
+        If the first entry in args is a project name (e.g., '@project')
+        then return the name of the project, or None.
+        """
+        if len(args) == 0:
+            if optional:
+                return None
+            else:
+                self.print_help()
+        elif args[0][0] != '@':
+            if optional:
+                return None
+            else:
+                self.print_help()
+        else:
+            return args.pop(0)[1:]
+
+    def get_str_arg(self, args, optional=False):
+        """
+        Returns the first entry in args as a string, or None.
+        """
+        if len(args) == 0:
+            if optional:
+                return None
+            else:
+                self.print_help()
+        else:
+            return args.pop(0)
+
+    def print_help(self):
+        """Prints the usage message and exits."""
+        self.parser.print_help()
+        sys.exit(1)
+
+    def start_time_entry(self, args):
+        """
+           Starts a new time entry.
+           args should be: DESCR [@PROJECT] [DATETIME]
+        """
+        description = self.get_str_arg(args, optional=False)
+        project_name = self.get_project_arg(args, optional=True)
+        start_time = self.get_datetime_arg(args, optional=True)
+        if start_time is None:
+            start_time = DateAndTime().now()
+
+        # Create the time entry.
+        entry = TimeEntry(description, start_time, project_name)
+        entry.start()
+        
+#############################################################################
+# Still needs to be refactored.
+#############################################################################
+
 def continue_entry(args):
     """Continues a time entry. args[0] should be the description of the entry
     to restart. Assumes that the entry appears in the list returned by
@@ -474,8 +769,7 @@ def continue_entry(args):
 # to count the entire interval from when it was first stopped until the continuation stopped.
 
     if len(args) == 0:
-        Parser.print_help()
-        return 1
+        CLI().print_help()
 
     description = args[0]
 
@@ -492,7 +786,10 @@ def continue_entry(args):
             if start_time <= DateAndTime().start_of_today():
                 # If the entry was from a previous day, then we simply start
                 # a new entry.
-                start_time_entry( [description, '@%s' % ProjectList().find_by_id(entry['pid'])['name'] ])
+                TimeEntry(description, 
+                    ProjectList().find_by_id(entry['pid'])['name'],
+                    DateAndTime().now()
+                ).start()
             else:
                 # To continue an entry from today, set duration to 
                 # 0-(current_time-duration).
@@ -558,6 +855,7 @@ def get_time_entry_data():
     Logger.debug(url)
     r = requests.get(url, auth=Config().auth)
     r.raise_for_status() # raise exception on error
+    Logger.debug(r.text)
     
     return json.loads(r.text)
 
@@ -676,208 +974,6 @@ def stop_time_entry(args=None):
 
     return 0
 
-#----------------------------------------------------------------------------
-#       _        _   _                 
-#      / \   ___| |_(_) ___  _ __  ___ 
-#     / _ \ / __| __| |/ _ \| '_ \/ __|
-#    / ___ \ (__| |_| | (_) | | | \__ \
-#   /_/   \_\___|\__|_|\___/|_| |_|___/
-#                                                                                             
-#----------------------------------------------------------------------------
-class Actions(object):
-    """Singleton class to process command-line actions."""
-
-    __metaclass__ = Singleton
-
-    def __init__(self):
-        """Constructor."""
-
-        # Override the option parser epilog formatting rule.
-        # See http://stackoverflow.com/questions/1857346/python-optparse-how-to-include-additional-info-in-usage-output
-        optparse.OptionParser.format_epilog = lambda self, formatter: self.epilog
-        
-        self.parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
-            epilog="\nActions:\n"
-            "  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
-            "  clients\n\tlists all clients\n"
-            "  continue DESCR\n\trestarts the given entry\n"
-            "  ls\n\tlist recent time entries\n"
-            "  now\n\tprint what you're working on now\n"
-            "  projects\n\tlists all projects\n"
-            "  rm ID\n\tdelete a time entry by id\n"
-            "  start DESCR [@PROJECT] [DATETIME]\n\tstarts a new entry\n"
-            "  stop [DATETIME]\n\tstops the current entry\n"
-            "  www\n\tvisits toggl.com\n"
-            "\n"
-            "  DURATION = [[Hours:]Minutes:]Seconds\n")
-        self.parser.add_option("-q", "--quiet",
-                              action="store_true", dest="quiet", default=False,
-                              help="don't print anything")
-        self.parser.add_option("-v", "--verbose",
-                              action="store_true", dest="verbose", default=False,
-                              help="print additional info")
-        self.parser.add_option("-d", "--debug",
-                              action="store_true", dest="debug", default=False,
-                              help="print debugging output")
-
-
-        (options, args) = self.parser.parse_args()
-
-        # Process command-line options.
-        Logger.level = Logger.INFO
-        if options.quiet:
-            Logger.level = Logger.NONE
-        if options.debug:
-            Logger.level = Logger.DEBUG
-        if options.verbose:
-            global VERBOSE 
-            VERBOSE = True
-
-        self.act(args)
-
-    def add_time_entry(self, args):
-        """
-        Creates a completed time entry.
-        args should be: DESCR [@PROJECT] START_DATE_TIME 'd'DURATION | END_DATE_TIME
-        """
-        # Process the args.
-        description = self.get_str_arg(args)
-
-        project_name = self.get_project_arg(args, optional=True)
-        if project_name is not None:
-            project = ProjectList().find_by_name(project_name)
-            if project == None:
-                raise RuntimeError("Project '%s' not found." % project_name)
-
-        start_time = self.get_datetime_arg(args, optional=False)
-        end_time = None
-        duration = self.get_duration_arg(args, optional=True)
-        if duration is None:
-            end_time = self.get_datetime_arg(args, optional=False)
-            duration = (end_time - start_time).seconds
-
-        # Create a time entry.
-        entry = TimeEntry(description, project_name, start_time)
-        entry.set('duration', duration)
-        if end_time is not None:
-            entry.set('stop', end_time.isoformat())
-
-        entry.add()
-        
-    def act(self, args):
-        """
-        Performs the actions described by the list of args. args should be
-        the command line arguments except for the name of the executable
-        program. So typical usage is Actions().act(sys.argv[1:])
-        """
-        if len(args) == 0 or args[0] == "ls":
-            return list_time_entries()
-        elif args[0] == "add":
-            self.add_time_entry(args[1:])
-        elif args[0] == "clients":
-            Logger.info( ClientList() )
-        elif args[0] == "continue":
-            return continue_entry(args[1:])
-        elif args[0] == "now":
-            return list_current_time_entry()
-        elif args[0] == "projects":
-            Logger.info( ProjectList() )
-        elif args[0] == "rm":
-            return delete_time_entry(args[1:])
-        elif args[0] == "start":
-            self.start_time_entry(args[1:])
-        elif args[0] == "stop":
-            if len(args) > 1:
-                return stop_time_entry(args[1:])
-            else:
-                return stop_time_entry()
-        elif args[0] == "www":
-            os.system(VISIT_WWW_COMMAND)	
-        else:
-            self.help()
-
-    def get_datetime_arg(self, args, optional=False):
-        """
-        Returns args[0] as a localized datetime object, or None.
-        """
-        if len(args) == 0:
-            if optional:
-                return None
-            else:
-                self.help()
-        else:
-            return DateAndTime().parse_local_datetime_str(
-                self.get_str_arg(args.pop(0))
-            )
-
-    def get_duration_arg(self, args, optional=False):
-        """
-        Returns args[0] (e.g. 'dHH:MM:SS') as an integer number of
-        seconds, or None.
-        """
-        if len(args) == 0:
-            if optional:
-                return None
-            else:
-                self.help()
-        elif args[0][0] != 'd':
-            if optional:
-                return None
-            else:
-                self.help()
-        else:
-            return DateAndTime().duration_str_to_seconds( args.pop(0)[1:] )
-
-    def get_project_arg(self, args, optional=False):
-        """
-        If the first entry in args is a project name (e.g., '@project')
-        then return the name of the project, or None.
-        """
-        if len(args) == 0:
-            if optional:
-                return None
-            else:
-                self.help()
-        elif args[0][0] != '@':
-            if optional:
-                return None
-            else:
-                self.help()
-        else:
-            return args.pop(0)[1:]
-
-    def get_str_arg(self, args, optional=False):
-        """
-        Returns the first entry in args as a string, or None.
-        """
-        if len(args) == 0:
-            if optional:
-                return None
-            else:
-                self.help()
-        else:
-            return args.pop(0)
-
-    def help(self):
-        """Prints the usage message and exits."""
-        self.parser.print_help()
-        sys.exit(1)
-
-    def start_time_entry(self, args):
-        """
-           Starts a new time entry.
-           args should be: DESCR [@PROJECT] [DATETIME]
-        """
-        description = self.get_str_arg(args, optional=False)
-        project_name = self.get_project_arg(args, optional=True)
-        start_time = self.get_datetime_arg(args, optional=True)
-        if start_time is None:
-            start_time = DateAndTime().now()
-
-        # Create the time entry.
-        entry = TimeEntry(description, project_name, start_time)
-        entry.start()
-        
 if __name__ == "__main__":
-    Actions()
+    CLI().act()
     sys.exit(0)
