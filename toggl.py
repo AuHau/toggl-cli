@@ -8,10 +8,10 @@ Modified for toggl API v8 by Beau Raines
 ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 """
 
-# NOTES
+# TODO
 #
+# Refactor CLI._start_time_entry() to move the duration calculation to TimeEntry.
 # Actions that need to be refactored:
-#    start DESCR [@PROJECT] [DATETIME]
 #    ls
 #    now
 #    stop [DATETIME]
@@ -414,14 +414,15 @@ class TimeEntry(object):
     to be in UTC.
     """
 
-    def __init__(self, description, start_time, duration=None, end_time=None, project_name=None):
+    def __init__(self, description, start_time=None, duration=None, end_time=None, project_name=None):
         """
         Constructor. 
         * description(str) is the time entry description.
-        * start_time(datetime) is the time this entry started.
-          duration(int) is the optional duration, in seconds. If None, but end_time is given, then
-          duration is set to end_time-start_time.
-          as 0-time_since_epoch, representing a currently running process.
+        * start_time(datetime) is the optional time this entry started. If None
+          then it is set to the current time.
+        * duration(int) is the optional duration, in seconds. If None, but end_time is given, then
+          duration is set to end_time-start_time. If None and no end_time is given, then
+          duration is set to 0-start_time, representing a currently running process.
         * end_time(datetime) is the optional time this entry ended.
         * project_name(str) is the optional name of the project without the @ prefix.
 
@@ -430,6 +431,8 @@ class TimeEntry(object):
         """
         # This data is also represented in the 'data' dictionary, but in
         # different formats. It is useful to keep them as-is.
+        if start_time is None:
+            start_time = DateAndTime().now()
         self.start_time = start_time
         self.end_time = end_time
         self.project_name = project_name 
@@ -444,7 +447,7 @@ class TimeEntry(object):
             if end_time is not None:
                 duration = (end_time - start_time).seconds
             else:
-                duration = 0-time.time()
+                duration = 0 - DateAndTime().duration_since_epoch(self.start_time)
         self.data['duration'] = duration
 
         if end_time is not None:
@@ -617,10 +620,11 @@ class CLI(object):
                 raise RuntimeError("Project '%s' not found." % project_name)
 
         start_time = self._get_datetime_arg(args, optional=False)
-        end_time = None
         duration = self._get_duration_arg(args, optional=True)
         if duration is None:
             end_time = self._get_datetime_arg(args, optional=False)
+        else:
+            end_time = None
 
         # Create a time entry.
         entry = TimeEntry(description, start_time, duration=duration, end_time=end_time, project_name=project_name)
@@ -732,17 +736,12 @@ class CLI(object):
         description = self._get_str_arg(args, optional=False)
         project_name = self._get_project_arg(args, optional=True)
         start_time = self._get_datetime_arg(args, optional=True)
-        if start_time is None:
-            start_time = DateAndTime().now()
-            duration = None # allow TimeEntry to calculate duration
-        else:
-            duration = 0-DateAndTime().duration_since_epoch(start_time)
 
         # Create the time entry.
-        entry = TimeEntry(description, start_time, duration=duration, project_name=project_name)
+        entry = TimeEntry(description, start_time, project_name=project_name)
         Logger.debug(entry.json())
         entry.start()
-        Logger.info('%s started at %s' % (description, DateAndTime().format_time(start_time)))
+        Logger.info('%s started at %s' % (description, DateAndTime().format_time(entry.start_time)))
         
 #############################################################################
 # Still needs to be refactored.
