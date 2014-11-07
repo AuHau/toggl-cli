@@ -125,14 +125,13 @@ class DateAndTime(object):
 
     def __init__(self):
         self.tz = pytz.timezone( Config().get('options', 'timezone') ) 
-        self.epoch = self.tz.localize( datetime.datetime(1970, 1, 1) ) 
 
-    def datetime_to_epoch(self, dt):
+    def duration_since_epoch(self, dt):
         """
-        Returns the given localizd datetime as the number of seconds since the epoch.
+        Converts the given localized datetime object to the number of seconds since the epoch.
         """
-        return (dt - self.epoch).total_seconds()
-    
+        return (dt.astimezone(pytz.UTC) - datetime.datetime(1970,1,1,tzinfo=pytz.UTC)).total_seconds()
+
     def duration_str_to_seconds(self, duration_str):
         """
         Parses a string of the form [[Hours:]Minutes:]Seconds and returns
@@ -274,14 +273,18 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
     """
     Makes an HTTP request to toggl.com. Returns the data received from them.
     """
-    if method == 'get':
-        r = requests.get(url, auth=Config().auth, data=data, headers=headers)
-    elif method == 'post':
-        r = requests.post(url, auth=Config().auth, data=data, headers=headers)
-    else:
-        raise NotImplementedError('HTTP method "%s" not implemented.' % method)
-    r.raise_for_status() # raise exception on error
-    return r.text
+    try:
+        if method == 'get':
+            r = requests.get(url, auth=Config().auth, data=data, headers=headers)
+        elif method == 'post':
+            r = requests.post(url, auth=Config().auth, data=data, headers=headers)
+        else:
+            raise NotImplementedError('HTTP method "%s" not implemented.' % method)
+        r.raise_for_status() # raise exception on error
+        return r.text
+    except Exception:
+        print 'Sent: %s' % data
+        print 'Received: %s' % r.text
 
 #############################################################################
 #    _                    _   __  __           _      _     
@@ -411,14 +414,16 @@ class TimeEntry(object):
     to be in UTC.
     """
 
-    def __init__(self, description, start_time, duration, end_time=None, project_name=None):
+    def __init__(self, description, start_time, duration=None, end_time=None, project_name=None):
         """
         Constructor. 
-        description(str) is the time entry description,
-        start_time(datetime) is the time this entry started,
-        duration(int) is the duration, in seconds,
-        end_time(datetime) is the time this entry ended,
-        project_name(str) is the optional name of the project without the @ prefix.
+        * description(str) is the time entry description.
+        * start_time(datetime) is the time this entry started.
+          duration(int) is the optional duration, in seconds. If None, but end_time is given, then
+          duration is set to end_time-start_time.
+          as 0-time_since_epoch, representing a currently running process.
+        * end_time(datetime) is the optional time this entry ended.
+        * project_name(str) is the optional name of the project without the @ prefix.
 
         NB: No validation is done to ensure end_time - start_time = duration. toggl will
         accept any data you give it.
@@ -434,6 +439,12 @@ class TimeEntry(object):
         self.data['start'] = start_time.isoformat()
         self.data['billable'] = False
         self.data['created_with'] = 'toggl-cli'
+
+        if duration is None:
+            if end_time is not None:
+                duration = (end_time - start_time).seconds
+            else:
+                duration = 0-time.time()
         self.data['duration'] = duration
 
         if end_time is not None:
@@ -449,17 +460,7 @@ class TimeEntry(object):
         """
         Adds this time entry as a completed entry.
         """
-        try:
-            Logger.debug(self.json())
-            r = requests.post("%s/time_entries" % TOGGL_URL, 
-                auth=Config().auth,
-                data=self.json(), 
-                headers={'content-type': 'application/json'}
-            )
-            r.raise_for_status() # raise exception on error
-        except requests.HTTPError:
-            print 'Sent: ' + self.json()
-            print 'Received: ' + r.text
+        toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
             
     def json(self):
         """
@@ -471,21 +472,7 @@ class TimeEntry(object):
         """
         Starts this time entry by telling toggl.
         """
-        self.data['duration'] = 0 - DateAndTime().datetime_to_epoch(self.start_time)
-
-        try:
-            Logger.debug(str(self))
-            r = requests.post("%s/time_entries" % TOGGL_URL, 
-                auth=Config().auth,
-                data=self.json(), 
-                headers={'content-type': 'application/json'}
-            )
-            r.raise_for_status() # raise exception on error
-        except requests.HTTPError:
-            print 'Sent: ' + self
-            print 'Received: ' + r.text
-        else:
-            Logger.info('%s started at %s' % (self.data['description'], DateAndTime().format_time(self.start_time)))
+        toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
 
     def set(self, prop, value):
         """
@@ -634,13 +621,11 @@ class CLI(object):
         duration = self._get_duration_arg(args, optional=True)
         if duration is None:
             end_time = self._get_datetime_arg(args, optional=False)
-            duration = (end_time - start_time).seconds
 
         # Create a time entry.
-        entry = TimeEntry(description, start_time, duration=duration+100, end_time=end_time, project_name=project_name)
+        entry = TimeEntry(description, start_time, duration=duration, end_time=end_time, project_name=project_name)
 
         Logger.debug(entry.json())
-
         entry.add()
         Logger.info('%s added' % description)
         
@@ -663,7 +648,7 @@ class CLI(object):
         elif self.args[0] == "rm":
             return delete_time_entry(self.args[1:])
         elif self.args[0] == "start":
-            self.start_time_entry(self.args[1:])
+            self._start_time_entry(self.args[1:])
         elif self.args[0] == "stop":
             if len(self.args) > 1:
                 return stop_time_entry(self.args[1:])
@@ -739,20 +724,25 @@ class CLI(object):
         self.parser.print_help()
         sys.exit(1)
 
-    def start_time_entry(self, args):
+    def _start_time_entry(self, args):
         """
-           Starts a new time entry.
-           args should be: DESCR [@PROJECT] [DATETIME]
+        Starts a new time entry.
+        args should be: DESCR [@PROJECT] [DATETIME]
         """
-        description = self.get_str_arg(args, optional=False)
-        project_name = self.get_project_arg(args, optional=True)
-        start_time = self.get_datetime_arg(args, optional=True)
+        description = self._get_str_arg(args, optional=False)
+        project_name = self._get_project_arg(args, optional=True)
+        start_time = self._get_datetime_arg(args, optional=True)
         if start_time is None:
             start_time = DateAndTime().now()
+            duration = None # allow TimeEntry to calculate duration
+        else:
+            duration = 0-DateAndTime().duration_since_epoch(start_time)
 
         # Create the time entry.
-        entry = TimeEntry(description, start_time, project_name)
+        entry = TimeEntry(description, start_time, duration=duration, project_name=project_name)
+        Logger.debug(entry.json())
         entry.start()
+        Logger.info('%s started at %s' % (description, DateAndTime().format_time(start_time)))
         
 #############################################################################
 # Still needs to be refactored.
