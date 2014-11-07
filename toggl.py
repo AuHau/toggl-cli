@@ -11,24 +11,13 @@ ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 # NOTES
 #
 # Actions that need to be refactored:
-#  clients
-#  projects
-#  start DESCR [@PROJECT] [DATETIME]
-#  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)
-#  ls
-#  continue DESCR
-#  now
-#  rm ID
-#  stop [DATETIME]
-#  www
-
-#
-# Negative duration (seconds since epoch) should be in UTC. If you localize it,
-# it will be off by however far you are from GMT.
-#
-# Need to add some sanity checks to TimeEntry().start() and add(). For example
-# start() should ensure that duration is negative. add() should ensure duration
-# is positive.
+#    start DESCR [@PROJECT] [DATETIME]
+#    ls
+#    now
+#    stop [DATETIME]
+#    continue DESCR
+#    rm ID
+# Move VISIT_WWW_COMMAND to .togglrc file.
 
 import ConfigParser
 import datetime
@@ -422,14 +411,22 @@ class TimeEntry(object):
     to be in UTC.
     """
 
-    def __init__(self, description, start_time, project_name=None):
+    def __init__(self, description, start_time, duration, end_time=None, project_name=None):
         """
-        Constructor. description(str) is the time entry description,
+        Constructor. 
+        description(str) is the time entry description,
+        start_time(datetime) is the time this entry started,
+        duration(int) is the duration, in seconds,
+        end_time(datetime) is the time this entry ended,
         project_name(str) is the optional name of the project without the @ prefix.
-        start_time(datetime) is the time this entry started.
-        end_time(datetime) is the optional time this entry was stopped.
+
+        NB: No validation is done to ensure end_time - start_time = duration. toggl will
+        accept any data you give it.
         """
-        self.start_time = start_time # start time in datetime format
+        # This data is also represented in the 'data' dictionary, but in
+        # different formats. It is useful to keep them as-is.
+        self.start_time = start_time
+        self.end_time = end_time
         self.project_name = project_name 
 
         self.data = {}  # toggl time entry data
@@ -437,9 +434,12 @@ class TimeEntry(object):
         self.data['start'] = start_time.isoformat()
         self.data['billable'] = False
         self.data['created_with'] = 'toggl-cli'
+        self.data['duration'] = duration
+
+        if end_time is not None:
+            self.data['stop'] = end_time.isoformat()
 
         if project_name != None:
-            # Look up the project from toggl to get the id.
             project = ProjectList().find_by_name(project_name)
             if project == None:
                 raise RuntimeError("Project '%s' not found." % project_name)
@@ -450,7 +450,7 @@ class TimeEntry(object):
         Adds this time entry as a completed entry.
         """
         try:
-            Logger.debug(str(self))
+            Logger.debug(self.json())
             r = requests.post("%s/time_entries" % TOGGL_URL, 
                 auth=Config().auth,
                 data=self.json(), 
@@ -509,7 +509,6 @@ class TimeEntry(object):
             elapsed_seconds = time.time() + int(self.data['duration'])
         elapsed_time_str = "%s" % DateAndTime().elapsed_time(int(elapsed_seconds), separator='')
         
-        # Get the project name, if it exists.
         if self.project_name is not None:
             project_name = " @%s " % self.project_name 
         else:
@@ -616,32 +615,31 @@ class CLI(object):
             global VERBOSE 
             VERBOSE = True
 
-    def add_time_entry(self, args):
+    def _add_time_entry(self, args):
         """
         Creates a completed time entry.
         args should be: DESCR [@PROJECT] START_DATE_TIME 'd'DURATION | END_DATE_TIME
         """
         # Process the args.
-        description = self.get_str_arg(args)
+        description = self._get_str_arg(args)
 
-        project_name = self.get_project_arg(args, optional=True)
+        project_name = self._get_project_arg(args, optional=True)
         if project_name is not None:
             project = ProjectList().find_by_name(project_name)
             if project == None:
                 raise RuntimeError("Project '%s' not found." % project_name)
 
-        start_time = self.get_datetime_arg(args, optional=False)
+        start_time = self._get_datetime_arg(args, optional=False)
         end_time = None
-        duration = self.get_duration_arg(args, optional=True)
+        duration = self._get_duration_arg(args, optional=True)
         if duration is None:
-            end_time = self.get_datetime_arg(args, optional=False)
+            end_time = self._get_datetime_arg(args, optional=False)
             duration = (end_time - start_time).seconds
 
         # Create a time entry.
-        entry = TimeEntry(description, start_time, project_name)
-        entry.set('duration', duration)
-        if end_time is not None:
-            entry.set('stop', end_time.isoformat())
+        entry = TimeEntry(description, start_time, duration=duration+100, end_time=end_time, project_name=project_name)
+
+        Logger.debug(entry.json())
 
         entry.add()
         Logger.info('%s added' % description)
@@ -653,7 +651,7 @@ class CLI(object):
         if len(self.args) == 0 or self.args[0] == "ls":
             return list_time_entries()
         elif self.args[0] == "add":
-            self.add_time_entry(self.args[1:])
+            self._add_time_entry(self.args[1:])
         elif self.args[0] == "clients":
             print ClientList()
         elif self.args[0] == "continue":
@@ -676,7 +674,7 @@ class CLI(object):
         else:
             self.print_help()
 
-    def get_datetime_arg(self, args, optional=False):
+    def _get_datetime_arg(self, args, optional=False):
         """
         Returns args[0] as a localized datetime object, or None.
         """
@@ -688,7 +686,7 @@ class CLI(object):
         else:
             return DateAndTime().parse_local_datetime_str(args.pop(0))
 
-    def get_duration_arg(self, args, optional=False):
+    def _get_duration_arg(self, args, optional=False):
         """
         Returns args[0] (e.g. 'dHH:MM:SS') as an integer number of
         seconds, or None.
@@ -706,7 +704,7 @@ class CLI(object):
         else:
             return DateAndTime().duration_str_to_seconds( args.pop(0)[1:] )
 
-    def get_project_arg(self, args, optional=False):
+    def _get_project_arg(self, args, optional=False):
         """
         If the first entry in args is a project name (e.g., '@project')
         then return the name of the project, or None.
@@ -724,7 +722,7 @@ class CLI(object):
         else:
             return args.pop(0)[1:]
 
-    def get_str_arg(self, args, optional=False):
+    def _get_str_arg(self, args, optional=False):
         """
         Returns the first entry in args as a string, or None.
         """
