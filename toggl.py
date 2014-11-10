@@ -10,11 +10,16 @@ ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 
 # TODO
 #
+# I don't think the logic of stopping a continued entry works correctly
 # Actions that need to be refactored:
-#    stop [DATETIME]
 #    continue DESCR
 #    rm ID
 # Move VISIT_WWW_COMMAND to .togglrc file.
+
+# This file is divided into three main parts.
+#   1. Utility Classes - generic support code
+#   2. Toggl Models - Toggl-specific data classes
+#   3. Command Line Interface - CLI
 
 import ConfigParser
 import datetime
@@ -146,7 +151,7 @@ class DateAndTime(object):
         
         return duration
 
-    def elapsed_time(self, seconds, suffixes=['y','w','d','h','m','s'], add_s=False, separator=' '):
+    def elapsed_time(self, seconds, suffixes=['y','w','d','h','m','s'], add_s=False, separator=''):
         """
         Takes an amount of seconds and turns it into a human-readable amount of time.
         From http://snipplr.com/view.php?codeview&id=5713
@@ -275,13 +280,16 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
             r = requests.get(url, auth=Config().auth, data=data, headers=headers)
         elif method == 'post':
             r = requests.post(url, auth=Config().auth, data=data, headers=headers)
+        elif method == 'put':
+            r = requests.post(url, auth=Config().auth, data=data, headers=headers)
         else:
             raise NotImplementedError('HTTP method "%s" not implemented.' % method)
         r.raise_for_status() # raise exception on error
         return r.text
-    except Exception:
+    except Exception, e:
         print 'Sent: %s' % data
-        print 'Received: %s' % r.text
+        print e
+        sys.exit(1)
 
 #############################################################################
 #    _                    _   __  __           _      _     
@@ -297,8 +305,12 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
 #----------------------------------------------------------------------------
 class ClientList(object):
     """
-    A list of clients.
+    A singleton list of clients. A "client object" is a set of properties
+    as documented at 
+    https://github.com/toggl/toggl_api_docs/blob/master/chapters/clients.md
     """
+
+    __metaclass__ = Singleton
 
     def __init__(self):
         """
@@ -338,7 +350,7 @@ class ClientList(object):
 #----------------------------------------------------------------------------
 class ProjectList(object):
     """
-    A list of projects. A "project object" is a dictionary as documented
+    A singleton list of projects. A "project object" is a dictionary as documented
     at https://github.com/toggl/toggl_api_docs/blob/master/chapters/projects.md
     """
 
@@ -348,7 +360,7 @@ class ProjectList(object):
         """
         Fetches the list of projects from toggl.
         """
-        result = toggl("%s/workspaces/%s/projects" % (TOGGL_URL, User().default_wid), 'get')
+        result = toggl("%s/workspaces/%s/projects" % (TOGGL_URL, User().get('default_wid')), 'get')
         self.project_list = json.loads(result)
 
     def find_by_id(self, pid):
@@ -413,7 +425,7 @@ class TimeEntry(object):
     to be in UTC.
     """
 
-    def __init__(self, description=None, start_time=None, duration=None, end_time=None, project_name=None, json_str=None):
+    def __init__(self, description=None, start_time=None, duration=None, end_time=None, project_name=None, data_dict=None):
         """
         Constructor. 
         * description(str) is the optional time entry description. 
@@ -426,10 +438,9 @@ class TimeEntry(object):
         * end_time(datetime) is the optional time this entry ended.
         * project_name(str) is the optional name of the project without 
           the @ prefix.
-        * json_str is an optional JSON string from toggl that can be used to 
-          initialize self. If the json parameter is used to initialize the object,
-          its values will supercede any other constructor parameters. We expect
-          the JSON to define a simple dictionary of toggl parameters.
+        * data_dict is an optional dictionary created from a JSON-encoded time
+          entry from toggl. If this parameter is used to initialize the object,
+          its values will supercede any other constructor parameters. 
 
         NB: No validation is done to ensure end_time - start_time = duration. toggl will
         accept any data you give it.
@@ -438,8 +449,8 @@ class TimeEntry(object):
         self.data = {}  # toggl time entry data
 
         # Initialize with json dictionary.
-        if json_str is not None:
-            self.data = json.loads(json_str)
+        if data_dict is not None:
+            self.data = data_dict
             description = self.data['description']
             start_time = DateAndTime().parse_iso_str(self.data['start'])
             duration = self.data['duration']
@@ -521,26 +532,37 @@ class TimeEntry(object):
         """
         self.data[prop] = value
 
+    def stop(self, stop_time=None):
+        """
+        Stops this entry. Sets the stop time to the datetime given, calculates
+        a duration, then updates toggl.
+        stop_time(datetime) is an optional datetime when this entry stopped.
+        """
+        if stop_time is None:
+            stop_time = DateAndTime().now()
+        self.set('stop', stop_time.isoformat())
+        self.set('duration', (stop_time - self.start_time).seconds)
+
+        toggl("%s/time_entries/%d" % (TOGGL_URL, self.get('id')), 'put', self.json())
+        
+
     def __str__(self):
         """
         Returns a human-friendly string representation of this time entry.
         """
-        # Make a human-friendly elapsed time.
-        elapsed_seconds = 0
         if self.data['duration'] > 0:
             is_running = '  '
-            elapsed_seconds = int(self.data['duration'])
         else:
             is_running = '* '
-            elapsed_seconds = time.time() + int(self.data['duration'])
-        elapsed_time_str = "%s" % DateAndTime().elapsed_time(int(elapsed_seconds), separator='')
         
         if self.project_name is not None:
             project_name = " @%s " % self.project_name 
         else:
             project_name = " "
 
-        s = "%s%s%s%s" % (is_running, self.data['description'], project_name, elapsed_time_str)
+        s = "%s%s%s%s" % (is_running, self.data['description'], project_name, 
+            DateAndTime().elapsed_time(int(self.normalized_duration())) \
+        )
 
         if VERBOSE:
             s += " [%s]" % self.data['id']
@@ -568,13 +590,13 @@ class TimeEntryList(object):
             urllib.quote(DateAndTime().last_minute_today().isoformat('T')))
         Logger.debug(url)
         entries = json.loads( toggl(url, 'get') )
-        Logger.debug(entries)
+        # Logger.debug(entries)
 
         self.time_entries = []
         for entry in entries:
-            te = TimeEntry(json_str=json.dumps(entry))
+            te = TimeEntry(data_dict=entry)
             Logger.debug(te.json())
-            Logger.debug('===')
+            Logger.debug('---')
             self.time_entries.append(te)
         
     def __iter__(self):
@@ -609,7 +631,7 @@ class TimeEntryList(object):
 #----------------------------------------------------------------------------
 class User(object):
     """
-    Singleon. Toggl user data.
+    Singleton toggl user data.
     """
 
     __metaclass__ = Singleton
@@ -619,20 +641,20 @@ class User(object):
         Fetches user data from toggl.
         """
         result = toggl("%s/me" % TOGGL_URL, 'get')
-        self.__dict__['user_data'] = json.loads(result)
+        result_dict = json.loads(result)
 
-    def __getattr__(self, property):
+        # Results come back in two parts. 'since' is how long the user has
+        # had their toggl account. 'data' is a dictionary of all the other
+        # user data.
+        self.data = result_dict['data']
+        self.data['since'] = result_dict['since']
+
+    def get(self, prop):
         """
-        Usage: User().PROPERTY
         Return the given toggl user property. User properties are
         documented at https://github.com/toggl/toggl_api_docs/blob/master/chapters/users.md
         """
-        if property == 'since': # 'since' lives at the root of the user_data dict.
-            return self.__dict__['user_data']['since']
-        elif property in self.__dict__['user_data']['data']:
-            return self.__dict__['user_data']['data'][property]
-        else:
-            raise AttributeError("toggl user object has no property '%s'" % property)
+        return self.data[prop]
 
 #############################################################################
 #     ____                                          _   _     _            
@@ -747,10 +769,7 @@ class CLI(object):
         elif self.args[0] == "start":
             self._start_time_entry(self.args[1:])
         elif self.args[0] == "stop":
-            if len(self.args) > 1:
-                return stop_time_entry(self.args[1:])
-            else:
-                return stop_time_entry()
+            self._stop_time_entry(self.args[1:])
         elif self.args[0] == "www":
             os.system(VISIT_WWW_COMMAND)	
         else:
@@ -872,6 +891,26 @@ class CLI(object):
         entry.start()
         Logger.info('%s started at %s' % (description, DateAndTime().format_time(entry.start_time)))
         
+    def _stop_time_entry(self, args):
+        """
+        Stops the current time entry. 
+        args contains an optional end time.
+        """
+
+        entry = TimeEntryList().now()
+        if entry != None:
+            if args != None:
+                stop_time = DateAndTime().parse_local_datetime_str(args[0])
+            else:
+                stop_time = DateAndTime().now()
+
+            entry.stop(stop_time)
+            Logger.debug(entry.json())
+
+            Logger.info('%s stopped at %s' % (entry.get('description'), DateAndTime().format_time(stop_time)))
+        else:
+            Logger.info("You're not working on anything right now.")
+
 #############################################################################
 # Still needs to be refactored.
 #############################################################################
@@ -945,45 +984,6 @@ def delete_time_entry(args):
             r = requests.delete("%s/time_entries/%s" % (TOGGL_URL, entry_id), auth=Config().auth,
                 data=None, headers=headers)
             r.raise_for_status() # raise exception on error
-
-    return 0
-
-#----------------------------------------------------------------------------
-def stop_time_entry(args=None):
-    """
-    Stops the current time entry (duration is currently negative).
-    args contains an optional end time.
-    """
-
-    entry = get_current_time_entry()
-    if entry != None:
-        # Get the start time from the entry.
-        start_time = DateAndTime().parse_iso_str(entry['start'])
-
-        if args != None and len(args) == 1:
-	    stop_time = DateAndTime().parse_local_datetime_str(args[0])
-        else:
-            # Get stop time (now) in UTC.
-            stop_time = DateAndTime().now()
-
-        # Create the payload.
-        data = { 'time_entry' : entry }
-        data['time_entry']['stop'] = stop_time.isoformat()
-        data['time_entry']['duration'] = (stop_time - start_time).seconds
-
-        url = "%s/time_entries/%d" % (TOGGL_URL, entry['id'])
-
-        Logger.debug(url)
-        Logger.debug(json.dumps(data))
-
-        headers = {'content-type': 'application/json'}
-        r = requests.put(url, auth=Config().auth, data=json.dumps(data), headers=headers)
-        r.raise_for_status() # raise exception on error
-
-        Logger.info('%s stopped at %s' % (entry['description'], DateAndTime().format_time(stop_time)))
-    else:
-        Logger.info("You're not working on anything right now.")
-        return 1
 
     return 0
 
