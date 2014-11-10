@@ -10,9 +10,7 @@ ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 
 # TODO
 #
-# Refactor CLI._start_time_entry() to move the duration calculation to TimeEntry.
 # Actions that need to be refactored:
-#    ls
 #    now
 #    stop [DATETIME]
 #    continue DESCR
@@ -256,7 +254,7 @@ class Logger(object):
         Prints msg if the current logging level >= DEBUG.
         """ 
         if Logger.level >= Logger.DEBUG:
-            print ("%s%s" % (msg, end)),
+            print("%s%s" % (msg, end)),
 
     @staticmethod
     def info(msg, end="\n"):
@@ -264,14 +262,14 @@ class Logger(object):
         Prints msg if the current logging level >= INFO.
         """ 
         if Logger.level >= Logger.INFO:
-            print ("%s%s" % (msg, end)),
+            print("%s%s" % (msg, end)),
 
 #----------------------------------------------------------------------------
 # toggl
 #----------------------------------------------------------------------------
 def toggl(url, method, data=None, headers={'content-type' : 'application/json'}):
     """
-    Makes an HTTP request to toggl.com. Returns the data received from them.
+    Makes an HTTP request to toggl.com. Returns the raw text data received.
     """
     try:
         if method == 'get':
@@ -345,6 +343,8 @@ class ProjectList(object):
     at https://github.com/toggl/toggl_api_docs/blob/master/chapters/projects.md
     """
 
+    __metaclass__ = Singleton
+
     def __init__(self):
         """
         Fetches the list of projects from toggl.
@@ -414,21 +414,41 @@ class TimeEntry(object):
     to be in UTC.
     """
 
-    def __init__(self, description, start_time=None, duration=None, end_time=None, project_name=None):
+    def __init__(self, description=None, start_time=None, duration=None, end_time=None, project_name=None, json_str=None):
         """
         Constructor. 
-        * description(str) is the time entry description.
+        * description(str) is the optional time entry description. 
         * start_time(datetime) is the optional time this entry started. If None
           then it is set to the current time.
-        * duration(int) is the optional duration, in seconds. If None, but end_time is given, then
-          duration is set to end_time-start_time. If None and no end_time is given, then
-          duration is set to 0-start_time, representing a currently running process.
+        * duration(int) is the optional duration, in seconds. If None, but 
+          end_time is given, then duration is set to end_time-start_time. If 
+          None and no end_time is given, then duration is set to 0-start_time, 
+          representing a currently running process.
         * end_time(datetime) is the optional time this entry ended.
-        * project_name(str) is the optional name of the project without the @ prefix.
+        * project_name(str) is the optional name of the project without 
+          the @ prefix.
+        * json_str is an optional JSON string from toggl that can be used to 
+          initialize self. If the json parameter is used to initialize the object,
+          its values will supercede any other constructor parameters. We expect
+          the JSON to define a simple dictionary of toggl parameters.
 
         NB: No validation is done to ensure end_time - start_time = duration. toggl will
         accept any data you give it.
         """
+
+        self.data = {}  # toggl time entry data
+
+        # Initialize with json dictionary.
+        if json_str is not None:
+            self.data = json.loads(json_str)
+            description = self.data['description']
+            start_time = DateAndTime().parse_iso_str(self.data['start'])
+            duration = self.data['duration']
+            if 'stop' in self.data:
+                end_time = DateAndTime().parse_iso_str(self.data['stop'])
+            if 'pid' in self.data:
+                project_name = ProjectList().find_by_id(self.data['pid'])['name']
+
         # This data is also represented in the 'data' dictionary, but in
         # different formats. It is useful to keep them as-is.
         if start_time is None:
@@ -437,7 +457,6 @@ class TimeEntry(object):
         self.end_time = end_time
         self.project_name = project_name 
 
-        self.data = {}  # toggl time entry data
         self.data['description'] = description
         self.data['start'] = start_time.isoformat()
         self.data['billable'] = False
@@ -464,12 +483,30 @@ class TimeEntry(object):
         Adds this time entry as a completed entry.
         """
         toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
+
+    def get(self, prop):
+        """
+        Returns the given toggl time entry property as documented at 
+        https://github.com/toggl/toggl_api_docs/blob/master/chapters/time_entries.md
+        """
+        return self.data[prop]
             
     def json(self):
         """
         Returns a JSON dump of this entire object as toggl payload.
         """
         return '{"time_entry": %s}' % json.dumps(self.data)
+
+    def normalized_duration(self):
+        """
+        Returns a "normalized" duration. If the native duration is positive, it
+        is simply returned. If negative, we return current_time + duration (the
+        actual amount of seconds this entry has been running).
+        """
+        if self.data['duration'] > 0:
+            return int(self.data['duration'])
+        else:
+            return time.time() + int(self.data['duration'])
 
     def start(self):
         """
@@ -510,6 +547,53 @@ class TimeEntry(object):
             s += " [%s]" % self.data['id']
 
         return s
+
+#----------------------------------------------------------------------------
+# TimeEntryList
+#----------------------------------------------------------------------------
+class TimeEntryList(object):
+    """
+    A singleton list of recent TimeEntry objects.
+    """
+
+    __metaclass__ = Singleton
+
+    def __init__(self):
+        """
+        Fetches time entry data from toggl.
+        """
+
+        # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
+        url = "%s/time_entries?start_date=%s&end_date=%s" % \
+            (TOGGL_URL, urllib.quote(DateAndTime().start_of_yesterday().isoformat('T')), \
+            urllib.quote(DateAndTime().last_minute_today().isoformat('T')))
+        Logger.debug(url)
+        entries = json.loads( toggl(url, 'get') )
+        Logger.debug(entries)
+
+        self.time_entries = []
+        for entry in entries:
+            te = TimeEntry(json_str=json.dumps(entry))
+            Logger.debug(te.json())
+            Logger.debug('===')
+            self.time_entries.append(te)
+        
+    def __iter__(self):
+        """
+        Start iterating over the time entries.
+        """
+        self.iter_index = 0
+        return self
+
+    def next(self):
+        """
+        Returns the next time entry.
+        """
+        if self.iter_index >= len(self.time_entries):
+            raise StopIteration
+        else:
+            self.iter_index += 1
+            return self.time_entries[self.iter_index-1]
 
 #----------------------------------------------------------------------------
 # User
@@ -638,7 +722,7 @@ class CLI(object):
         Performs the actions described by the list of arguments in self.args.
         """
         if len(self.args) == 0 or self.args[0] == "ls":
-            return list_time_entries()
+            return self._list_time_entries()
         elif self.args[0] == "add":
             self._add_time_entry(self.args[1:])
         elif self.args[0] == "clients":
@@ -722,6 +806,31 @@ class CLI(object):
                 self.print_help()
         else:
             return args.pop(0)
+
+    def _list_time_entries(self):
+	"""
+        Lists all of the time entries from yesterday and today along with
+	the amount of time devoted to each.
+	"""
+
+        entries = TimeEntryList()
+
+	# Sort the time entries into buckets based on "Month Day" of the entry.
+	days = { }
+	for entry in entries:
+            start_time = DateAndTime().parse_iso_str(entry.get('start')).strftime("%Y-%m-%d")
+            if start_time not in days:
+                days[start_time] = []
+            days[start_time].append(entry)
+
+	# For each day, print the entries, then sum the times.
+	for date in sorted(days.keys()):
+            Logger.info(date)
+            duration = 0
+            for entry in days[date]:
+                Logger.info(entry)
+                duration += entry.normalized_duration()
+            Logger.info("  (%s)" % DateAndTime().elapsed_time(int(duration)) )
 
     def print_help(self):
         """Prints the usage message and exits."""
@@ -862,64 +971,27 @@ def list_current_time_entry():
     return 0
 
 #----------------------------------------------------------------------------
-def list_time_entries():
-	"""Lists all of the time entries from yesterday and today along with
-	   the amount of time devoted to each.
-	"""
-
-	# Get an array of objects of recent time data.
-	response = get_time_entry_data()
-
-	# Sort the time entries into buckets based on "Month Day" of the entry.
-	days = { }
-        projects = ProjectList()
-	for entry in response:
-		start_time = DateAndTime().parse_iso_str(entry['start']).strftime("%b %d")
-		if start_time not in days:
-			days[start_time] = []
-		days[start_time].append(entry)
-                # If the entry has a project, get it's name.
-    		if 'pid' in entry:
-	            entry['project_name'] = '@' + projects.find_by_id(entry['pid'])['name']
-
-	# For each day, print the entries, then sum the times.
-	for date in sorted(days.keys()):
-            Logger.info(date)
-            duration = 0
-            for entry in days[date]:
-                    Logger.info("  ", end="")
-                    duration += print_time_entry(entry)
-            Logger.info("   (%s)" % DateAndTime().elapsed_time(int(duration)))
-
-	return 0
-
-#----------------------------------------------------------------------------
 def print_time_entry(entry):
     """Utility function to print a time entry object and returns the
 	   integer duration for this entry."""
     
     # If the duration is negative, the entry is currently running so we
     # have to calculate the duration by adding the current time.
-    is_running = ''
     e_time = 0
     if entry['duration'] > 0:
+        is_running = '   '
         e_time = int(entry['duration'])
     else:
-        is_running = '*'
+        is_running = ' * '
         e_time = time.time() + int(entry['duration'])
-    e_time_str = "%s" % DateAndTime().elapsed_time(int(e_time), separator='')
+    e_time_str = DateAndTime().elapsed_time(int(e_time), separator='')
     
-    Logger.info(is_running, end="")
-    Logger.info(entry['description'], end="")
-    if 'project_name' in entry:
-        Logger.info(entry['project_name'], end="")
-    Logger.info(e_time_str, end="")
-
+    project_name = (entry['project_name'] if 'project_name' in entry else None)
+    s = "%s%s %s %s" % (is_running, entry['description'], project_name, e_time_str) 
     if VERBOSE:
-        Logger.info("[%s]" % entry['id'])
-    else:
-        Logger.info("")
+        s += " [%s]" % entry['id']
 
+    Logger.info(s)
     return e_time
 
 #----------------------------------------------------------------------------
