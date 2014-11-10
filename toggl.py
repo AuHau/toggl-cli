@@ -11,7 +11,6 @@ ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 # TODO
 #
 # Actions that need to be refactored:
-#    now
 #    stop [DATETIME]
 #    continue DESCR
 #    rm ID
@@ -587,14 +586,24 @@ class TimeEntryList(object):
 
     def next(self):
         """
-        Returns the next time entry.
+        Returns the next time entry object.
         """
         if self.iter_index >= len(self.time_entries):
             raise StopIteration
         else:
             self.iter_index += 1
             return self.time_entries[self.iter_index-1]
-
+    
+    def now(self):
+        """
+        Returns the current time entry object or None.
+        """
+        for entry in self:
+            if int(entry.get('duration')) < 0:
+                return entry
+        
+        return None
+    
 #----------------------------------------------------------------------------
 # User
 #----------------------------------------------------------------------------
@@ -730,7 +739,7 @@ class CLI(object):
         elif self.args[0] == "continue":
             return continue_entry(self.args[1:])
         elif self.args[0] == "now":
-            return list_current_time_entry()
+            return self._list_current_time_entry()
         elif self.args[0] == "projects":
             print ProjectList()
         elif self.args[0] == "rm":
@@ -806,6 +815,17 @@ class CLI(object):
                 self.print_help()
         else:
             return args.pop(0)
+
+    def _list_current_time_entry(self):
+        """
+        Shows what the user is currently working on.
+        """
+        entry = TimeEntryList().now()
+
+        if entry != None:
+            Logger.info(str(entry))
+        else:
+            Logger.info("You're not working on anything right now.")
 
     def _list_time_entries(self):
 	"""
@@ -927,72 +947,6 @@ def delete_time_entry(args):
             r.raise_for_status() # raise exception on error
 
     return 0
-    
-#----------------------------------------------------------------------------
-def get_current_time_entry():
-    """Returns the current time entry JSON object, or None."""
-    response = get_time_entry_data()
-    
-    for entry in response:
-        if int(entry['duration']) < 0:
-            return entry
-    
-    return None
-
-#----------------------------------------------------------------------------
-def get_time_entry_data():
-    """Fetches time entry data and returns it as a Python array."""
-
-    # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
-    url = "%s/time_entries?start_date=%s&end_date=%s" % \
-        (TOGGL_URL, urllib.quote(DateAndTime().start_of_yesterday().isoformat('T')), \
-        urllib.quote(DateAndTime().last_minute_today().isoformat('T')))
-
-    Logger.debug(url)
-    r = requests.get(url, auth=Config().auth)
-    r.raise_for_status() # raise exception on error
-    Logger.debug(r.text)
-    
-    return json.loads(r.text)
-
-#----------------------------------------------------------------------------
-def list_current_time_entry():
-    """Shows what the user is currently working on."""
-    entry = get_current_time_entry()
-
-    if entry != None:
-	# Lookup the project name, if it exists.
-    	if 'pid' in entry:
-            entry['project_name'] = '@' + ProjectList().find_by_id(entry['pid'])['name']
-        print_time_entry(entry)
-    else:
-        Logger.info("You're not working on anything right now.")
-    
-    return 0
-
-#----------------------------------------------------------------------------
-def print_time_entry(entry):
-    """Utility function to print a time entry object and returns the
-	   integer duration for this entry."""
-    
-    # If the duration is negative, the entry is currently running so we
-    # have to calculate the duration by adding the current time.
-    e_time = 0
-    if entry['duration'] > 0:
-        is_running = '   '
-        e_time = int(entry['duration'])
-    else:
-        is_running = ' * '
-        e_time = time.time() + int(entry['duration'])
-    e_time_str = DateAndTime().elapsed_time(int(e_time), separator='')
-    
-    project_name = (entry['project_name'] if 'project_name' in entry else None)
-    s = "%s%s %s %s" % (is_running, entry['description'], project_name, e_time_str) 
-    if VERBOSE:
-        s += " [%s]" % entry['id']
-
-    Logger.info(s)
-    return e_time
 
 #----------------------------------------------------------------------------
 def stop_time_entry(args=None):
