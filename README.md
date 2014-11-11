@@ -14,6 +14,8 @@ help).
 Latest Update
 -------------
 
+**11 Nov 2014**: Major refactoring into a more MVC OO structure.
+
 **30 Oct 2014**: Added a feature that starting, stopping, and continuing an
 entry prints out the time it started or stopped. This requires a new option in
 ~/.togglrc: `time_format = %I:%M%p` is the default.  See
@@ -60,24 +62,24 @@ Usage
 
 	Actions:
 	  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)
-		 creates a completed time entry
+		  creates a completed time entry
 	  clients
-		 lists all clients
+		  lists all clients
 	  continue DESCR
-		 restarts the given entry
+		  restarts the given entry
 	  ls
-		 list recent time entries
+		  list recent time entries
 	  now
-		 print what you're working on now
+		  print what you're working on now
 	  projects
-		 lists all projects
+		  lists all projects
 	  rm ID
-		 delete a time entry by id
+		  delete a time entry by id
 	  start DESCR [@PROJECT] [DATETIME]
-		 starts a new entry
+		  starts a new entry
 	  stop [DATETIME]
-		 stops the current entry
+		  stops the current entry
 	  www
-		 visits toggl.com
+		  visits toggl.com
 
 	  DURATION = [[Hours:]Minutes:]Seconds
