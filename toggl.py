@@ -10,11 +10,11 @@ ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 
 # TODO
 #
-# I don't think the logic of stopping a continued entry works correctly
-# Actions that need to be refactored:
-#    continue DESCR
-#    rm ID
-# Move VISIT_WWW_COMMAND to .togglrc file.
+# * Refactor into OO:
+#     - continue DESCR
+#     - rm ID
+# * Move VISIT_WWW_COMMAND to .togglrc file.
+# * Write some tests.
 
 # This file is divided into three main parts.
 #   1. Utility Classes - generic support code
@@ -130,7 +130,8 @@ class DateAndTime(object):
 
     def duration_since_epoch(self, dt):
         """
-        Converts the given localized datetime object to the number of seconds since the epoch.
+        Converts the given localized datetime object to the number of 
+        seconds since the epoch.
         """
         return (dt.astimezone(pytz.UTC) - datetime.datetime(1970,1,1,tzinfo=pytz.UTC)).total_seconds()
 
@@ -153,7 +154,8 @@ class DateAndTime(object):
 
     def elapsed_time(self, seconds, suffixes=['y','w','d','h','m','s'], add_s=False, separator=''):
         """
-        Takes an amount of seconds and turns it into a human-readable amount of time.
+        Takes an amount of seconds and turns it into a human-readable amount
+        of time.
         From http://snipplr.com/view.php?codeview&id=5713
         """
         # the formatted time string to be returned
@@ -289,7 +291,8 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
     except Exception, e:
         print 'Sent: %s' % data
         print e
-        sys.exit(1)
+        print r.text
+        #sys.exit(1)
 
 #############################################################################
 #    _                    _   __  __           _      _     
@@ -350,8 +353,9 @@ class ClientList(object):
 #----------------------------------------------------------------------------
 class ProjectList(object):
     """
-    A singleton list of projects. A "project object" is a dictionary as documented
-    at https://github.com/toggl/toggl_api_docs/blob/master/chapters/projects.md
+    A singleton list of projects. A "project object" is a dictionary as 
+    documented at 
+    https://github.com/toggl/toggl_api_docs/blob/master/chapters/projects.md
     """
 
     __metaclass__ = Singleton
@@ -416,90 +420,71 @@ class ProjectList(object):
 #----------------------------------------------------------------------------
 class TimeEntry(object):
     """
-    Represents a single toggl time entry. An entry can represent a completed
-    time entry, or a currently running entry on depending on the values of
-    the duration and end_time properties.
+    Represents a single time entry. 
 
     NB: If duration is negative, it represents the amount of elapsed time
     since the epoch. It's not well documented, but toggl expects this duration
     to be in UTC.
     """
 
-    def __init__(self, description=None, start_time=None, duration=None, end_time=None, project_name=None, data_dict=None):
+    def __init__(self, description=None, start_time=None, stop_time=None, duration=None, project_name=None, data_dict=None):
         """
-        Constructor. 
+        Constructor. None of the parameters are required at object creation,
+        but the object is validated before data is sent to toggl.
         * description(str) is the optional time entry description. 
-        * start_time(datetime) is the optional time this entry started. If None
-          then it is set to the current time.
-        * duration(int) is the optional duration, in seconds. If None, but 
-          end_time is given, then duration is set to end_time-start_time. If 
-          None and no end_time is given, then duration is set to 0-start_time, 
-          representing a currently running process.
-        * end_time(datetime) is the optional time this entry ended.
+        * start_time(datetime) is the optional time this entry started. 
+        * stop_time(datetime) is the optional time this entry ended.
+        * duration(int) is the optional duration, in seconds. 
         * project_name(str) is the optional name of the project without 
-          the @ prefix.
+          the '@' prefix.
         * data_dict is an optional dictionary created from a JSON-encoded time
           entry from toggl. If this parameter is used to initialize the object,
           its values will supercede any other constructor parameters. 
-
-        NB: No validation is done to ensure end_time - start_time = duration. toggl will
-        accept any data you give it.
         """
 
-        self.data = {}  # toggl time entry data
-
-        # Initialize with json dictionary.
-        if data_dict is not None:
-            self.data = data_dict
-            description = self.data['description']
-            start_time = DateAndTime().parse_iso_str(self.data['start'])
-            duration = self.data['duration']
-            if 'stop' in self.data:
-                end_time = DateAndTime().parse_iso_str(self.data['stop'])
-            if 'pid' in self.data:
-                project_name = ProjectList().find_by_id(self.data['pid'])['name']
-
-        # This data is also represented in the 'data' dictionary, but in
-        # different formats. It is useful to keep them as-is.
-        if start_time is None:
-            start_time = DateAndTime().now()
-        self.start_time = start_time
-        self.end_time = end_time
-        self.project_name = project_name 
-
-        self.data['description'] = description
-        self.data['start'] = start_time.isoformat()
-        self.data['billable'] = False
+        # All toggl data is stored in the "data" dictionary.
+        self.data = {} 
         self.data['created_with'] = 'toggl-cli'
 
-        if duration is None:
-            if end_time is not None:
-                duration = (end_time - start_time).seconds
-            else:
-                duration = 0 - DateAndTime().duration_since_epoch(self.start_time)
-        self.data['duration'] = duration
+        if description is not None:
+            self.data['description'] = description
 
-        if end_time is not None:
-            self.data['stop'] = end_time.isoformat()
+        if start_time is not None:
+            self.data['start'] = start_time.isoformat()
 
-        if project_name != None:
+        if stop_time is not None:
+            self.data['stop'] = stop_time.isoformat()
+
+        if project_name is not None:
             project = ProjectList().find_by_name(project_name)
             if project == None:
                 raise RuntimeError("Project '%s' not found." % project_name)
             self.data['pid'] = project['id']
 
+        if duration is not None:
+            self.data['duration'] = duration
+
+        # If we have a dictionary of data, use it to initialize this.
+        if data_dict is not None:
+            self.data = data_dict
+       
     def add(self):
         """
-        Adds this time entry as a completed entry.
+        Adds this time entry as a completed entry. 
         """
+        self.validate()
         toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
 
     def get(self, prop):
         """
         Returns the given toggl time entry property as documented at 
         https://github.com/toggl/toggl_api_docs/blob/master/chapters/time_entries.md
+        or None, if the property isn't set.
         """
-        return self.data[prop]
+        if prop in self.data:
+            return self.data[prop]
+        else:
+            return None
             
     def json(self):
         """
@@ -509,10 +494,13 @@ class TimeEntry(object):
 
     def normalized_duration(self):
         """
-        Returns a "normalized" duration. If the native duration is positive, it
-        is simply returned. If negative, we return current_time + duration (the
-        actual amount of seconds this entry has been running).
+        Returns a "normalized" duration. If the native duration is positive, 
+        it is simply returned. If negative, we return current_time + duration 
+        (the actual amount of seconds this entry has been running). If no
+        duration is set, raises an exception.
         """
+        if 'duration' not in self.data:
+            raise Exception('Time entry has no "duration" property')
         if self.data['duration'] > 0:
             return int(self.data['duration'])
         else:
@@ -520,31 +508,49 @@ class TimeEntry(object):
 
     def start(self):
         """
-        Starts this time entry by telling toggl.
+        Starts this time entry by telling toggl. If this entry doesn't have
+        a start time yet, it is set to now. duration is set to
+        0-start_time.
         """
+        if 'start' not in self.data:
+            start_time = DateAndTime().now()
+            self.data['start'] = start_time.isoformat()
+        else:
+            start_time = DateAndTime().parse_iso_str(self.get('start'))
+        self.set('duration', 0-DateAndTime().duration_since_epoch(start_time))
+
+        self.validate()
+
         toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
 
     def set(self, prop, value):
         """
-        Sets the given toggl time entry property to the given value. Properties
-        are documented at 
+        Sets the given toggl time entry property to the given value.
+        Properties are documented at 
         https://github.com/toggl/toggl_api_docs/blob/master/chapters/time_entries.md
         """
         self.data[prop] = value
 
     def stop(self, stop_time=None):
         """
-        Stops this entry. Sets the stop time to the datetime given, calculates
+        Stops this entry. Sets the stop time at the datetime given, calculates
         a duration, then updates toggl.
-        stop_time(datetime) is an optional datetime when this entry stopped.
+        stop_time(datetime) is an optional datetime when this entry stopped. If
+        not given, then stops the time entry now.
         """
+        self.validate()
+        if int(self.data['duration']) >= 0:
+            raise Exception("toggl: time entry is not currently running.")
+        if 'id' not in self.data:
+            raise Exception("toggl: time entry must have an id.")
+
         if stop_time is None:
             stop_time = DateAndTime().now()
         self.set('stop', stop_time.isoformat())
-        self.set('duration', (stop_time - self.start_time).seconds)
+        self.set('duration', \
+            DateAndTime().duration_since_epoch(stop_time) + int(self.get('duration')))
 
         toggl("%s/time_entries/%d" % (TOGGL_URL, self.get('id')), 'put', self.json())
-        
 
     def __str__(self):
         """
@@ -555,8 +561,8 @@ class TimeEntry(object):
         else:
             is_running = '* '
         
-        if self.project_name is not None:
-            project_name = " @%s " % self.project_name 
+        if 'pid' in self.data:
+            project_name = " @%s " % ProjectList().find_by_id(self.data['pid'])['name']
         else:
             project_name = " "
 
@@ -568,6 +574,26 @@ class TimeEntry(object):
             s += " [%s]" % self.data['id']
 
         return s
+
+    def validate(self):
+        """
+        Ensure this time entry contains the minimum information required
+        by toggl, as well as passing some basic sanity checks. If not,
+        an exception is raised.
+
+        * toggl requires start, duration, and created_with.
+        * toggl doesn't require a description, but we do.
+        """
+        if self.get('start') is None:
+            Logger.debug(self.json())
+            raise Exception("toggl: time entries must have a start property.")
+        if self.get('duration') is None:
+            Logger.debug(self.json())
+            raise Exception("toggl: time entries must have a duration property.")
+        if self.get('description') is None:
+            Logger.debug(self.json())
+            raise Exception("toggl: time entries should have a description property.")
+        return True
 
 #----------------------------------------------------------------------------
 # TimeEntryList
@@ -583,21 +609,7 @@ class TimeEntryList(object):
         """
         Fetches time entry data from toggl.
         """
-
-        # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
-        url = "%s/time_entries?start_date=%s&end_date=%s" % \
-            (TOGGL_URL, urllib.quote(DateAndTime().start_of_yesterday().isoformat('T')), \
-            urllib.quote(DateAndTime().last_minute_today().isoformat('T')))
-        Logger.debug(url)
-        entries = json.loads( toggl(url, 'get') )
-        # Logger.debug(entries)
-
-        self.time_entries = []
-        for entry in entries:
-            te = TimeEntry(data_dict=entry)
-            Logger.debug(te.json())
-            Logger.debug('---')
-            self.time_entries.append(te)
+        self.reload()
         
     def __iter__(self):
         """
@@ -623,8 +635,27 @@ class TimeEntryList(object):
         for entry in self:
             if int(entry.get('duration')) < 0:
                 return entry
-        
         return None
+
+    def reload(self):
+        """
+        Force reloading time entry data from the server. Returns self for
+        method chaining.
+        """
+        # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
+        url = "%s/time_entries?start_date=%s&end_date=%s" % \
+            (TOGGL_URL, urllib.quote(DateAndTime().start_of_yesterday().isoformat('T')), \
+            urllib.quote(DateAndTime().last_minute_today().isoformat('T')))
+        Logger.debug(url)
+        entries = json.loads( toggl(url, 'get') )
+
+        self.time_entries = []
+        for entry in entries:
+            te = TimeEntry(data_dict=entry)
+            Logger.debug(te.json())
+            Logger.debug('---')
+            self.time_entries.append(te)
+        return self
     
 #----------------------------------------------------------------------------
 # User
@@ -676,7 +707,8 @@ class CLI(object):
 
     def __init__(self):
         """
-        Initializes the command-line parser and handles the command-line options.
+        Initializes the command-line parser and handles the command-line 
+        options.
         """
 
         # Override the option parser epilog formatting rule.
@@ -723,7 +755,8 @@ class CLI(object):
     def _add_time_entry(self, args):
         """
         Creates a completed time entry.
-        args should be: DESCR [@PROJECT] START_DATE_TIME 'd'DURATION | END_DATE_TIME
+        args should be: DESCR [@PROJECT] START_DATE_TIME 
+            'd'DURATION | STOP_DATE_TIME
         """
         # Process the args.
         description = self._get_str_arg(args)
@@ -737,12 +770,19 @@ class CLI(object):
         start_time = self._get_datetime_arg(args, optional=False)
         duration = self._get_duration_arg(args, optional=True)
         if duration is None:
-            end_time = self._get_datetime_arg(args, optional=False)
+            stop_time = self._get_datetime_arg(args, optional=False)
+            duration = (stop_time - start_time).total_seconds()
         else:
-            end_time = None
+            stop_time = None
 
         # Create a time entry.
-        entry = TimeEntry(description, start_time, duration=duration, end_time=end_time, project_name=project_name)
+        entry = TimeEntry(
+            description=description,
+            start_time=start_time,
+            stop_time=stop_time,
+            duration=duration,
+            project_name=project_name
+        )
 
         Logger.debug(entry.json())
         entry.add()
@@ -886,10 +926,15 @@ class CLI(object):
         start_time = self._get_datetime_arg(args, optional=True)
 
         # Create the time entry.
-        entry = TimeEntry(description, start_time, project_name=project_name)
-        Logger.debug(entry.json())
+        entry = TimeEntry(
+            description=description,
+            start_time=start_time, 
+            project_name=project_name
+        )
         entry.start()
-        Logger.info('%s started at %s' % (description, DateAndTime().format_time(entry.start_time)))
+        Logger.debug(entry.json())
+        friendly_time = DateAndTime().format_time(DateAndTime().parse_iso_str(entry.get('start')))
+        Logger.info('%s started at %s' % (description, friendly_time))
         
     def _stop_time_entry(self, args):
         """
@@ -899,15 +944,14 @@ class CLI(object):
 
         entry = TimeEntryList().now()
         if entry != None:
-            if args != None:
-                stop_time = DateAndTime().parse_local_datetime_str(args[0])
+            if len(args) > 0:
+                entry.stop(DateAndTime().parse_local_datetime_str(args[0]))
             else:
-                stop_time = DateAndTime().now()
+                entry.stop()
 
-            entry.stop(stop_time)
             Logger.debug(entry.json())
-
-            Logger.info('%s stopped at %s' % (entry.get('description'), DateAndTime().format_time(stop_time)))
+            friendly_time = DateAndTime().format_time(DateAndTime().parse_iso_str(entry.get('stop')))
+            Logger.info('%s stopped at %s' % (entry.get('description'), friendly_time))
         else:
             Logger.info("You're not working on anything right now.")
 
@@ -941,10 +985,12 @@ def continue_entry(args):
             if start_time <= DateAndTime().start_of_today():
                 # If the entry was from a previous day, then we simply start
                 # a new entry.
-                TimeEntry(description, 
-                    ProjectList().find_by_id(entry['pid'])['name'],
-                    DateAndTime().now()
-                ).start()
+                entry = TimeEntry(
+                    start_time=DateAndTime().now(),
+                    project_name=ProjectList().find_by_id(entry['pid'])['name']
+                )
+                entry.set('description', description)
+                entry.start()
             else:
                 # To continue an entry from today, set duration to 
                 # 0-(current_time-duration).
