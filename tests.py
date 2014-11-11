@@ -93,11 +93,7 @@ class TestTimeEntry(unittest.TestCase):
         toggl.DateAndTime.tz = pytz.UTC
 
     def find_time_entry(self, description):
-        list = toggl.TimeEntryList().reload()
-        for entry in list:
-            if entry.get('description') == description:
-                return entry
-        return None
+        return toggl.TimeEntryList().reload().find_by_description(description)
 
     def mock_time_time(self):
         """Mock time.time()"""
@@ -117,6 +113,39 @@ class TestTimeEntry(unittest.TestCase):
         entry = self.find_time_entry('unittest_add')
         self.assertIsNotNone(entry)
         self.assertEquals(entry.get('duration'), 10)
+
+    def test_continue_from_today(self):
+        # create a completed time today
+        now = datetime.datetime.utcnow().isoformat()
+        toggl.CLI()._add_time_entry(['unittest_continue2', now, 'd1:0:0'])
+
+        # find it
+        entry = self.find_time_entry('unittest_continue2')
+        self.assertIsNotNone(entry)
+
+        # continue it
+        entry.continue_entry()
+
+        # find it again, this time, it should be running.
+        entry = self.find_time_entry('unittest_continue2')
+        self.assertTrue(int(entry.get('duration')) < 0)
+
+
+    def test_continue_from_yesterday(self):
+        # create a completed time yesterday
+        yesterday = (datetime.datetime.utcnow() - datetime.timedelta(days=1)).isoformat()
+        toggl.CLI()._add_time_entry(['unittest_continue', yesterday, 'd1:0:0'])
+
+        # find it
+        entry = self.find_time_entry('unittest_continue')
+        self.assertIsNotNone(entry)
+
+        # continue it
+        entry.continue_entry()
+
+        # find the new one
+        entry2 = self.find_time_entry('unittest_continue')
+        self.assertNotEqual(entry.get('duration'), entry2.get('duration'))
 
     def test_delete(self):
         # start a time entry
@@ -318,5 +347,5 @@ class TestTimeEntryList(unittest.TestCase):
 
 if __name__ == '__main__':
     toggl.CLI() # this initializes Logger to INFO
-    toggl.Logger.level = toggl.Logger.NONE
+    toggl.Logger.level = toggl.Logger.DEBUG
     unittest.main()

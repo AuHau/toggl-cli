@@ -10,7 +10,6 @@ ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 
 # TODO
 #
-# * Use TimeEntry.has() method where appropriate.
 # * Move VISIT_WWW_COMMAND to .togglrc file.
 
 # This file is divided into three main parts.
@@ -514,7 +513,7 @@ class TimeEntry(object):
         """
         Deletes this time entry from the server.
         """
-        if self.get('id') is None:
+        if not self.has('id'):
             raise Exception("Time entry must have an id to be deleted.")
 
         url = "%s/time_entries/%s" % (TOGGL_URL, self.get('id'))
@@ -643,7 +642,7 @@ class TimeEntry(object):
         * toggl doesn't require a description, but we do.
         """
         for prop in [ 'start', 'duration', 'description', 'created_with' ]:
-            if self.get(prop) is None:
+            if not self.has(prop):
                 Logger.debug(self.json())
                 raise Exception("toggl: time entries must have a '%s' property." % prop)
         return True
