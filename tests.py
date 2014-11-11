@@ -143,7 +143,19 @@ class TestTimeEntry(unittest.TestCase):
 
         # test valid property
         self.assertIsNotNone( self.entry.get('created_with') )
-        
+
+    def test_has(self):
+        # test nonexistant property
+        self.assertFalse( self.entry.has('foobar') )
+
+        # test existing, but None property
+        self.entry.set('foobar', None)
+        self.assertFalse( self.entry.has('foobar') )
+       
+        # test existing, non-None property
+        self.entry.set('foobar', True)
+        self.assertTrue( self.entry.has('foobar') )
+
     def test_normalized_duration(self):
         # no duration set, raise an exception
         self.assertRaises(Exception, self.entry.normalized_duration)
@@ -160,9 +172,12 @@ class TestTimeEntry(unittest.TestCase):
         time.time = old_time
 
     def test_set(self):
+        # basic test
         self.entry.set('foo', 'bar')
         self.assertEquals( self.entry.data['foo'], 'bar' )
-        self.entry.data.pop('foo')
+
+        # remove value
+        self.entry.set('foo', None)
         self.assertFalse('foo' in self.entry.data)
         
     def test_start_simple(self):
@@ -191,7 +206,7 @@ class TestTimeEntry(unittest.TestCase):
         self.assertIsNotNone(entry)
        
         # toggl duration should be 1 hour
-        self.assertAlmostEqual(entry.get('duration'), orig_duration, places=0)
+        self.assertGreaterEqual(entry.normalized_duration(), 3600)
 
     def test_stop_simple(self):
         # empty time entry raises an exception
@@ -260,6 +275,25 @@ class TestTimeEntryList(unittest.TestCase):
     
     def setUp(self):
         self.list = toggl.TimeEntryList()
+
+    def test_find_by_description(self):
+        toggl.CLI()._start_time_entry(['unittest_find_by_description'])
+        self.list.reload()
+
+        # searching for something that doesn't exist returns none
+        self.assertIsNone( self.list.find_by_description('foobar') )
+
+        # otherwise, we get an entry with the matching description
+        entry1 = self.list.find_by_description('unittest_find_by_description')
+        self.assertEquals( entry1.get('description'), 'unittest_find_by_description')
+
+        # start another entry with the same description
+        toggl.CLI()._start_time_entry(['unittest_find_by_description'])
+        self.list.reload()
+
+        # searching should return the newer entry
+        entry2 = self.list.find_by_description('unittest_find_by_description')
+        self.assertNotEquals( entry1.get('start'), entry2.get('start') )
  
     def test_iterator(self):
         num_entries = len(self.list.time_entries)

@@ -10,8 +10,7 @@ ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 
 # TODO
 #
-# * Refactor into OO:
-#     - continue DESCR
+# * Use TimeEntry.has() method where appropriate.
 # * Move VISIT_WWW_COMMAND to .togglrc file.
 
 # This file is divided into three main parts.
@@ -444,7 +443,6 @@ class TimeEntry(object):
 
         # All toggl data is stored in the "data" dictionary.
         self.data = {} 
-        self.data['created_with'] = 'toggl-cli'
 
         if description is not None:
             self.data['description'] = description
@@ -468,6 +466,8 @@ class TimeEntry(object):
         if data_dict is not None:
             self.data = data_dict
        
+        self.data['created_with'] = 'toggl-cli'
+
     def add(self):
         """
         Adds this time entry as a completed entry. 
@@ -475,6 +475,41 @@ class TimeEntry(object):
         self.validate()
         toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
 
+    def continue_entry(self):
+        """
+        Continues an existing entry.
+        """
+        # Was the entry started today or earlier than today?
+        start_time = DateAndTime().parse_iso_str( self.get('start') )
+
+        if start_time <= DateAndTime().start_of_today():
+            # Entry was from a previous day. Create a new entry from this
+            # one, resetting any identifiers or time data.
+            new_entry = TimeEntry()
+            new_entry.data = self.data.copy()
+            new_entry.set('at', None)
+            new_entry.set('created_with', 'toggl-cli') 
+            new_entry.set('duration', None)
+            new_entry.set('duronly', False) 
+            new_entry.set('guid', None)
+            new_entry.set('id', None) 
+            new_entry.set('start', None)
+            new_entry.set('stop', None)
+            new_entry.set('uid', None)
+            new_entry.start()
+        else:
+            # To continue an entry from today, set duration to 
+            # 0 - (current_time - duration).
+            now = DateAndTime().duration_since_epoch( DateAndTime().now() )
+            self.data['duration'] = 0 - (now - int(self.data['duration']))
+            self.data['duronly'] = True # ignore start/stop times from now on
+
+            toggl("%s/time_entries/%s" % (TOGGL_URL, self.data['id']), 'put', data=self.json())
+
+            Logger.debug('Continuing entry %s' % self.json())
+            Logger.info("%s continued at %s" % (self.get('description'), 
+                DateAndTime().format_time(datetime.datetime.now())))
+ 
     def delete(self):
         """
         Deletes this time entry from the server.
@@ -495,6 +530,13 @@ class TimeEntry(object):
             return self.data[prop]
         else:
             return None
+
+    def has(self, prop):
+        """
+        Returns True if this time entry has the given property and it's not
+        None, False otherwise.
+        """
+        return prop in self.data and self.data[prop] is not None
             
     def json(self):
         """
@@ -516,30 +558,35 @@ class TimeEntry(object):
         else:
             return time.time() + int(self.data['duration'])
 
+    def set(self, prop, value):
+        """
+        Sets the given toggl time entry property to the given value. If 
+        value is None, the property is removed from this time entry.
+        Properties are documented at 
+        https://github.com/toggl/toggl_api_docs/blob/master/chapters/time_entries.md
+        """
+        if value is not None:
+            self.data[prop] = value
+        elif prop in self.data:
+            self.data.pop(prop)
+
     def start(self):
         """
         Starts this time entry by telling toggl. If this entry doesn't have
         a start time yet, it is set to now. duration is set to
         0-start_time.
         """
-        if 'start' not in self.data:
+        if self.has('start'):
+            start_time = DateAndTime().parse_iso_str(self.get('start'))
+        else:
             start_time = DateAndTime().now()
             self.data['start'] = start_time.isoformat()
-        else:
-            start_time = DateAndTime().parse_iso_str(self.get('start'))
         self.set('duration', 0-DateAndTime().duration_since_epoch(start_time))
 
         self.validate()
 
         toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
-
-    def set(self, prop, value):
-        """
-        Sets the given toggl time entry property to the given value.
-        Properties are documented at 
-        https://github.com/toggl/toggl_api_docs/blob/master/chapters/time_entries.md
-        """
-        self.data[prop] = value
+        Logger.debug('Started time entry: %s' % self.json())
 
     def stop(self, stop_time=None):
         """
@@ -548,6 +595,7 @@ class TimeEntry(object):
         stop_time(datetime) is an optional datetime when this entry stopped. If
         not given, then stops the time entry now.
         """
+        Logger.debug('Stopping entry %s' % self.json())
         self.validate()
         if int(self.data['duration']) >= 0:
             raise Exception("toggl: time entry is not currently running.")
@@ -594,15 +642,10 @@ class TimeEntry(object):
         * toggl requires start, duration, and created_with.
         * toggl doesn't require a description, but we do.
         """
-        if self.get('start') is None:
-            Logger.debug(self.json())
-            raise Exception("toggl: time entries must have a start property.")
-        if self.get('duration') is None:
-            Logger.debug(self.json())
-            raise Exception("toggl: time entries must have a duration property.")
-        if self.get('description') is None:
-            Logger.debug(self.json())
-            raise Exception("toggl: time entries should have a description property.")
+        for prop in [ 'start', 'duration', 'description', 'created_with' ]:
+            if self.get(prop) is None:
+                Logger.debug(self.json())
+                raise Exception("toggl: time entries must have a '%s' property." % prop)
         return True
 
 #----------------------------------------------------------------------------
@@ -627,6 +670,18 @@ class TimeEntryList(object):
         """
         self.iter_index = 0
         return self
+
+    def find_by_description(self, description):
+        """
+        Searches the list of entries for the one matching the given 
+        description, or return None. If more than one entry exists
+        with a matching description, the most recent one is
+        returned.
+        """
+        for entry in reversed(self.time_entries):
+            if entry.get('description') == description:
+                return entry
+        return None
 
     def next(self):
         """
@@ -659,13 +714,40 @@ class TimeEntryList(object):
         Logger.debug(url)
         entries = json.loads( toggl(url, 'get') )
 
+        # Build a list of entries.
         self.time_entries = []
         for entry in entries:
             te = TimeEntry(data_dict=entry)
             Logger.debug(te.json())
             Logger.debug('---')
             self.time_entries.append(te)
+
+        # Sort the list by start time.
+        sorted(self.time_entries, key=lambda entry: entry.data['start'])
         return self
+
+    def __str__(self):
+        """
+        Returns a human-friendly list of recent time entries.
+        """
+	# Sort the time entries into buckets based on "Month Day" of the entry.
+	days = { }
+	for entry in self.time_entries:
+            start_time = DateAndTime().parse_iso_str(entry.get('start')).strftime("%Y-%m-%d")
+            if start_time not in days:
+                days[start_time] = []
+            days[start_time].append(entry)
+
+	# For each day, print the entries, and sum the times.
+        s = ""
+	for date in sorted(days.keys()):
+            s += date + "\n"
+            duration = 0
+            for entry in days[date]:
+                s += str(entry) + "\n"
+                duration += entry.normalized_duration()
+            s += "  (%s)\n" % DateAndTime().elapsed_time(int(duration))
+        return s.rstrip() # strip trailing \n
     
 #----------------------------------------------------------------------------
 # User
@@ -803,13 +885,13 @@ class CLI(object):
         Performs the actions described by the list of arguments in self.args.
         """
         if len(self.args) == 0 or self.args[0] == "ls":
-            return self._list_time_entries()
+            Logger.info(TimeEntryList())
         elif self.args[0] == "add":
             self._add_time_entry(self.args[1:])
         elif self.args[0] == "clients":
             print ClientList()
         elif self.args[0] == "continue":
-            continue_entry(self.args[1:])
+            self._continue_entry(self.args[1:])
         elif self.args[0] == "now":
             self._list_current_time_entry()
         elif self.args[0] == "projects":
@@ -825,6 +907,20 @@ class CLI(object):
         else:
             self.print_help()
 
+    def _continue_entry(self, args):
+        """
+        Continues a time entry. args[0] should be the description of the entry
+        to restart. If a description appears multiple times in your history,
+        then we restart the newest one.
+        """
+        if len(args) == 0:
+            CLI().print_help()
+        entry = TimeEntryList().find_by_description(args[0])
+        if entry:
+            entry.continue_entry()
+        else:
+            Logger.info("Did not find '%s' in list of entries." % args[0] )
+
     def _delete_time_entry(self, args):
         """
         Removes a time entry from toggl.
@@ -832,7 +928,7 @@ class CLI(object):
         entry to be deleted.
         """
         if len(args) == 0:
-            Parser.print_help()
+            CLI().print_help()
 
         entry_id = args[0]
 
@@ -912,31 +1008,6 @@ class CLI(object):
         else:
             Logger.info("You're not working on anything right now.")
 
-    def _list_time_entries(self):
-	"""
-        Lists all of the time entries from yesterday and today along with
-	the amount of time devoted to each.
-	"""
-
-        entries = TimeEntryList()
-
-	# Sort the time entries into buckets based on "Month Day" of the entry.
-	days = { }
-	for entry in entries:
-            start_time = DateAndTime().parse_iso_str(entry.get('start')).strftime("%Y-%m-%d")
-            if start_time not in days:
-                days[start_time] = []
-            days[start_time].append(entry)
-
-	# For each day, print the entries, then sum the times.
-	for date in sorted(days.keys()):
-            Logger.info(date)
-            duration = 0
-            for entry in days[date]:
-                Logger.info(entry)
-                duration += entry.normalized_duration()
-            Logger.info("  (%s)" % DateAndTime().elapsed_time(int(duration)) )
-
     def print_help(self):
         """Prints the usage message and exits."""
         self.parser.print_help()
@@ -980,63 +1051,6 @@ class CLI(object):
             Logger.info('%s stopped at %s' % (entry.get('description'), friendly_time))
         else:
             Logger.info("You're not working on anything right now.")
-
-#############################################################################
-# Still needs to be refactored.
-#############################################################################
-
-def continue_entry(args):
-    """Continues a time entry. args[0] should be the description of the entry
-    to restart. Assumes that the entry appears in the list returned by
-    get_time_entry_data()."""
-
-# Continuing an entry from earlier today, then stopping it sometimes (always?) messes up the time. It seems
-# to count the entire interval from when it was first stopped until the continuation stopped.
-
-    if len(args) == 0:
-        CLI().print_help()
-
-    description = args[0]
-
-    entries = get_time_entry_data()
-
-    # There may be multiple entries with the same description. We restart
-    # the most recent one by iterating through the responses backwards
-    # (newest to oldest), and restart the first one we find.
-    for entry in reversed(entries):
-	if str(entry['description']) == description:
-
-            # Check when the entry was started, today or previously?
-            start_time = DateAndTime().parse_iso_str(entry['start'])
-            if start_time <= DateAndTime().start_of_today():
-                # If the entry was from a previous day, then we simply start
-                # a new entry.
-                entry = TimeEntry(
-                    start_time=DateAndTime().now(),
-                    project_name=ProjectList().find_by_id(entry['pid'])['name']
-                )
-                entry.set('description', description)
-                entry.start()
-            else:
-                # To continue an entry from today, set duration to 
-                # 0-(current_time-duration).
-                entry['duration'] = 0-(time.time()-int(entry['duration']))
-                entry['duronly'] = True # ignore start/stop times from now on
-
-                # Send the data.
-                headers = {'content-type': 'application/json'}
-                r = requests.put("%s/time_entries/%s" % (TOGGL_URL, entry['id']), 
-                    auth=Config().auth, 
-                    data='{"time_entry":%s}' % json.dumps(entry), headers=headers)
-                r.raise_for_status() # raise exception on error
-
-                Logger.info("%s continued at %s" % (description, DateAndTime().format_time(datetime.datetime.now())))
-
-                Logger.debug(json.dumps(entry))
-
-            return 0
-
-    raise RuntimeError("Did not find '%s' in list of entries." % description)
 
 if __name__ == "__main__":
     CLI().act()
