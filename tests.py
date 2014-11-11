@@ -118,6 +118,25 @@ class TestTimeEntry(unittest.TestCase):
         self.assertIsNotNone(entry)
         self.assertEquals(entry.get('duration'), 10)
 
+    def test_delete(self):
+        # start a time entry
+        self.entry = toggl.TimeEntry(description='unittest_delete')
+        self.entry.start()
+
+        # deleting an entry without an id is an error
+        self.assertRaises(Exception, self.entry.delete)
+
+        # make sure it shows up in the list, this also fetches the id
+        entry = self.find_time_entry('unittest_delete')
+        self.assertIsNotNone(entry)
+
+        # delete it
+        entry.delete()
+
+        # make sure it shows up in the list
+        entry = self.find_time_entry('unittest_delete')
+        self.assertIsNone(entry)
+
     def test_get(self):
         # test invalid property
         self.assertIsNone( self.entry.get('foobar') )

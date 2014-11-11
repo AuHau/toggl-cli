@@ -12,9 +12,7 @@ ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 #
 # * Refactor into OO:
 #     - continue DESCR
-#     - rm ID
 # * Move VISIT_WWW_COMMAND to .togglrc file.
-# * Write some tests.
 
 # This file is divided into three main parts.
 #   1. Utility Classes - generic support code
@@ -278,7 +276,9 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
     Makes an HTTP request to toggl.com. Returns the raw text data received.
     """
     try:
-        if method == 'get':
+        if method == 'delete':
+            r = requests.delete(url, auth=Config().auth, data=data, headers=headers)
+        elif method == 'get':
             r = requests.get(url, auth=Config().auth, data=data, headers=headers)
         elif method == 'post':
             r = requests.post(url, auth=Config().auth, data=data, headers=headers)
@@ -475,6 +475,16 @@ class TimeEntry(object):
         self.validate()
         toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
 
+    def delete(self):
+        """
+        Deletes this time entry from the server.
+        """
+        if self.get('id') is None:
+            raise Exception("Time entry must have an id to be deleted.")
+
+        url = "%s/time_entries/%s" % (TOGGL_URL, self.get('id'))
+        toggl(url, 'delete')
+        
     def get(self, prop):
         """
         Returns the given toggl time entry property as documented at 
@@ -799,13 +809,13 @@ class CLI(object):
         elif self.args[0] == "clients":
             print ClientList()
         elif self.args[0] == "continue":
-            return continue_entry(self.args[1:])
+            continue_entry(self.args[1:])
         elif self.args[0] == "now":
-            return self._list_current_time_entry()
+            self._list_current_time_entry()
         elif self.args[0] == "projects":
             print ProjectList()
         elif self.args[0] == "rm":
-            return delete_time_entry(self.args[1:])
+            self._delete_time_entry(self.args[1:])
         elif self.args[0] == "start":
             self._start_time_entry(self.args[1:])
         elif self.args[0] == "stop":
@@ -814,6 +824,22 @@ class CLI(object):
             os.system(VISIT_WWW_COMMAND)	
         else:
             self.print_help()
+
+    def _delete_time_entry(self, args):
+        """
+        Removes a time entry from toggl.
+        args must be [ID] where ID is the unique identifier for the time
+        entry to be deleted.
+        """
+        if len(args) == 0:
+            Parser.print_help()
+
+        entry_id = args[0]
+
+        for entry in TimeEntryList():
+            if entry.get('id') == int(entry_id):
+                entry.delete()
+                Logger.info("Deleting entry " + entry_id)
 
     def _get_datetime_arg(self, args, optional=False):
         """
@@ -1011,27 +1037,6 @@ def continue_entry(args):
             return 0
 
     raise RuntimeError("Did not find '%s' in list of entries." % description)
-
-#----------------------------------------------------------------------------
-def delete_time_entry(args):
-    if len(args) == 0:
-        Parser.print_help()
-        return 1
-
-    entry_id = args[0]
-
-    response = get_time_entry_data()
-
-    for entry in response:
-	if str(entry['id']) == entry_id:
-            Logger.info("Deleting entry " + entry_id)
-
-            headers = {'content-type': 'application/json'}
-            r = requests.delete("%s/time_entries/%s" % (TOGGL_URL, entry_id), auth=Config().auth,
-                data=None, headers=headers)
-            r.raise_for_status() # raise exception on error
-
-    return 0
 
 if __name__ == "__main__":
     CLI().act()
