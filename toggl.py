@@ -8,10 +8,6 @@ Modified for toggl API v8 by Beau Raines
 ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 """
 
-# TODO
-#
-# * Move VISIT_WWW_COMMAND to .togglrc file.
-
 # This file is divided into three main parts.
 #   1. Utility Classes - generic support code
 #   2. Toggl Models - Toggl-specific data classes

@@ -5,15 +5,21 @@ Unit tests for toggl-cli.
 
 Usage: python tests.py [CLASSNAME[.METHODNAME]]
 
-TODO:
-    * Clean up entries by deleting them when we're done.
+NB: These tests add and modify entries in your toggl account. All of the
+entries have the prefix given below, and they should all be removed after
+the tests are complete.
 """
+PREFIX = "unittest_"
 
 import datetime
 import unittest
 import pytz
 import time
 import toggl
+
+
+def desc(description):
+    return "%s%s" % (PREFIX, description)
 
 #----------------------------------------------------------------------------
 # TestClientList
@@ -105,65 +111,65 @@ class TestTimeEntry(unittest.TestCase):
 
         # create basic entry and add it
         start_time = toggl.DateAndTime().now()
-        self.entry = toggl.TimeEntry(description='unittest_add', 
+        self.entry = toggl.TimeEntry(description=desc('add'), 
             start_time=start_time, duration=10)
         self.entry.add()
 
         # make sure it shows up in the list
-        entry = self.find_time_entry('unittest_add')
+        entry = self.find_time_entry(desc('add'))
         self.assertIsNotNone(entry)
         self.assertEquals(entry.get('duration'), 10)
 
     def test_continue_from_today(self):
         # create a completed time today
         now = datetime.datetime.utcnow().isoformat()
-        toggl.CLI()._add_time_entry(['unittest_continue2', now, 'd1:0:0'])
+        toggl.CLI()._add_time_entry([desc('continue2'), now, 'd1:0:0'])
 
         # find it
-        entry = self.find_time_entry('unittest_continue2')
+        entry = self.find_time_entry(desc('continue2'))
         self.assertIsNotNone(entry)
 
         # continue it
         entry.continue_entry()
 
         # find it again, this time, it should be running.
-        entry = self.find_time_entry('unittest_continue2')
+        entry = self.find_time_entry(desc('continue2'))
         self.assertTrue(int(entry.get('duration')) < 0)
 
 
     def test_continue_from_yesterday(self):
         # create a completed time yesterday
         yesterday = (datetime.datetime.utcnow() - datetime.timedelta(days=1)).isoformat()
-        toggl.CLI()._add_time_entry(['unittest_continue', yesterday, 'd1:0:0'])
+        toggl.CLI()._add_time_entry([desc('continue'), yesterday, 'd1:0:0'])
 
         # find it
-        entry = self.find_time_entry('unittest_continue')
+        entry = self.find_time_entry(desc('continue'))
         self.assertIsNotNone(entry)
 
         # continue it
         entry.continue_entry()
 
         # find the new one
-        entry2 = self.find_time_entry('unittest_continue')
+        entry2 = self.find_time_entry(desc('continue'))
         self.assertNotEqual(entry.get('duration'), entry2.get('duration'))
 
     def test_delete(self):
         # start a time entry
-        self.entry = toggl.TimeEntry(description='unittest_delete')
+        self.entry = toggl.TimeEntry(description=desc('delete'))
         self.entry.start()
 
         # deleting an entry without an id is an error
         self.assertRaises(Exception, self.entry.delete)
 
         # make sure it shows up in the list, this also fetches the id
-        entry = self.find_time_entry('unittest_delete')
+        entry = self.find_time_entry(desc('delete'))
         self.assertIsNotNone(entry)
 
         # delete it
         entry.delete()
 
         # make sure it shows up in the list
-        entry = self.find_time_entry('unittest_delete')
+        entry = self.find_time_entry(desc('delete'))
         self.assertIsNone(entry)
 
     def test_get(self):
@@ -214,10 +220,10 @@ class TestTimeEntry(unittest.TestCase):
         self.assertRaises(Exception, self.entry.start)
 
         # test with simpliest entry
-        self.entry = toggl.TimeEntry(description='unittest_start')
+        self.entry = toggl.TimeEntry(description=desc('start'))
         self.entry.start()
         orig_duration = int(self.entry.get('duration'))
-        entry = self.find_time_entry('unittest_start')
+        entry = self.find_time_entry(desc('start'))
         self.assertIsNotNone(entry)
         # round duration to nearest integer
         self.assertEqual(entry.get('duration'), orig_duration)
@@ -225,13 +231,13 @@ class TestTimeEntry(unittest.TestCase):
     def test_start_complex(self):
         # test with preset start time one hour ago UTC
         one_hour_ago = pytz.UTC.localize(datetime.datetime.utcnow() - datetime.timedelta(hours=1))
-        self.entry = toggl.TimeEntry(description='unittest_start2',
+        self.entry = toggl.TimeEntry(description=desc('start2'),
             start_time=one_hour_ago)
         self.entry.start()
         orig_duration = self.entry.get('duration')
 
         # see what toggl has
-        entry = self.find_time_entry('unittest_start2')
+        entry = self.find_time_entry(desc('start2'))
         self.assertIsNotNone(entry)
        
         # toggl duration should be 1 hour
@@ -250,18 +256,18 @@ class TestTimeEntry(unittest.TestCase):
         self.assertRaises(Exception, self.entry.start)
 
         # start an entry now
-        self.entry = toggl.TimeEntry(description='unittest_stop')
+        self.entry = toggl.TimeEntry(description=desc('stop'))
         self.entry.start()
 
         # find it 
-        entry = self.find_time_entry('unittest_stop')
+        entry = self.find_time_entry(desc('stop'))
         self.assertIsNotNone(entry)
 
         # stop it
         entry.stop()
 
         # find it again
-        entry = self.find_time_entry('unittest_stop')
+        entry = self.find_time_entry(desc('stop'))
 
         # make sure duration is positive. we can't be more specific because
         # we don't know the lag between us and toggl.
@@ -269,11 +275,11 @@ class TestTimeEntry(unittest.TestCase):
 
     def test_stop_complex(self):
         # start an entry now
-        self.entry = toggl.TimeEntry(description='unittest_stop2')
+        self.entry = toggl.TimeEntry(description=desc('stop2'))
         self.entry.start()
 
         # find it
-        entry = self.find_time_entry('unittest_stop2')
+        entry = self.find_time_entry(desc('stop2'))
         self.assertIsNotNone(entry)
         
         # stop it an hour from now
@@ -281,7 +287,7 @@ class TestTimeEntry(unittest.TestCase):
         entry.stop(one_hour_ahead)
 
         # find it again
-        entry = self.find_time_entry('unittest_stop2')
+        entry = self.find_time_entry(desc('stop2'))
         self.assertIsNotNone(entry)
 
         # make sure duration is at least 1 hour (3600 seconds)
@@ -306,22 +312,22 @@ class TestTimeEntryList(unittest.TestCase):
         self.list = toggl.TimeEntryList()
 
     def test_find_by_description(self):
-        toggl.CLI()._start_time_entry(['unittest_find_by_description'])
+        toggl.CLI()._start_time_entry([desc('find_by_description')])
         self.list.reload()
 
         # searching for something that doesn't exist returns none
         self.assertIsNone( self.list.find_by_description('foobar') )
 
         # otherwise, we get an entry with the matching description
-        entry1 = self.list.find_by_description('unittest_find_by_description')
-        self.assertEquals( entry1.get('description'), 'unittest_find_by_description')
+        entry1 = self.list.find_by_description(desc('find_by_description'))
+        self.assertEquals( entry1.get('description'), desc('find_by_description'))
 
         # start another entry with the same description
-        toggl.CLI()._start_time_entry(['unittest_find_by_description'])
+        toggl.CLI()._start_time_entry([desc('find_by_description')])
         self.list.reload()
 
         # searching should return the newer entry
-        entry2 = self.list.find_by_description('unittest_find_by_description')
+        entry2 = self.list.find_by_description(desc('find_by_description'))
         self.assertNotEquals( entry1.get('start'), entry2.get('start') )
  
     def test_iterator(self):
@@ -338,14 +344,25 @@ class TestTimeEntryList(unittest.TestCase):
         self.assertIsNone( self.list.now() )
 
         # test with running entry
-        toggl.CLI()._start_time_entry(['unittest_now'])
+        toggl.CLI()._start_time_entry([desc('now')])
         self.list.reload()
         current = self.list.now()
         self.assertIsNotNone(current)
-        self.assertEquals( current.get('description'), 'unittest_now' )
+        self.assertEquals( current.get('description'), desc('now') )
         current.stop()
+
+def tearDownModule():
+    """
+    Cleans up toggl with all the unittest entries we just created. This
+    relies on TimeEntryList and TimeEntry.delete.
+    """
+    print "Removing toggl entries created by the test..."
+    for entry in toggl.TimeEntryList():
+        if entry.get('description').startswith('unittest_'):
+            entry.delete()
 
 if __name__ == '__main__':
     toggl.CLI() # this initializes Logger to INFO
-    toggl.Logger.level = toggl.Logger.DEBUG
+    #toggl.Logger.level = toggl.Logger.DEBUG
+    toggl.Logger.level = toggl.Logger.NONE
     unittest.main()
