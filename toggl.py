@@ -502,9 +502,7 @@ class TimeEntry(object):
             toggl("%s/time_entries/%s" % (TOGGL_URL, self.data['id']), 'put', data=self.json())
 
             Logger.debug('Continuing entry %s' % self.json())
-            Logger.info("%s continued at %s" % (self.get('description'), 
-                DateAndTime().format_time(datetime.datetime.now())))
- 
+
     def delete(self):
         """
         Deletes this time entry from the server.
@@ -913,6 +911,8 @@ class CLI(object):
         entry = TimeEntryList().find_by_description(args[0])
         if entry:
             entry.continue_entry()
+            Logger.info("%s continued at %s" % (entry.get('description'), 
+                DateAndTime().format_time(datetime.datetime.now())))
         else:
             Logger.info("Did not find '%s' in list of entries." % args[0] )
 
