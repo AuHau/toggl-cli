@@ -93,7 +93,7 @@ class Config(object):
         cfg.add_section('options')
         cfg.set('options', 'timezone', 'UTC')
         cfg.set('options', 'time_format', '%I:%M%p')
-        cfg.set('options', 'prefer_token', 'false')
+        cfg.set('options', 'prefer_token', 'true')
         with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
             cfg.write(cfgfile)
         os.chmod(os.path.expanduser('~/.togglrc'), 0600)
