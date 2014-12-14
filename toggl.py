@@ -81,8 +81,6 @@ class Config(object):
             self._create_empty_config()
             raise IOError("Missing ~/.togglrc. A default has been created for editing.")
 
-        self.auth = (self.get('auth', 'username'), self.get('auth', 'password'))
-    
     def _create_empty_config(self):
         """
         Creates a blank ~/.togglrc.
@@ -91,9 +89,11 @@ class Config(object):
         cfg.add_section('auth')
         cfg.set('auth', 'username', 'user@example.com')
         cfg.set('auth', 'password', 'toggl_password')
+        cfg.set('auth', 'api_token', 'your_api_token')
         cfg.add_section('options')
         cfg.set('options', 'timezone', 'UTC')
         cfg.set('options', 'time_format', '%I:%M%p')
+        cfg.set('options', 'prefer_token', 'false')
         with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
             cfg.write(cfgfile)
         os.chmod(os.path.expanduser('~/.togglrc'), 0600)
@@ -105,6 +105,14 @@ class Config(object):
         ConfigParser exceptions if the section or key are invalid.
         """
         return self.cfg.get(section, key).strip()
+
+    def get_auth(self):
+        if self.get('options', 'prefer_token').lower() == 'true':
+            return requests.auth.HTTPBasicAuth(self.get('auth', 'api_token'),
+                                               'api_token')
+        else:
+            return requests.auth.HTTPBasicAuth(self.get('auth', 'username'),
+                                               self.get('auth', 'password'))
 
 #----------------------------------------------------------------------------
 # DateAndTime
@@ -271,13 +279,13 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
     """
     try:
         if method == 'delete':
-            r = requests.delete(url, auth=Config().auth, data=data, headers=headers)
+            r = requests.delete(url, auth=Config().get_auth(), data=data, headers=headers)
         elif method == 'get':
-            r = requests.get(url, auth=Config().auth, data=data, headers=headers)
+            r = requests.get(url, auth=Config().get_auth(), data=data, headers=headers)
         elif method == 'post':
-            r = requests.post(url, auth=Config().auth, data=data, headers=headers)
+            r = requests.post(url, auth=Config().get_auth(), data=data, headers=headers)
         elif method == 'put':
-            r = requests.post(url, auth=Config().auth, data=data, headers=headers)
+            r = requests.post(url, auth=Config().get_auth(), data=data, headers=headers)
         else:
             raise NotImplementedError('HTTP method "%s" not implemented.' % method)
         r.raise_for_status() # raise exception on error
