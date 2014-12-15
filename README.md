@@ -14,7 +14,7 @@ help).
 Latest Update
 -------------
 
-**15 Dec 2014**: Thanks to (FedericoVaga)[https://github.com/FedericoVaga]
+**15 Dec 2014**: Thanks to [FedericoVaga](https://github.com/FedericoVaga)
 `.togglrc` now supports API token authentication. You will need to add
 `api_token` to the `auth` section, and `prefer_token` to the `options` section.
 
