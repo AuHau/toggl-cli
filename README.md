@@ -14,6 +14,10 @@ help).
 Latest Update
 -------------
 
+**15 Dec 2014**: Thanks to (FedericoVaga)[https://github.com/FedericoVaga]
+`.togglrc` now supports API token authentication. You will need to add
+`api_token` to the `auth` section, and `prefer_token` to the `options` section.
+
 **11 Nov 2014**: Major refactoring into a more MVC OO structure.
 
 **30 Oct 2014**: Added a feature that starting, stopping, and continuing an
