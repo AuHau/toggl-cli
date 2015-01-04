@@ -579,14 +579,18 @@ class TimeEntry(object):
         """
         if self.has('start'):
             start_time = DateAndTime().parse_iso_str(self.get('start'))
+            self.set('duration', 0-DateAndTime().duration_since_epoch(start_time))
+
+            self.validate()
+
+            toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
         else:
-            start_time = DateAndTime().now()
-            self.data['start'] = start_time.isoformat()
-        self.set('duration', 0-DateAndTime().duration_since_epoch(start_time))
+            # 'start' is ignored by 'time_entries/start' endpoint. We define it
+            # to keep consinstency with toggl server
+            self.data['start'] = DateAndTime().now().isoformat()
 
-        self.validate()
+            toggl("%s/time_entries/start" % TOGGL_URL, "post", self.json())
 
-        toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
         Logger.debug('Started time entry: %s' % self.json())
 
     def stop(self, stop_time=None):
