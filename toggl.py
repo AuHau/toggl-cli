@@ -586,7 +586,7 @@ class TimeEntry(object):
 
         self.validate()
 
-        toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
+        toggl("%s/time_entries/start" % TOGGL_URL, "post", self.json())
         Logger.debug('Started time entry: %s' % self.json())
 
     def stop(self, stop_time=None):
