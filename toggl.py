@@ -499,7 +499,9 @@ class TimeEntry(object):
     to be in UTC.
     """
 
-    def __init__(self, description=None, start_time=None, stop_time=None, duration=None, project_name=None, data_dict=None):
+    def __init__(self, description=None, start_time=None, stop_time=None,
+                 duration=None, workspace_name = None, project_name=None,
+                 data_dict=None):
         """
         Constructor. None of the parameters are required at object creation,
         but the object is validated before data is sent to toggl.
@@ -526,8 +528,14 @@ class TimeEntry(object):
         if stop_time is not None:
             self.data['stop'] = stop_time.isoformat()
 
+        if workspace_name is not None:
+            workspace = WorkspaceList().find_by_name(workspace_name)
+            if workspace == None:
+                raise RuntimeError("Workspace '%s' not found." % workspace_name)
+            self.data['wid'] = workspace['id']
+
         if project_name is not None:
-            project = ProjectList().find_by_name(project_name)
+            project = ProjectList(workspace_name).find_by_name(project_name)
             if project == None:
                 raise RuntimeError("Project '%s' not found." % project_name)
             self.data['pid'] = project['id']
