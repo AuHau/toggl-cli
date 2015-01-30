@@ -422,11 +422,21 @@ class ProjectList(object):
 
     __metaclass__ = Singleton
 
-    def __init__(self):
+    def __init__(self, workspace_name = None):
         """
         Fetches the list of projects from toggl.
         """
-        result = toggl("%s/workspaces/%s/projects" % (TOGGL_URL, User().get('default_wid')), 'get')
+        wid = None
+        if workspace_name is not None:
+            self.workspace = WorkspaceList().find_by_name(workspace_name)
+            if self.workspace is not None:
+                wid = self.workspace["id"]
+
+        if wid is None:
+                wid = User().get('default_wid')
+                self.workspace = WorkspaceList().find_by_id(wid)
+
+        result = toggl("%s/workspaces/%s/projects" % (TOGGL_URL, wid), 'get')
         self.project_list = json.loads(result)
 
     def find_by_id(self, pid):
@@ -474,7 +484,7 @@ class ProjectList(object):
                for client in clients:
                    if project['cid'] == client['id']:
                        client_name = " - %s" % client['name']
-            s = s + "@%s%s\n" % (project['name'], client_name)
+            s = s + ":%s @%s%s\n" % (self.workspace['name'], project['name'], client_name)
         return s.rstrip() # strip trailing \n
 
 #----------------------------------------------------------------------------
