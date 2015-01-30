@@ -351,6 +351,66 @@ class ClientList(object):
         return s.rstrip() # strip trailing \n
 
 #----------------------------------------------------------------------------
+# WorkspaceList
+#----------------------------------------------------------------------------
+class WorkspaceList(object):
+    """
+    A singleton list of workspace. A workspace object is a dictionary as
+    documented at
+    https://github.com/toggl/toggl_api_docs/blob/master/chapters/workspaces.md
+    """
+
+    __metaclass__ = Singleton
+
+    def __init__(self):
+        """
+        Fetches the list of workspaces from toggl.
+        """
+        result = toggl("%s/workspaces" % TOGGL_URL, "get")
+        self.workspace_list = json.loads(result)
+
+    def find_by_id(self, wid):
+        """
+        Returns the workspace object with the given id, or None.
+        """
+        for workspace in self:
+            if workspace['id'] == wid:
+                return workspace
+        return None
+
+    def find_by_name(self, name_prefix):
+        """
+        Returns the workspace object with the given name (or prefix), or None.
+        """
+        for workspace in self:
+            if workspace['name'].startswith(name_prefix):
+                return workspace
+        return None
+
+    def __iter__(self):
+        """
+        Start iterating over the workspaces.
+        """
+        self.iter_index = 0
+        return self
+
+    def next(self):
+        """
+        Returns the next workspace.
+        """
+        if self.iter_index >= len(self.workspace_list):
+            raise StopIteration
+        else:
+            self.iter_index += 1
+            return self.workspace_list[self.iter_index-1]
+
+    def __str__(self):
+        """Formats the project list as a string."""
+        s = ""
+        for workspace in self:
+            s = s + ":%s\n" % workspace['name']
+        return s.rstrip() # strip trailing \n
+#----------------------------------------------------------------------------
 # ProjectList
 #----------------------------------------------------------------------------
 class ProjectList(object):
