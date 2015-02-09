@@ -351,6 +351,66 @@ class ClientList(object):
         return s.rstrip() # strip trailing \n
 
 #----------------------------------------------------------------------------
+# WorkspaceList
+#----------------------------------------------------------------------------
+class WorkspaceList(object):
+    """
+    A singleton list of workspace. A workspace object is a dictionary as
+    documented at
+    https://github.com/toggl/toggl_api_docs/blob/master/chapters/workspaces.md
+    """
+
+    __metaclass__ = Singleton
+
+    def __init__(self):
+        """
+        Fetches the list of workspaces from toggl.
+        """
+        result = toggl("%s/workspaces" % TOGGL_URL, "get")
+        self.workspace_list = json.loads(result)
+
+    def find_by_id(self, wid):
+        """
+        Returns the workspace object with the given id, or None.
+        """
+        for workspace in self:
+            if workspace['id'] == wid:
+                return workspace
+        return None
+
+    def find_by_name(self, name_prefix):
+        """
+        Returns the workspace object with the given name (or prefix), or None.
+        """
+        for workspace in self:
+            if workspace['name'].startswith(name_prefix):
+                return workspace
+        return None
+
+    def __iter__(self):
+        """
+        Start iterating over the workspaces.
+        """
+        self.iter_index = 0
+        return self
+
+    def next(self):
+        """
+        Returns the next workspace.
+        """
+        if self.iter_index >= len(self.workspace_list):
+            raise StopIteration
+        else:
+            self.iter_index += 1
+            return self.workspace_list[self.iter_index-1]
+
+    def __str__(self):
+        """Formats the project list as a string."""
+        s = ""
+        for workspace in self:
+            s = s + ":%s\n" % workspace['name']
+        return s.rstrip() # strip trailing \n
+#----------------------------------------------------------------------------
 # ProjectList
 #----------------------------------------------------------------------------
 class ProjectList(object):
@@ -362,11 +422,21 @@ class ProjectList(object):
 
     __metaclass__ = Singleton
 
-    def __init__(self):
+    def __init__(self, workspace_name = None):
         """
         Fetches the list of projects from toggl.
         """
-        result = toggl("%s/workspaces/%s/projects" % (TOGGL_URL, User().get('default_wid')), 'get')
+        wid = None
+        if workspace_name is not None:
+            self.workspace = WorkspaceList().find_by_name(workspace_name)
+            if self.workspace is not None:
+                wid = self.workspace["id"]
+
+        if wid is None:
+                wid = User().get('default_wid')
+                self.workspace = WorkspaceList().find_by_id(wid)
+
+        result = toggl("%s/workspaces/%s/projects" % (TOGGL_URL, wid), 'get')
         self.project_list = json.loads(result)
 
     def find_by_id(self, pid):
@@ -414,7 +484,7 @@ class ProjectList(object):
                for client in clients:
                    if project['cid'] == client['id']:
                        client_name = " - %s" % client['name']
-            s = s + "@%s%s\n" % (project['name'], client_name)
+            s = s + ":%s @%s%s\n" % (self.workspace['name'], project['name'], client_name)
         return s.rstrip() # strip trailing \n
 
 #----------------------------------------------------------------------------
@@ -429,7 +499,9 @@ class TimeEntry(object):
     to be in UTC.
     """
 
-    def __init__(self, description=None, start_time=None, stop_time=None, duration=None, project_name=None, data_dict=None):
+    def __init__(self, description=None, start_time=None, stop_time=None,
+                 duration=None, workspace_name = None, project_name=None,
+                 data_dict=None):
         """
         Constructor. None of the parameters are required at object creation,
         but the object is validated before data is sent to toggl.
@@ -456,8 +528,14 @@ class TimeEntry(object):
         if stop_time is not None:
             self.data['stop'] = stop_time.isoformat()
 
+        if workspace_name is not None:
+            workspace = WorkspaceList().find_by_name(workspace_name)
+            if workspace == None:
+                raise RuntimeError("Workspace '%s' not found." % workspace_name)
+            self.data['wid'] = workspace['id']
+
         if project_name is not None:
-            project = ProjectList().find_by_name(project_name)
+            project = ProjectList(workspace_name).find_by_name(project_name)
             if project == None:
                 raise RuntimeError("Project '%s' not found." % project_name)
             self.data['pid'] = project['id']
@@ -814,14 +892,15 @@ class CLI(object):
         
         self.parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
             epilog="\nActions:\n"
-            "  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
+            "  add DESCR [:WORKSPACE] [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
             "  clients\n\tlists all clients\n"
             "  continue DESCR\n\trestarts the given entry\n"
             "  ls\n\tlist recent time entries\n"
             "  now\n\tprint what you're working on now\n"
-            "  projects\n\tlists all projects\n"
+            "  workspaces\n\tlists all workspaces\n"
+            "  projects [:WORKSPACE]\n\tlists all projects\n"
             "  rm ID\n\tdelete a time entry by id\n"
-            "  start DESCR [@PROJECT] [DATETIME]\n\tstarts a new entry\n"
+            "  start DESCR [:WORKSPACE] [@PROJECT] [DATETIME]\n\tstarts a new entry\n"
             "  stop [DATETIME]\n\tstops the current entry\n"
             "  www\n\tvisits toggl.com\n"
             "\n"
@@ -852,15 +931,19 @@ class CLI(object):
     def _add_time_entry(self, args):
         """
         Creates a completed time entry.
-        args should be: DESCR [@PROJECT] START_DATE_TIME 
+        args should be: DESCR [:WORKSPACE] [@PROJECT] START_DATE_TIME
             'd'DURATION | STOP_DATE_TIME
         """
         # Process the args.
         description = self._get_str_arg(args)
-
+        workspace_name = self._get_workspace_arg(args, optional=True)
+        if workspace_name is not None:
+            workspace = WorkspaceList().find_by_name(workspace_name)
+            if workspace == None:
+                raise RuntimeError("Workspace '%s' not found." % workspace_name)
         project_name = self._get_project_arg(args, optional=True)
         if project_name is not None:
-            project = ProjectList().find_by_name(project_name)
+            project = ProjectList(workspace["name"]).find_by_name(project_name)
             if project == None:
                 raise RuntimeError("Project '%s' not found." % project_name)
 
@@ -878,7 +961,8 @@ class CLI(object):
             start_time=start_time,
             stop_time=stop_time,
             duration=duration,
-            project_name=project_name
+            project_name=project_name,
+            workspace_name=workspace_name
         )
 
         Logger.debug(entry.json())
@@ -900,7 +984,7 @@ class CLI(object):
         elif self.args[0] == "now":
             self._list_current_time_entry()
         elif self.args[0] == "projects":
-            print ProjectList()
+            self._show_projects(self.args[1:])
         elif self.args[0] == "rm":
             self._delete_time_entry(self.args[1:])
         elif self.args[0] == "start":
@@ -908,9 +992,15 @@ class CLI(object):
         elif self.args[0] == "stop":
             self._stop_time_entry(self.args[1:])
         elif self.args[0] == "www":
-            os.system(VISIT_WWW_COMMAND)	
+            os.system(VISIT_WWW_COMMAND)
+        elif self.args[0] == "workspaces":
+            print WorkspaceList()
         else:
             self.print_help()
+
+    def _show_projects(self, args):
+        workspace_name = self._get_workspace_arg(args, optional=True)
+        print ProjectList(workspace_name)
 
     def _continue_entry(self, args):
         """
@@ -974,6 +1064,24 @@ class CLI(object):
         else:
             return DateAndTime().duration_str_to_seconds( args.pop(0)[1:] )
 
+    def _get_workspace_arg(self, args, optional=False):
+        """
+        If the first entry in args is a workspace name (e.g., '#project')
+        then return the name of the project, or None.
+        """
+        if len(args) == 0:
+            if optional:
+                return None
+            else:
+                self.print_help()
+        elif args[0][0] != ':':
+            if optional:
+                return None
+            else:
+                self.print_help()
+        else:
+            return args.pop(0)[1:]
+
     def _get_project_arg(self, args, optional=False):
         """
         If the first entry in args is a project name (e.g., '@project')
@@ -1023,17 +1131,19 @@ class CLI(object):
     def _start_time_entry(self, args):
         """
         Starts a new time entry.
-        args should be: DESCR [@PROJECT] [DATETIME]
+        args should be: DESCR [#WORKSPACE] [@PROJECT] [DATETIME]
         """
         description = self._get_str_arg(args, optional=False)
+        workspace_name = self._get_workspace_arg(args, optional=True)
         project_name = self._get_project_arg(args, optional=True)
         start_time = self._get_datetime_arg(args, optional=True)
 
         # Create the time entry.
         entry = TimeEntry(
             description=description,
-            start_time=start_time, 
-            project_name=project_name
+            start_time=start_time,
+            project_name=project_name,
+            workspace_name=workspace_name
         )
         entry.start()
         Logger.debug(entry.json())
