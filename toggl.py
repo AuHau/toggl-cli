@@ -709,7 +709,7 @@ class TimeEntry(object):
         else:
             project_name = " "
 
-        s = "%s%s%s%s" % (is_running, self.data['description'], project_name, 
+        s = "%s%s%s%s" % (is_running, self.data.get('description'), project_name, 
             DateAndTime().elapsed_time(int(self.normalized_duration())) \
         )
 
