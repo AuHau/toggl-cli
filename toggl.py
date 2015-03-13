@@ -423,6 +423,9 @@ class ProjectList(object):
     __metaclass__ = Singleton
 
     def __init__(self, workspace_name = None):
+        self.fetch(workspace_name)
+
+    def fetch(self, workspace_name = None):
         """
         Fetches the list of projects from toggl.
         """
@@ -431,7 +434,6 @@ class ProjectList(object):
             self.workspace = WorkspaceList().find_by_name(workspace_name)
             if self.workspace is not None:
                 wid = self.workspace["id"]
-
         if wid is None:
                 wid = User().get('default_wid')
                 self.workspace = WorkspaceList().find_by_id(wid)
@@ -707,7 +709,7 @@ class TimeEntry(object):
         else:
             project_name = " "
 
-        s = "%s%s%s%s" % (is_running, self.data['description'], project_name, 
+        s = "%s%s%s%s" % (is_running, self.data.get('description'), project_name, 
             DateAndTime().elapsed_time(int(self.normalized_duration())) \
         )
 
