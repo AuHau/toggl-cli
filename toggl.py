@@ -937,13 +937,16 @@ class CLI(object):
         # Process the args.
         description = self._get_str_arg(args)
         workspace_name = self._get_workspace_arg(args, optional=True)
+        ws_name = None # canonical name from toggl
         if workspace_name is not None:
             workspace = WorkspaceList().find_by_name(workspace_name)
             if workspace == None:
                 raise RuntimeError("Workspace '%s' not found." % workspace_name)
+            else:
+                ws_name = workspace["name"]
         project_name = self._get_project_arg(args, optional=True)
         if project_name is not None:
-            project = ProjectList(workspace["name"]).find_by_name(project_name)
+            project = ProjectList(ws_name).find_by_name(project_name)
             if project == None:
                 raise RuntimeError("Project '%s' not found." % project_name)
 
