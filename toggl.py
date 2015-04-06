@@ -815,17 +815,17 @@ class TimeEntryList(object):
         """
         Returns a human-friendly list of recent time entries.
         """
-	# Sort the time entries into buckets based on "Month Day" of the entry.
-	days = { }
-	for entry in self.time_entries:
+        # Sort the time entries into buckets based on "Month Day" of the entry.
+        days = { }
+        for entry in self.time_entries:
             start_time = DateAndTime().parse_iso_str(entry.get('start')).strftime("%Y-%m-%d")
             if start_time not in days:
                 days[start_time] = []
             days[start_time].append(entry)
 
-	# For each day, print the entries, and sum the times.
+        # For each day, print the entries, and sum the times.
         s = ""
-	for date in sorted(days.keys()):
+        for date in sorted(days.keys()):
             s += date + "\n"
             duration = 0
             for entry in days[date]:
