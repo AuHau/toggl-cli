@@ -96,7 +96,7 @@ class Config(object):
         cfg.set('options', 'prefer_token', 'true')
         with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
             cfg.write(cfgfile)
-        os.chmod(os.path.expanduser('~/.togglrc'), 0600)
+        os.chmod(os.path.expanduser('~/.togglrc'), 0o600)
 
     def get(self, section, key):
         """
@@ -290,10 +290,10 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
             raise NotImplementedError('HTTP method "%s" not implemented.' % method)
         r.raise_for_status() # raise exception on error
         return r.text
-    except Exception, e:
-        print 'Sent: %s' % data
-        print e
-        print r.text
+    except Exception as e:
+        print('Sent: %s' % data)
+        print(e)
+        print(r.text)
         #sys.exit(1)
 
 #############################################################################
@@ -983,7 +983,7 @@ class CLI(object):
         elif self.args[0] == "add":
             self._add_time_entry(self.args[1:])
         elif self.args[0] == "clients":
-            print ClientList()
+            print(ClientList())
         elif self.args[0] == "continue":
             self._continue_entry(self.args[1:])
         elif self.args[0] == "now":
@@ -999,13 +999,13 @@ class CLI(object):
         elif self.args[0] == "www":
             os.system(VISIT_WWW_COMMAND)
         elif self.args[0] == "workspaces":
-            print WorkspaceList()
+            print(WorkspaceList())
         else:
             self.print_help()
 
     def _show_projects(self, args):
         workspace_name = self._get_workspace_arg(args, optional=True)
-        print ProjectList(workspace_name)
+        print(ProjectList(workspace_name))
 
     def _continue_entry(self, args):
         """
