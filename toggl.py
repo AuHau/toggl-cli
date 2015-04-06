@@ -175,7 +175,7 @@ class DateAndTime(object):
         # for each time piece, grab the value and remaining seconds, and add it to
         # the time string
         for suffix, length in parts:
-            value = seconds / length
+            value = seconds // length
             if value > 0:
                 seconds = seconds % length
                 time.append('%s%s' % (str(value),
