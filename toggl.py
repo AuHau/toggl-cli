@@ -13,7 +13,6 @@ ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 #   2. Toggl Models - Toggl-specific data classes
 #   3. Command Line Interface - CLI
 
-import ConfigParser
 import datetime
 import dateutil.parser
 import iso8601
@@ -24,7 +23,9 @@ import pytz
 import requests
 import sys
 import time
-import urllib
+import six
+from six.moves import urllib
+from six.moves import configparser as ConfigParser
 
 TOGGL_URL = "https://www.toggl.com/api/v8"
 VERBOSE = False # verbose output?
@@ -96,7 +97,7 @@ class Config(object):
         cfg.set('options', 'prefer_token', 'true')
         with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
             cfg.write(cfgfile)
-        os.chmod(os.path.expanduser('~/.togglrc'), 0600)
+        os.chmod(os.path.expanduser('~/.togglrc'), 0o600)
 
     def get(self, section, key):
         """
@@ -174,7 +175,7 @@ class DateAndTime(object):
         # for each time piece, grab the value and remaining seconds, and add it to
         # the time string
         for suffix, length in parts:
-            value = seconds / length
+            value = seconds // length
             if value > 0:
                 seconds = seconds % length
                 time.append('%s%s' % (str(value),
@@ -290,10 +291,10 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
             raise NotImplementedError('HTTP method "%s" not implemented.' % method)
         r.raise_for_status() # raise exception on error
         return r.text
-    except Exception, e:
-        print 'Sent: %s' % data
-        print e
-        print r.text
+    except Exception as e:
+        print('Sent: %s' % data)
+        print(e)
+        print(r.text)
         #sys.exit(1)
 
 #############################################################################
@@ -353,7 +354,7 @@ class ClientList(object):
 #----------------------------------------------------------------------------
 # WorkspaceList
 #----------------------------------------------------------------------------
-class WorkspaceList(object):
+class WorkspaceList(six.Iterator):
     """
     A singleton list of workspace. A workspace object is a dictionary as
     documented at
@@ -394,7 +395,7 @@ class WorkspaceList(object):
         self.iter_index = 0
         return self
 
-    def next(self):
+    def __next__(self):
         """
         Returns the next workspace.
         """
@@ -413,7 +414,7 @@ class WorkspaceList(object):
 #----------------------------------------------------------------------------
 # ProjectList
 #----------------------------------------------------------------------------
-class ProjectList(object):
+class ProjectList(six.Iterator):
     """
     A singleton list of projects. A "project object" is a dictionary as 
     documented at 
@@ -466,7 +467,7 @@ class ProjectList(object):
         self.iter_index = 0
         return self
 
-    def next(self):
+    def __next__(self):
         """
         Returns the next project.
         """
@@ -794,8 +795,8 @@ class TimeEntryList(object):
         """
         # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
         url = "%s/time_entries?start_date=%s&end_date=%s" % \
-            (TOGGL_URL, urllib.quote(DateAndTime().start_of_yesterday().isoformat('T')), \
-            urllib.quote(DateAndTime().last_minute_today().isoformat('T')))
+            (TOGGL_URL, urllib.parse.quote(DateAndTime().start_of_yesterday().isoformat('T')), \
+            urllib.parse.quote(DateAndTime().last_minute_today().isoformat('T')))
         Logger.debug(url)
         entries = json.loads( toggl(url, 'get') )
 
@@ -815,17 +816,17 @@ class TimeEntryList(object):
         """
         Returns a human-friendly list of recent time entries.
         """
-	# Sort the time entries into buckets based on "Month Day" of the entry.
-	days = { }
-	for entry in self.time_entries:
+        # Sort the time entries into buckets based on "Month Day" of the entry.
+        days = { }
+        for entry in self.time_entries:
             start_time = DateAndTime().parse_iso_str(entry.get('start')).strftime("%Y-%m-%d")
             if start_time not in days:
                 days[start_time] = []
             days[start_time].append(entry)
 
-	# For each day, print the entries, and sum the times.
+        # For each day, print the entries, and sum the times.
         s = ""
-	for date in sorted(days.keys()):
+        for date in sorted(days.keys()):
             s += date + "\n"
             duration = 0
             for entry in days[date]:
@@ -983,7 +984,7 @@ class CLI(object):
         elif self.args[0] == "add":
             self._add_time_entry(self.args[1:])
         elif self.args[0] == "clients":
-            print ClientList()
+            print(ClientList())
         elif self.args[0] == "continue":
             self._continue_entry(self.args[1:])
         elif self.args[0] == "now":
@@ -999,13 +1000,13 @@ class CLI(object):
         elif self.args[0] == "www":
             os.system(VISIT_WWW_COMMAND)
         elif self.args[0] == "workspaces":
-            print WorkspaceList()
+            print(WorkspaceList())
         else:
             self.print_help()
 
     def _show_projects(self, args):
         workspace_name = self._get_workspace_arg(args, optional=True)
-        print ProjectList(workspace_name)
+        print(ProjectList(workspace_name))
 
     def _continue_entry(self, args):
         """
