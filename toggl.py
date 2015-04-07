@@ -25,6 +25,9 @@ import requests
 import sys
 import time
 import urllib
+import socket
+import struct
+from socket import AF_INET, SOCK_DGRAM
 
 TOGGL_URL = "https://www.toggl.com/api/v8"
 VERBOSE = False # verbose output?
@@ -203,7 +206,11 @@ class DateAndTime(object):
         """
         Returns "now" as a localized datetime object.
         """
-        return self.tz.localize( datetime.datetime.now() ) 
+        t = self.ntp()
+        if t:
+            return self.tz.localize( datetime.datetime.fromtimestamp(t) )
+        else:
+            return self.tz.localize( datetime.datetime.now() )
  
     def parse_local_datetime_str(self, datetime_str):
         """
@@ -235,6 +242,36 @@ class DateAndTime(object):
             datetime.datetime.combine( datetime.date.today(), datetime.time.min) - 
             datetime.timedelta(days=1) # subtract one day from today at midnight
         )
+
+    def ntp(self):
+        """
+        Returns the actual epoch time from NTP.
+        """
+        # ref: http://blog.mattcrampton.com/post/88291892461/query-an-ntp-server-from-python
+        # TODO: behind a proxy
+        # TODO: custom ntp conf
+        host = "pool.ntp.org"
+        port = 123
+        buf = 1024
+        address = (host,port)
+        msg = '\x1b' + 47 * '\0'
+        
+        # reference time (in seconds since 1900-01-01 00:00:00)
+        TIME1970 = 2208988800L # 1970-01-01 00:00:00
+        
+        # connect to server
+        client = socket.socket(AF_INET, SOCK_DGRAM)
+        client.sendto(msg, address)
+        client.settimeout(3)
+        
+        for x in range(1, 2):
+            try:
+                msg, address = client.recvfrom( buf )
+            except:
+                pass
+        
+        t = struct.unpack("!12I", msg )[10]
+        return t - TIME1970 if t else 0
 
 #----------------------------------------------------------------------------
 # Logger 
