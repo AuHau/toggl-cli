@@ -349,7 +349,7 @@ class ClientList(object):
         s = ""
         for client in self.client_list:
             s = s + "%s\n" % client['name']
-        return s.rstrip() # strip trailing \n
+        return s.rstrip().encode('utf-8') # strip trailing \n
 
 #----------------------------------------------------------------------------
 # WorkspaceList
