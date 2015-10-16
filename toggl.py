@@ -1072,8 +1072,8 @@ class CLI(object):
 
     def _get_workspace_arg(self, args, optional=False):
         """
-        If the first entry in args is a workspace name (e.g., '#project')
-        then return the name of the project, or None.
+        If the first entry in args is a workspace name (e.g., ':workspace')
+        then return the name of the workspace, or None.
         """
         if len(args) == 0:
             if optional:
@@ -1137,7 +1137,7 @@ class CLI(object):
     def _start_time_entry(self, args):
         """
         Starts a new time entry.
-        args should be: DESCR [#WORKSPACE] [@PROJECT] [DATETIME]
+        args should be: DESCR [:WORKSPACE] [@PROJECT] [DATETIME]
         """
         description = self._get_str_arg(args, optional=False)
         workspace_name = self._get_workspace_arg(args, optional=True)
