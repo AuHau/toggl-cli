@@ -754,6 +754,14 @@ class TimeEntryList(object):
                 return entry
         return None
 
+    def get_latest(self):
+    	"""
+    	Returns the latest entry
+    	"""
+    	if len(self.time_entries) == 0:
+    		return None
+    	return self.time_entries[len(self.time_entries)-1]
+
     def next(self):
         """
         Returns the next time entry object.
@@ -999,9 +1007,11 @@ class CLI(object):
         to restart. If a description appears multiple times in your history,
         then we restart the newest one.
         """
+        entry = None
         if len(args) == 0:
-            CLI().print_help()
-        entry = TimeEntryList().find_by_description(args[0])
+            entry = TimeEntryList().get_latest()
+        else:
+        	entry = TimeEntryList().find_by_description(args[0])
         if entry:
             entry.continue_entry()
             Logger.info("%s continued at %s" % (entry.get('description'), 
