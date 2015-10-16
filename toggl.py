@@ -1072,8 +1072,8 @@ class CLI(object):
 
     def _get_workspace_arg(self, args, optional=False):
         """
-        If the first entry in args is a workspace name (e.g., '#project')
-        then return the name of the project, or None.
+        If the first entry in args is a workspace name (e.g., ':workspace')
+        then return the name of the workspace, or None.
         """
         if len(args) == 0:
             if optional:
