@@ -1132,7 +1132,7 @@ class CLI(object):
     def _start_time_entry(self, args):
         """
         Starts a new time entry.
-        args should be: DESCR [#WORKSPACE] [@PROJECT] [DATETIME]
+        args should be: DESCR [:WORKSPACE] [@PROJECT] [DATETIME]
         """
         description = self._get_str_arg(args, optional=False)
         workspace_name = self._get_workspace_arg(args, optional=True)
