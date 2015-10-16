@@ -563,34 +563,19 @@ class TimeEntry(object):
         """
         Continues an existing entry.
         """
-        # Was the entry started today or earlier than today?
-        start_time = DateAndTime().parse_iso_str( self.get('start') )
 
-        if start_time <= DateAndTime().start_of_today():
-            # Entry was from a previous day. Create a new entry from this
-            # one, resetting any identifiers or time data.
-            new_entry = TimeEntry()
-            new_entry.data = self.data.copy()
-            new_entry.set('at', None)
-            new_entry.set('created_with', 'toggl-cli') 
-            new_entry.set('duration', None)
-            new_entry.set('duronly', False) 
-            new_entry.set('guid', None)
-            new_entry.set('id', None) 
-            new_entry.set('start', None)
-            new_entry.set('stop', None)
-            new_entry.set('uid', None)
-            new_entry.start()
-        else:
-            # To continue an entry from today, set duration to 
-            # 0 - (current_time - duration).
-            now = DateAndTime().duration_since_epoch( DateAndTime().now() )
-            self.data['duration'] = 0 - (now - int(self.data['duration']))
-            self.data['duronly'] = True # ignore start/stop times from now on
-
-            toggl("%s/time_entries/%s" % (TOGGL_URL, self.data['id']), 'put', data=self.json())
-
-            Logger.debug('Continuing entry %s' % self.json())
+        new_entry = TimeEntry()
+        new_entry.data = self.data.copy()
+        new_entry.set('at', None)
+        new_entry.set('created_with', 'toggl-cli') 
+        new_entry.set('duration', None)
+        new_entry.set('duronly', False) 
+        new_entry.set('guid', None)
+        new_entry.set('id', None) 
+        new_entry.set('start', None)
+        new_entry.set('stop', None)
+        new_entry.set('uid', None)
+        new_entry.start()
 
     def delete(self):
         """
