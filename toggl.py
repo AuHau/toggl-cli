@@ -406,7 +406,7 @@ class WorkspaceList(six.Iterator):
             return self.workspace_list[self.iter_index-1]
 
     def __str__(self):
-        """Formats the workspace list as a string."""
+        """Formats the project list as a string."""
         s = ""
         for workspace in self:
             s = s + ":%s\n" % workspace['name']
@@ -916,7 +916,7 @@ class IcalEntryList(object):
 
     def __str__(self):
         """
-        Returns a functional VCALENDER / iCal appointment list of recent time entries.
+        Returns a human-friendly list of recent time entries.
         """
         # Sort the time entries into buckets based on "Month Day" of the entry.
         days = { }
@@ -1190,8 +1190,8 @@ class CLI(object):
 
     def _get_workspace_arg(self, args, optional=False):
         """
-        If the first entry in args is a workspace name (e.g., '#project')
-        then return the name of the project, or None.
+        If the first entry in args is a workspace name (e.g., ':workspace')
+        then return the name of the workspace, or None.
         """
         if len(args) == 0:
             if optional:
@@ -1255,12 +1255,17 @@ class CLI(object):
     def _start_time_entry(self, args):
         """
         Starts a new time entry.
-        args should be: DESCR [#WORKSPACE] [@PROJECT] [DATETIME]
+        args should be: DESCR [:WORKSPACE] [@PROJECT] ['d'DURATION | DATETIME]
         """
         description = self._get_str_arg(args, optional=False)
         workspace_name = self._get_workspace_arg(args, optional=True)
         project_name = self._get_project_arg(args, optional=True)
-        start_time = self._get_datetime_arg(args, optional=True)
+        duration = self._get_duration_arg(args, optional=True)
+        if duration is not None:
+        	start_time = DateAndTime().now() - datetime.timedelta(seconds=duration)
+    	else:
+        	start_time = self._get_datetime_arg(args, optional=True)
+
 
         # Create the time entry.
         entry = TimeEntry(
