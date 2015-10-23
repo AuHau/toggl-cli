@@ -1105,7 +1105,7 @@ class CLI(object):
             Logger.info(TimeEntryList())
         elif len(self.args) == 1 and self.args[0] == "ical":
             Logger.info(IcalEntryList())
-        elif len(self.args) == 3 or self.args[0] == "ical":
+        elif len(self.args) == 3 and self.args[0] == "ical":
             Logger.info(IcalEntryList(self.args[1],self.args[2]))
         elif self.args[0] == "add":
             self._add_time_entry(self.args[1:])
