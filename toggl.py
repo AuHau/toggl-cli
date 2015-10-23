@@ -1021,7 +1021,7 @@ class CLI(object):
             "  workspaces\n\tlists all workspaces\n"
             "  projects [:WORKSPACE]\n\tlists all projects\n"
             "  rm ID\n\tdelete a time entry by id\n"
-            "  start DESCR [:WORKSPACE] [@PROJECT] [DATETIME]\n\tstarts a new entry\n"
+            "  start DESCR [:WORKSPACE] [@PROJECT] ['d'DURATION | DATETIME]\n\tstarts a new entry\n"
             "  stop [DATETIME]\n\tstops the current entry\n"
             "  www\n\tvisits toggl.com\n"
             "\n"

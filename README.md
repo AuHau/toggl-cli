@@ -58,34 +58,40 @@ See the [issues tracker](https://github.com/drobertadams/toggl-cli/issues)
 
 Usage
 -----
-	Usage: toggl [OPTIONS] [ACTION]
-
-	Options:
-	  -h, --help     show this help message and exit
-	  -q, --quiet    don't print anything
-	  -v, --verbose  print additional info
-	  -d, --debug    print debugging output
-
-	Actions:
-	  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)
-		  creates a completed time entry
-	  clients
-		  lists all clients
-	  continue DESCR
-		  restarts the given entry
-	  ls
-		  list recent time entries
-	  now
-		  print what you're working on now
-	  projects
-		  lists all projects
-	  rm ID
-		  delete a time entry by id
-	  start DESCR [@PROJECT] [DATETIME]
-		  starts a new entry
-	  stop [DATETIME]
-		  stops the current entry
-	  www
-		  visits toggl.com
-
-	  DURATION = [[Hours:]Minutes:]Seconds
+    Usage: toggl.py [OPTIONS] [ACTION]
+    
+    Options:
+      -h, --help     show this help message and exit
+      -q, --quiet    don't print anything
+      -v, --verbose  print additional info
+      -d, --debug    print debugging output
+    
+    Actions:
+      add DESCR [:WORKSPACE] [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)
+            creates a completed time entry
+      clients
+            lists all clients
+      continue DESCR
+            restarts the given entry
+      ls [starttime endtime]
+            list (recent) time entries
+      ical [starttime endtime]
+            dump iCal list of (recent) time entries
+      now
+            print what you're working on now
+      workspaces
+            lists all workspaces
+      projects [:WORKSPACE]
+            lists all projects
+      rm ID
+            delete a time entry by id
+      start DESCR [:WORKSPACE] [@PROJECT] ['d'DURATION | DATETIME]
+            starts a new entry
+      stop [DATETIME]
+            stops the current entry
+      www
+            visits toggl.com
+    
+      DURATION = [[Hours:]Minutes:]Seconds
+      starttime/endtime = YYYY-MM-DDThh:mm:ss+TZ:00
+      e.g. starttime = 2015-10-15T00:00:00+02:00
