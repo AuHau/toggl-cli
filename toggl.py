@@ -998,6 +998,7 @@ class CLI(object):
         self.parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
             epilog="\nActions:\n"
             "  add DESCR [:WORKSPACE] [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
+            "  add DESCR [:WORKSPACE] [@PROJECT] 'd'DURATION\n\tcreates a completed time entry, with start time DURATION ago\n"
             "  clients\n\tlists all clients\n"
             "  continue DESCR\n\trestarts the given entry\n"
             "  ls [starttime endtime]\n\tlist (recent) time entries\n"
@@ -1041,6 +1042,7 @@ class CLI(object):
         Creates a completed time entry.
         args should be: DESCR [:WORKSPACE] [@PROJECT] START_DATE_TIME
             'd'DURATION | STOP_DATE_TIME
+        or: DESCR [:WORKSPACE] [@PROJECT] 'd'DURATION
         """
         # Process the args.
         description = self._get_str_arg(args)
@@ -1058,13 +1060,18 @@ class CLI(object):
             if project == None:
                 raise RuntimeError("Project '%s' not found." % project_name)
 
-        start_time = self._get_datetime_arg(args, optional=False)
-        duration = self._get_duration_arg(args, optional=True)
-        if duration is None:
-            stop_time = self._get_datetime_arg(args, optional=False)
-            duration = (stop_time - start_time).total_seconds()
-        else:
-            stop_time = None
+    	duration = self._get_duration_arg(args, optional=True)
+    	if duration is not None:
+    		start_time = DateAndTime().now() - datetime.timedelta(seconds=duration)
+    		stop_time = None
+    	else:
+	        start_time = self._get_datetime_arg(args, optional=False)
+	        duration = self._get_duration_arg(args, optional=True)
+	        if duration is None:
+	            stop_time = self._get_datetime_arg(args, optional=False)
+	            duration = (stop_time - start_time).total_seconds()
+	        else:
+	            stop_time = None
 
         # Create a time entry.
         entry = TimeEntry(
