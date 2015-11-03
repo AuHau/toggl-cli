@@ -73,8 +73,10 @@ Usage
             creates a completed time entry, with start time DURATION ago
       clients
             lists all clients
-      continue DESCR
-            restarts the given entry
+      continue [from DATETIME | 'd'DURATION]
+            restarts the last entry
+      continue DESCR [from DATETIME | 'd'DURATION]
+            restarts the last entry matching DESCR
       ls [starttime endtime]
             list (recent) time entries
       ical [starttime endtime]
