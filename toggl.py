@@ -687,7 +687,7 @@ class TimeEntry(object):
         not given, then stops the time entry now.
         """
         Logger.debug('Stopping entry %s' % self.json())
-        self.validate()
+        self.validate(['description'])
         if int(self.data['duration']) >= 0:
             raise Exception("toggl: time entry is not currently running.")
         if 'id' not in self.data:
@@ -724,7 +724,7 @@ class TimeEntry(object):
 
         return s
 
-    def validate(self):
+    def validate(self, exclude=[]):
         """
         Ensure this time entry contains the minimum information required
         by toggl, as well as passing some basic sanity checks. If not,
@@ -733,8 +733,9 @@ class TimeEntry(object):
         * toggl requires start, duration, and created_with.
         * toggl doesn't require a description, but we do.
         """
-        for prop in [ 'start', 'duration', 'description', 'created_with' ]:
-            if not self.has(prop):
+        required = [ 'start', 'duration', 'description', 'created_with' ];
+        for prop in required:
+            if not self.has(prop) and prop not in exclude:
                 Logger.debug(self.json())
                 raise Exception("toggl: time entries must have a '%s' property." % prop)
         return True
