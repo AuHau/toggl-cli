@@ -560,7 +560,7 @@ class TimeEntry(object):
         self.validate()
         toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
 
-    def continue_entry(self):
+    def continue_entry(self, continued_at=None):
         """
         Continues an existing entry.
         """
@@ -573,7 +573,10 @@ class TimeEntry(object):
         new_entry.set('duronly', False) 
         new_entry.set('guid', None)
         new_entry.set('id', None) 
-        new_entry.set('start', None)
+	    if (continued_at):
+	        new_entry.set('start', continued_at.isoformat())
+	    else:
+	    new_entry.set('start', None)
         new_entry.set('stop', None)
         new_entry.set('uid', None)
         new_entry.start()
@@ -668,7 +671,7 @@ class TimeEntry(object):
         not given, then stops the time entry now.
         """
         Logger.debug('Stopping entry %s' % self.json())
-        self.validate()
+        self.validate(['description'])
         if int(self.data['duration']) >= 0:
             raise Exception("toggl: time entry is not currently running.")
         if 'id' not in self.data:
@@ -705,7 +708,7 @@ class TimeEntry(object):
 
         return s
 
-    def validate(self):
+    def validate(self, exclude=[]):
         """
         Ensure this time entry contains the minimum information required
         by toggl, as well as passing some basic sanity checks. If not,
@@ -714,8 +717,9 @@ class TimeEntry(object):
         * toggl requires start, duration, and created_with.
         * toggl doesn't require a description, but we do.
         """
-        for prop in [ 'start', 'duration', 'description', 'created_with' ]:
-            if not self.has(prop):
+        required = [ 'start', 'duration', 'description', 'created_with' ];
+        for prop in required:
+            if not self.has(prop) and prop not in exclude:
                 Logger.debug(self.json())
                 raise Exception("toggl: time entries must have a '%s' property." % prop)
         return True
@@ -1000,7 +1004,8 @@ class CLI(object):
             "  add DESCR [:WORKSPACE] [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
             "  add DESCR [:WORKSPACE] [@PROJECT] 'd'DURATION\n\tcreates a completed time entry, with start time DURATION ago\n"
             "  clients\n\tlists all clients\n"
-            "  continue DESCR\n\trestarts the given entry\n"
+            "  continue [from DATETIME | 'd'DURATION]\n\trestarts the last entry\n"
+            "  continue DESCR [from DATETIME | 'd'DURATION]\n\trestarts the last entry matching DESCR\n"
             "  ls [starttime endtime]\n\tlist (recent) time entries\n"
             "  ical [starttime endtime]\n\tdump iCal list of (recent) time entries\n"
             "  now\n\tprint what you're working on now\n"
@@ -1132,17 +1137,40 @@ class CLI(object):
         to restart. If a description appears multiple times in your history,
         then we restart the newest one.
         """
-        entry = None
-        if len(args) == 0:
+        if len(args) == 0 or args[0] == "from":
             entry = TimeEntryList().get_latest()
         else:
-        	entry = TimeEntryList().find_by_description(args[0])
+            entry = TimeEntryList().find_by_description(args[0])
+            args.pop(0)
+
         if entry:
-            entry.continue_entry()
+            continued_at = None
+            if len(args) > 0:
+                if args[0] == "from":
+                    args.pop(0)
+                    if len(args) == 0:
+                        self._show_continue_usage()
+                        return
+                    else:
+                        duration = self._get_duration_arg(args, optional=True)
+                        if (duration is not None):
+                            continued_at = DateAndTime().now() - datetime.timedelta(seconds=duration)
+                        else:
+                            continued_at = self._get_datetime_arg(args, optional=True)
+                else:
+                    self._show_continue_usage()
+                    return
+
+            entry.continue_entry(continued_at)
+
             Logger.info("%s continued at %s" % (entry.get('description'), 
-                DateAndTime().format_time(datetime.datetime.now())))
+                DateAndTime().format_time(continued_at or DateAndTime().now())))
         else:
             Logger.info("Did not find '%s' in list of entries." % args[0] )
+
+    def _show_continue_usage(self):
+        Logger.info("continue usage: \n\tcontinue DESC from START_DATE_TIME | 'd'DURATION"
+            "\n\tcontinue from START_DATE_TIME | 'd'DURATION")
 
     def _delete_time_entry(self, args):
         """

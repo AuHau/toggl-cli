@@ -68,13 +68,15 @@ Usage
     
     Actions:
       add DESCR [:WORKSPACE] [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)
-        creates a completed time entry
+            creates a completed time entry
       add DESCR [:WORKSPACE] [@PROJECT] 'd'DURATION
-        creates a completed time entry, with start time DURATION ago
+            creates a completed time entry, with start time DURATION ago
       clients
             lists all clients
-      continue DESCR
-            restarts the given entry
+      continue [from DATETIME | 'd'DURATION]
+            restarts the last entry
+      continue DESCR [from DATETIME | 'd'DURATION]
+            restarts the last entry matching DESCR
       ls [starttime endtime]
             list (recent) time entries
       ical [starttime endtime]
