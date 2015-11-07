@@ -573,10 +573,10 @@ class TimeEntry(object):
         new_entry.set('duronly', False) 
         new_entry.set('guid', None)
         new_entry.set('id', None) 
-	    if (continued_at):
-	        new_entry.set('start', continued_at.isoformat())
-	    else:
-	    new_entry.set('start', None)
+        if (continued_at):
+            new_entry.set('start', continued_at.isoformat())
+        else:
+            new_entry.set('start', None)
         new_entry.set('stop', None)
         new_entry.set('uid', None)
         new_entry.start()
