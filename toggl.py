@@ -198,7 +198,7 @@ class DateAndTime(object):
         Returns 23:59:59 today as a localized datetime object.
         """
         return datetime.datetime.now(self.tz) \
-            .replace(hour=23, minute=59, second=59, microsecond=0)
+            .replace(hour=23, minute=59, second=59, microsecond=999)
 
     def now(self):
         """
@@ -810,7 +810,9 @@ class TimeEntryList(object):
         """
         # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
         url = "%s/time_entries?start_date=%s&end_date=%s" % \
-            (TOGGL_URL, urllib.parse.quote(start_time), urllib.parse.quote(stop_time))
+            (TOGGL_URL, urllib.parse.quote(DateAndTime().parse_local_datetime_str(start_time).isoformat('T')), urllib.parse.quote(DateAndTime().parse_local_datetime_str(stop_time).isoformat('T')))
+#            (TOGGL_URL, urllib.parse.quote(DateAndTime().parse_local_datetime_str(start_time).replace(hour=0,minute=59,second=59,microsecond=0).isoformat('T')), urllib.parse.quote(DateAndTime().parse_local_datetime_str(stop_time).replace(hour=23, minute=59, second=59, microsecond=999).isoformat('T')))
+#            (TOGGL_URL, urllib.parse.quote(start_time), urllib.parse.quote(stop_time))
         Logger.debug(url)
         entries = json.loads( toggl(url, 'get') )
 
@@ -911,7 +913,7 @@ class IcalEntryList(object):
         """
         # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
         url = "%s/time_entries?start_date=%s&end_date=%s" % \
-            (TOGGL_URL, urllib.parse.quote(start_time), urllib.parse.quote(stop_time))
+            (TOGGL_URL, urllib.parse.quote(DateAndTime().parse_local_datetime_str(start_time).replace(hour=0,minute=59,second=59,microsecond=0).isoformat('T')), urllib.parse.quote(DateAndTime().parse_local_datetime_str(stop_time).replace(hour=23, minute=59, second=59, microsecond=999).isoformat('T')))
         Logger.debug(url)
         entries = json.loads( toggl(url, 'get') )
         
@@ -1023,7 +1025,7 @@ class CLI(object):
             "  continue [from DATETIME | 'd'DURATION]\n\trestarts the last entry\n"
             "  continue DESCR [from DATETIME | 'd'DURATION]\n\trestarts the last entry matching DESCR\n"
             "  ls [starttime endtime]\n\tlist (recent) time entries\n"
-            "  ical [starttime endtime]\n\tdump iCal list of (recent) time entries\n"
+            "  ical [START_DATETIME END_DATETIME]\n\tdump iCal list of (recent) time entries\n"
             "  now\n\tprint what you're working on now\n"
             "  workspaces\n\tlists all workspaces\n"
             "  projects [:WORKSPACE]\n\tlists all projects\n"
@@ -1033,8 +1035,11 @@ class CLI(object):
             "  www\n\tvisits toggl.com\n"
             "\n"
             "  DURATION = [[Hours:]Minutes:]Seconds\n"
-            "  starttime/endtime = YYYY-MM-DDThh:mm:ss+TZ:00\n"
-            "  e.g. starttime = 2015-10-15T00:00:00+02:00\n")
+            "  Notes abount start/end_datetime:\n"
+            "  e.g. starttime/endtime = 2015-10-15T00:00:00, 2015-10-15, 8:00am, 5:30pm\n"
+            "  Note: TimeZone is grabbed from .togglrc and cannot be specified here\n"
+            "  'ical' works on whole days only by design. 'ls' can work on hours and minutes\n"
+            "  If you want all events for a day in 'ls', specify the next day as the endpoint or set a time.\n")
         self.parser.add_option("-q", "--quiet",
                               action="store_true", dest="quiet", default=False,
                               help="don't print anything")
