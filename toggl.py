@@ -269,7 +269,7 @@ class Logger(object):
         Prints msg if the current logging level >= INFO.
         """ 
         if Logger.level >= Logger.INFO:
-            print("%s%s" % (unicode(msg), unicode(end))),
+            print("%s%s" % (msg, end)),
 
 #----------------------------------------------------------------------------
 # toggl
@@ -486,8 +486,8 @@ class ProjectList(six.Iterator):
             if 'cid' in project:
                for client in clients:
                    if project['cid'] == client['id']:
-                       client_name = " - %s" % unicode(client['name'])
-            s = s + ":%s @%s%s\n" % (unicode(self.workspace['name']), unicode(project['name']), unicode(client_name))
+                       client_name = " - %s" % client['name']
+            s = s + ":%s @%s%s\n" % (self.workspace['name'], project['name'], client_name)
         return s.rstrip() # strip trailing \n
 
 #----------------------------------------------------------------------------
@@ -542,7 +542,6 @@ class TimeEntry(object):
             if project == None:
                 raise RuntimeError("Project '%s' not found." % project_name)
             self.data['pid'] = project['id']
-            self.data['project_name'] = project['name']
 
         if duration is not None:
             self.data['duration'] = duration
@@ -750,11 +749,11 @@ class TimeEntryList(object):
 
     __metaclass__ = Singleton
 
-    def __init__(self, start_time=DateAndTime().start_of_yesterday().isoformat('T'), stop_time=DateAndTime().last_minute_today().isoformat('T'), project_name=None):
+    def __init__(self):
         """
         Fetches time entry data from toggl.
         """
-        self.reload(start_time,stop_time)
+        self.reload()
         
     def __iter__(self):
         """
@@ -802,15 +801,15 @@ class TimeEntryList(object):
                 return entry
         return None
 
-    #def reload(self,start_time,stop_time,project_name):
-    def reload(self,start_time,stop_time):
+    def reload(self):
         """
         Force reloading time entry data from the server. Returns self for
         method chaining.
         """
         # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
         url = "%s/time_entries?start_date=%s&end_date=%s" % \
-            (TOGGL_URL, urllib.parse.quote(start_time), urllib.parse.quote(stop_time))
+            (TOGGL_URL, urllib.parse.quote(DateAndTime().start_of_yesterday().isoformat('T')), \
+            urllib.parse.quote(DateAndTime().last_minute_today().isoformat('T')))
         Logger.debug(url)
         entries = json.loads( toggl(url, 'get') )
 
@@ -844,117 +843,9 @@ class TimeEntryList(object):
             s += date + "\n"
             duration = 0
             for entry in days[date]:
-                s += unicode(entry) + "\n"
+                s += str(entry) + "\n"
                 duration += entry.normalized_duration()
             s += "  (%s)\n" % DateAndTime().elapsed_time(int(duration))
-        return s.rstrip() # strip trailing \n
-    
-#----------------------------------------------------------------------------
-# IcalEntryList
-#----------------------------------------------------------------------------
-class IcalEntryList(object):
-    """
-    A singleton list of recent TimeEntry objects.
-    """
-
-    __metaclass__ = Singleton
-
-    def __init__(self, start_time=DateAndTime().start_of_yesterday().isoformat('T'), stop_time=DateAndTime().last_minute_today().isoformat('T'), project_name=None):
-        """
-        Fetches time entry data from toggl.
-        """
-        self.reload(start_time,stop_time)
-        
-    def __iter__(self):
-        """
-        Start iterating over the time entries.
-        """
-        self.iter_index = 0
-        return self
-
-    def find_by_description(self, description):
-        """
-        Searches the list of entries for the one matching the given 
-        description, or return None. If more than one entry exists
-        with a matching description, the most recent one is
-        returned.
-        """
-        for entry in reversed(self.time_entries):
-            if entry.get('description') == description:
-                return entry
-        return None
-
-    def next(self):
-        """
-        Returns the next time entry object.
-        """
-        if self.iter_index >= len(self.time_entries):
-            raise StopIteration
-        else:
-            self.iter_index += 1
-            return self.time_entries[self.iter_index-1]
-    
-    def now(self):
-        """
-        Returns the current time entry object or None.
-        """
-        for entry in self:
-            if int(entry.get('duration')) < 0:
-                return entry
-        return None
-
-    #def reload(self,start_time,stop_time,project_name):
-    def reload(self,start_time,stop_time):
-        """
-        Force reloading time entry data from the server. Returns self for
-        method chaining.
-        """
-        # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
-        url = "%s/time_entries?start_date=%s&end_date=%s" % \
-            (TOGGL_URL, urllib.parse.quote(start_time), urllib.parse.quote(stop_time))
-        Logger.debug(url)
-        entries = json.loads( toggl(url, 'get') )
-        
-        # Build a list of entries.
-        self.time_entries = []
-        for entry in entries:
-            te = TimeEntry(data_dict=entry)
-            Logger.debug(te.json())
-            Logger.debug('---')
-            self.time_entries.append(te)
-
-        # Sort the list by start time.
-        sorted(self.time_entries, key=lambda entry: entry.data['start'])
-        return self
-
-    def __str__(self):
-        """
-        Returns a human-friendly list of recent time entries.
-        """
-        # Sort the time entries into buckets based on "Month Day" of the entry.
-        days = { }
-        for entry in self.time_entries:
-            start_time = DateAndTime().parse_iso_str(entry.get('start')).strftime("%Y-%m-%d")
-            if start_time not in days:
-                days[start_time] = []
-            days[start_time].append(entry)
-
-        # For each day, create calendar entries for each toggle entry.
-        s="BEGIN:VCALENDAR\nX-WR-CALNAME:Toggl Entries\nVERSION:2.0:CALSCALE:GREGORIAN\nMETHOD:PUBLISH\n"
-        count=0
-        for date in sorted(days.keys()):
-            for entry in days[date]:
-                #print vars(entry) + "\n"
-                s += "BEGIN:VEVENT\nDTSTART:%sZ\n" % entry.get('start')
-                s += "DTEND:%sZ\n" % entry.get('stop')
-                if entry.has('pid') == True:
-                    s += "SUMMARY:%s\nDESCRIPTION:%s\nSEQUENCE:%i\nEND:VEVENT\n" % (unicode(ProjectList().find_by_id(entry.data['pid'])['name']), unicode(entry.get('description')), count)
-                else:
-                    s += "SUMMARY:%s\nDESCRIPTION:%s\nSEQUENCE:%i\nEND:VEVENT\n" % (unicode(entry.get('description')), unicode(entry.get('description')), count)
-                count += 1
-                #duration += entry.normalized_duration()
-            #s += "  (%s)\n" % DateAndTime().elapsed_time(int(duration))
-        s += "END:VCALENDAR\n"
         return s.rstrip() # strip trailing \n
     
 #----------------------------------------------------------------------------
@@ -1022,8 +913,7 @@ class CLI(object):
             "  clients\n\tlists all clients\n"
             "  continue [from DATETIME | 'd'DURATION]\n\trestarts the last entry\n"
             "  continue DESCR [from DATETIME | 'd'DURATION]\n\trestarts the last entry matching DESCR\n"
-            "  ls [starttime endtime]\n\tlist (recent) time entries\n"
-            "  ical [starttime endtime]\n\tdump iCal list of (recent) time entries\n"
+            "  ls\n\tlist recent time entries\n"
             "  now\n\tprint what you're working on now\n"
             "  workspaces\n\tlists all workspaces\n"
             "  projects [:WORKSPACE]\n\tlists all projects\n"
@@ -1032,9 +922,7 @@ class CLI(object):
             "  stop [DATETIME]\n\tstops the current entry\n"
             "  www\n\tvisits toggl.com\n"
             "\n"
-            "  DURATION = [[Hours:]Minutes:]Seconds\n"
-            "  starttime/endtime = YYYY-MM-DDThh:mm:ss+TZ:00\n"
-            "  e.g. starttime = 2015-10-15T00:00:00+02:00\n")
+            "  DURATION = [[Hours:]Minutes:]Seconds\n")
         self.parser.add_option("-q", "--quiet",
                               action="store_true", dest="quiet", default=False,
                               help="don't print anything")
@@ -1112,14 +1000,8 @@ class CLI(object):
         """
         Performs the actions described by the list of arguments in self.args.
         """
-        if len(self.args) == 3 and self.args[0] == "ls":
-            Logger.info(TimeEntryList(self.args[1],self.args[2]))
-        elif len(self.args) == 0 or self.args[0] == "ls":
+        if len(self.args) == 0 or self.args[0] == "ls":
             Logger.info(TimeEntryList())
-        elif len(self.args) == 1 and self.args[0] == "ical":
-            Logger.info(IcalEntryList())
-        elif len(self.args) == 3 and self.args[0] == "ical":
-            Logger.info(IcalEntryList(self.args[1],self.args[2]))
         elif self.args[0] == "add":
             self._add_time_entry(self.args[1:])
         elif self.args[0] == "clients":
@@ -1145,7 +1027,7 @@ class CLI(object):
 
     def _show_projects(self, args):
         workspace_name = self._get_workspace_arg(args, optional=True)
-        print(unicode(ProjectList(workspace_name)))
+        print(ProjectList(workspace_name))
 
     def _continue_entry(self, args):
         """
