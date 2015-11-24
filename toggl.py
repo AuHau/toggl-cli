@@ -564,38 +564,22 @@ class TimeEntry(object):
         """
         Continues an existing entry.
         """
-        # Was the entry started today or earlier than today?
-        start_time = DateAndTime().parse_iso_str( self.get('start') )
 
-        if start_time <= DateAndTime().start_of_today():
-            # Entry was from a previous day. Create a new entry from this
-            # one, resetting any identifiers or time data.
-            new_entry = TimeEntry()
-            new_entry.data = self.data.copy()
-            new_entry.set('at', None)
-            new_entry.set('created_with', 'toggl-cli') 
-            new_entry.set('duration', None)
-            new_entry.set('duronly', False) 
-            new_entry.set('guid', None)
-            new_entry.set('id', None)
-            if (continued_at):
-                new_entry.set('start', continued_at.isoformat())
-            else:
-                new_entry.set('start', None)
-            new_entry.set('stop', None)
-            new_entry.set('uid', None)
-            new_entry.start()
+        new_entry = TimeEntry()
+        new_entry.data = self.data.copy()
+        new_entry.set('at', None)
+        new_entry.set('created_with', 'toggl-cli') 
+        new_entry.set('duration', None)
+        new_entry.set('duronly', False) 
+        new_entry.set('guid', None)
+        new_entry.set('id', None) 
+        if (continued_at):
+            new_entry.set('start', continued_at.isoformat())
         else:
-            # To continue an entry from today, set duration to 
-            # 0 - (current_time - duration).
-            now = DateAndTime().duration_since_epoch( DateAndTime().now() )
-            duration = ((continued_at or DateAndTime().now()) - DateAndTime().now()).total_seconds()
-            self.data['duration'] = 0 - (now - int(self.data['duration'])) - duration
-            self.data['duronly'] = True # ignore start/stop times from now on
-
-            toggl("%s/time_entries/%s" % (TOGGL_URL, self.data['id']), 'put', data=self.json())
-
-            Logger.debug('Continuing entry %s' % self.json())
+            new_entry.set('start', None)
+        new_entry.set('stop', None)
+        new_entry.set('uid', None)
+        new_entry.start()
 
     def delete(self):
         """
@@ -941,15 +925,15 @@ class IcalEntryList(object):
 
         # For each day, create calendar entries for each toggle entry.
         s="BEGIN:VCALENDAR\nX-WR-CALNAME:Toggl Entries\nVERSION:2.0:CALSCALE:GREGORIAN\nMETHOD:PUBLISH\n"
-	count=0
+        count=0
         for date in sorted(days.keys()):
             for entry in days[date]:
-		#print vars(entry) + "\n"
+                #print vars(entry) + "\n"
                 s += "BEGIN:VEVENT\nDTSTART:%sZ\n" % entry.get('start')
                 s += "DTEND:%sZ\n" % entry.get('stop')
-		if entry.has('pid') == True:
+                if entry.has('pid') == True:
                     s += "SUMMARY:%s\nDESCRIPTION:%s\nSEQUENCE:%i\nEND:VEVENT\n" % (unicode(ProjectList().find_by_id(entry.data['pid'])['name']), unicode(entry.get('description')), count)
-		else:
+                else:
                     s += "SUMMARY:%s\nDESCRIPTION:%s\nSEQUENCE:%i\nEND:VEVENT\n" % (unicode(entry.get('description')), unicode(entry.get('description')), count)
                 count += 1
                 #duration += entry.normalized_duration()
@@ -1081,18 +1065,18 @@ class CLI(object):
             if project == None:
                 raise RuntimeError("Project '%s' not found." % project_name)
 
-    	duration = self._get_duration_arg(args, optional=True)
-    	if duration is not None:
-    		start_time = DateAndTime().now() - datetime.timedelta(seconds=duration)
-    		stop_time = None
-    	else:
-	        start_time = self._get_datetime_arg(args, optional=False)
-	        duration = self._get_duration_arg(args, optional=True)
-	        if duration is None:
-	            stop_time = self._get_datetime_arg(args, optional=False)
-	            duration = (stop_time - start_time).total_seconds()
-	        else:
-	            stop_time = None
+        duration = self._get_duration_arg(args, optional=True)
+        if duration is not None:
+            start_time = DateAndTime().now() - datetime.timedelta(seconds=duration)
+            stop_time = None
+        else:
+            start_time = self._get_datetime_arg(args, optional=False)
+            duration = self._get_duration_arg(args, optional=True)
+            if duration is None:
+                stop_time = self._get_datetime_arg(args, optional=False)
+                duration = (stop_time - start_time).total_seconds()
+            else:
+                stop_time = None
 
         # Create a time entry.
         entry = TimeEntry(
@@ -1308,9 +1292,9 @@ class CLI(object):
         project_name = self._get_project_arg(args, optional=True)
         duration = self._get_duration_arg(args, optional=True)
         if duration is not None:
-        	start_time = DateAndTime().now() - datetime.timedelta(seconds=duration)
-    	else:
-        	start_time = self._get_datetime_arg(args, optional=True)
+            start_time = DateAndTime().now() - datetime.timedelta(seconds=duration)
+        else:
+            start_time = self._get_datetime_arg(args, optional=True)
 
 
         # Create the time entry.
