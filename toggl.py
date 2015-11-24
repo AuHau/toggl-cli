@@ -77,7 +77,7 @@ class Config(object):
         """
         Reads configuration data from ~/.togglrc.
         """
-        self.cfg = ConfigParser.ConfigParser()
+        self.cfg = ConfigParser.ConfigParser({'continue_creates': 'false'})
         if self.cfg.read(os.path.expanduser('~/.togglrc')) == []:
             self._create_empty_config()
             raise IOError("Missing ~/.togglrc. A default has been created for editing.")
@@ -95,6 +95,7 @@ class Config(object):
         cfg.set('options', 'timezone', 'UTC')
         cfg.set('options', 'time_format', '%I:%M%p')
         cfg.set('options', 'prefer_token', 'true')
+        cfg.set('options', 'continue_creates', 'true')
         with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
             cfg.write(cfgfile)
         os.chmod(os.path.expanduser('~/.togglrc'), 0o600)
@@ -564,10 +565,12 @@ class TimeEntry(object):
         """
         Continues an existing entry.
         """
+        create = Config().get('options', 'continue_creates').lower() == 'true'
+
         # Was the entry started today or earlier than today?
         start_time = DateAndTime().parse_iso_str( self.get('start') )
 
-        if start_time <= DateAndTime().start_of_today():
+        if create or start_time <= DateAndTime().start_of_today():
             # Entry was from a previous day. Create a new entry from this
             # one, resetting any identifiers or time data.
             new_entry = TimeEntry()

@@ -43,6 +43,10 @@ automatically created.
 1. Update that file with your toggl username and password.
 2. Update the timezone entry (e.g. US/Pacific).
 
+####Continue Behaviour####
+
+Setting `continue_creates` to false will cause `continue` to continue already existing same-day entries as a duration continuation, rather than create a new entry.  `continue_creates` defaults to false for toggl-cli users where `.togglrc` already exists, and to true for new users as per the default of the toggl web UI.
+
 Limitations
 -----------
 
