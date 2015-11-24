@@ -199,7 +199,7 @@ class DateAndTime(object):
         Returns 23:59:59 today as a localized datetime object.
         """
         return datetime.datetime.now(self.tz) \
-            .replace(hour=23, minute=59, second=59, microsecond=0)
+            .replace(hour=23, minute=59, second=59, microsecond=999)
 
     def now(self):
         """
@@ -505,7 +505,7 @@ class TimeEntry(object):
 
     def __init__(self, description=None, start_time=None, stop_time=None,
                  duration=None, workspace_name = None, project_name=None,
-                 data_dict=None):
+                 tags=None,data_dict=None):
         """
         Constructor. None of the parameters are required at object creation,
         but the object is validated before data is sent to toggl.
@@ -753,7 +753,7 @@ class TimeEntryList(object):
 
     __metaclass__ = Singleton
 
-    def __init__(self, start_time=DateAndTime().start_of_yesterday().isoformat('T'), stop_time=DateAndTime().last_minute_today().isoformat('T'), project_name=None):
+    def __init__(self, start_time=DateAndTime().start_of_yesterday().replace(tzinfo=None).isoformat('T'), stop_time=DateAndTime().last_minute_today().replace(tzinfo=None).isoformat('T'), project_name=None):
         """
         Fetches time entry data from toggl.
         """
@@ -813,7 +813,9 @@ class TimeEntryList(object):
         """
         # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
         url = "%s/time_entries?start_date=%s&end_date=%s" % \
-            (TOGGL_URL, urllib.parse.quote(start_time), urllib.parse.quote(stop_time))
+            (TOGGL_URL, urllib.parse.quote(DateAndTime().parse_local_datetime_str(start_time).isoformat('T')), urllib.parse.quote(DateAndTime().parse_local_datetime_str(stop_time).isoformat('T')))
+#            (TOGGL_URL, urllib.parse.quote(DateAndTime().parse_local_datetime_str(start_time).replace(hour=0,minute=59,second=59,microsecond=0).isoformat('T')), urllib.parse.quote(DateAndTime().parse_local_datetime_str(stop_time).replace(hour=23, minute=59, second=59, microsecond=999).isoformat('T')))
+#            (TOGGL_URL, urllib.parse.quote(start_time), urllib.parse.quote(stop_time))
         Logger.debug(url)
         entries = json.loads( toggl(url, 'get') )
 
@@ -847,9 +849,15 @@ class TimeEntryList(object):
             s += date + "\n"
             duration = 0
             for entry in days[date]:
-                s += unicode(entry) + "\n"
+                if entry.get('tags') is not None:
+                   taglist += unicode(entry.get('tags')).replace("u'", "'")
+                else:
+                   taglist = ""
+                s += unicode(entry) + " " + taglist + "\n"
                 duration += entry.normalized_duration()
-            s += "  (%s)\n" % DateAndTime().elapsed_time(int(duration))
+            #s += "  (%s) %s\n" % (DateAndTime().elapsed_time(int(duration), entry.get('tags')))
+            s += "  (%s)\n" % (DateAndTime().elapsed_time(int(duration)))
+
         return s.rstrip() # strip trailing \n
     
 #----------------------------------------------------------------------------
@@ -862,7 +870,7 @@ class IcalEntryList(object):
 
     __metaclass__ = Singleton
 
-    def __init__(self, start_time=DateAndTime().start_of_yesterday().isoformat('T'), stop_time=DateAndTime().last_minute_today().isoformat('T'), project_name=None):
+    def __init__(self, start_time=DateAndTime().start_of_yesterday().replace(tzinfo=None).isoformat('T'), stop_time=DateAndTime().last_minute_today().replace(tzinfo=None).isoformat('T'), project_name=None):
         """
         Fetches time entry data from toggl.
         """
@@ -914,7 +922,7 @@ class IcalEntryList(object):
         """
         # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
         url = "%s/time_entries?start_date=%s&end_date=%s" % \
-            (TOGGL_URL, urllib.parse.quote(start_time), urllib.parse.quote(stop_time))
+            (TOGGL_URL, urllib.parse.quote(DateAndTime().parse_local_datetime_str(start_time).replace(hour=0,minute=59,second=59,microsecond=0).isoformat('T')), urllib.parse.quote(DateAndTime().parse_local_datetime_str(stop_time).replace(hour=23, minute=59, second=59, microsecond=999).isoformat('T')))
         Logger.debug(url)
         entries = json.loads( toggl(url, 'get') )
         
@@ -934,6 +942,14 @@ class IcalEntryList(object):
         """
         Returns a human-friendly list of recent time entries.
         """
+
+	"""
+        Set client name as location, if available.
+        """
+
+        clients = ClientList()
+	projects = ProjectList()
+
         # Sort the time entries into buckets based on "Month Day" of the entry.
         days = { }
         for entry in self.time_entries:
@@ -947,13 +963,23 @@ class IcalEntryList(object):
 	count=0
         for date in sorted(days.keys()):
             for entry in days[date]:
+                taglist = ""
+		client_name = ""
+                if entry.get('tags') is not None:
+                   taglist += " -- Tags: " + unicode(entry.get('tags')).replace("u'", "'")
+
+                if entry.has('pid') == True:
+                   cid = ProjectList().find_by_id(entry.data['pid'])['cid']
+                   for client in clients:
+                      if cid == client['id']:
+	    	         client_name = "\nLOCATION:" + unicode(client['name'])
 		#print vars(entry) + "\n"
                 s += "BEGIN:VEVENT\nDTSTART:%sZ\n" % entry.get('start')
                 s += "DTEND:%sZ\n" % entry.get('stop')
 		if entry.has('pid') == True:
-                    s += "SUMMARY:%s\nDESCRIPTION:%s\nSEQUENCE:%i\nEND:VEVENT\n" % (unicode(ProjectList().find_by_id(entry.data['pid'])['name']), unicode(entry.get('description')), count)
+                    s += "SUMMARY:%s\nDESCRIPTION:%s%s\nSEQUENCE:%i\nEND:VEVENT\n" % (unicode(ProjectList().find_by_id(entry.data['pid'])['name']), unicode(entry.get('description') + taglist), client_name, count)
 		else:
-                    s += "SUMMARY:%s\nDESCRIPTION:%s\nSEQUENCE:%i\nEND:VEVENT\n" % (unicode(entry.get('description')), unicode(entry.get('description')), count)
+                    s += "SUMMARY:%s\nDESCRIPTION:%s\nSEQUENCE:%i\nEND:VEVENT\n" % (unicode(entry.get('description')), unicode(entry.get('description') + taglist), count)
                 count += 1
                 #duration += entry.normalized_duration()
             #s += "  (%s)\n" % DateAndTime().elapsed_time(int(duration))
@@ -1026,7 +1052,7 @@ class CLI(object):
             "  continue [from DATETIME | 'd'DURATION]\n\trestarts the last entry\n"
             "  continue DESCR [from DATETIME | 'd'DURATION]\n\trestarts the last entry matching DESCR\n"
             "  ls [starttime endtime]\n\tlist (recent) time entries\n"
-            "  ical [starttime endtime]\n\tdump iCal list of (recent) time entries\n"
+            "  ical [START_DATETIME END_DATETIME]\n\tdump iCal list of (recent) time entries\n"
             "  now\n\tprint what you're working on now\n"
             "  workspaces\n\tlists all workspaces\n"
             "  projects [:WORKSPACE]\n\tlists all projects\n"
@@ -1036,8 +1062,11 @@ class CLI(object):
             "  www\n\tvisits toggl.com\n"
             "\n"
             "  DURATION = [[Hours:]Minutes:]Seconds\n"
-            "  starttime/endtime = YYYY-MM-DDThh:mm:ss+TZ:00\n"
-            "  e.g. starttime = 2015-10-15T00:00:00+02:00\n")
+            "  Notes abount start/end_datetime:\n"
+            "  e.g. starttime/endtime = 2015-10-15T00:00:00, 2015-10-15, 8:00am, 5:30pm\n"
+            "  Note: TimeZone is grabbed from .togglrc and cannot be specified here\n"
+            "  'ical' works on whole days only by design. 'ls' can work on hours and minutes\n"
+            "  If you want all events for a day in 'ls', specify the next day as the endpoint or set a time.\n")
         self.parser.add_option("-q", "--quiet",
                               action="store_true", dest="quiet", default=False,
                               help="don't print anything")
@@ -1104,7 +1133,8 @@ class CLI(object):
             stop_time=stop_time,
             duration=duration,
             project_name=project_name,
-            workspace_name=workspace_name
+            workspace_name=workspace_name,
+            tags=None
         )
 
         Logger.debug(entry.json())
