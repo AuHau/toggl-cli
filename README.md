@@ -32,7 +32,7 @@ Requirements
 * iso8601 module
 * pytz module
 * requests
-* dateutil
+* dateutils
 
 Configuration
 -------------
