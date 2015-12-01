@@ -81,10 +81,8 @@ Usage
             restarts the last entry
       continue DESCR [from DATETIME | 'd'DURATION]
             restarts the last entry matching DESCR
-      ls [starttime endtime]
-            list (recent) time entries
-      ical [starttime endtime]
-            dump iCal list of (recent) time entries
+      ls
+            list recent time entries
       now
             print what you're working on now
       workspaces
@@ -101,5 +99,3 @@ Usage
             visits toggl.com
     
       DURATION = [[Hours:]Minutes:]Seconds
-      starttime/endtime = YYYY-MM-DDThh:mm:ss+TZ:00
-      e.g. starttime = 2015-10-15T00:00:00+02:00
