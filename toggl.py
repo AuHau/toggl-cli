@@ -437,9 +437,12 @@ class ProjectList(six.Iterator):
             if self.workspace is not None:
                 wid = self.workspace["id"]
         if wid is None:
-                wid = User().get('default_wid')
-                self.workspace = WorkspaceList().find_by_id(wid)
+            wid = User().get('default_wid')
+            self.workspace = WorkspaceList().find_by_id(wid)
 
+        self.fetch_by_wid(wid)
+
+    def fetch_by_wid(self, wid):
         result = toggl("%s/workspaces/%s/projects" % (TOGGL_URL, wid), 'get')
         self.project_list = json.loads(result)
 
@@ -713,7 +716,15 @@ class TimeEntry(object):
             is_running = '* '
         
         if 'pid' in self.data:
-            project_name = " @%s " % ProjectList().find_by_id(self.data['pid'])['name']
+            project = ProjectList().find_by_id(self.data['pid'])
+            if project is not None:
+                project_name = " @%s " % project['name']
+            elif 'wid' in self.data:
+                ProjectList().fetch_by_wid(self.data['wid']);
+                project_name = " @%s " % ProjectList().find_by_id(self.data['pid'])['name']
+            else:
+                project_name = " "
+                
         else:
             project_name = " "
 
