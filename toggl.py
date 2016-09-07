@@ -300,6 +300,7 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
     """
     Makes an HTTP request to toggl.com. Returns the raw text data received.
     """
+    r = None
     try:
         if method == 'delete':
             r = requests.delete(url, auth=Config().get_auth(), data=data, headers=headers)
@@ -316,7 +317,8 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
     except Exception as e:
         print('Sent: %s' % data)
         print(e)
-        print(r.text)
+        if r is not None:
+            print(r.text)
         #sys.exit(1)
 
 #############################################################################
