@@ -756,7 +756,7 @@ class TimeEntry(object):
         if VERBOSE:
             s += " [%s]" % self.data['id']
 
-        return s
+        return s.encode("utf-8")
 
     def validate(self, exclude=[]):
         """
