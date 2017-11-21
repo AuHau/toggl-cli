@@ -332,7 +332,7 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
 #----------------------------------------------------------------------------
 # ClientList
 #----------------------------------------------------------------------------
-class ClientList(object):
+class ClientList(six.Iterator):
     """
     A singleton list of clients. A "client object" is a set of properties
     as documented at 
@@ -355,7 +355,7 @@ class ClientList(object):
         self.iter_index = 0
         return self
 
-    def next(self):
+    def __next__(self):
         """
         Returns the next client.
         """
@@ -779,7 +779,7 @@ class TimeEntry(object):
 #----------------------------------------------------------------------------
 # TimeEntryList
 #----------------------------------------------------------------------------
-class TimeEntryList(object):
+class TimeEntryList(six.Iterator):
     """
     A singleton list of recent TimeEntry objects.
     """
@@ -819,7 +819,7 @@ class TimeEntryList(object):
     		return None
     	return self.time_entries[len(self.time_entries)-1]
 
-    def next(self):
+    def __next__(self):
         """
         Returns the next time entry object.
         """
