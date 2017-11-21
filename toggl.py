@@ -34,6 +34,7 @@ ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 #   2. Toggl Models - Toggl-specific data classes
 #   3. Command Line Interface - CLI
 
+import re
 import datetime
 import dateutil.parser
 import iso8601
@@ -98,7 +99,7 @@ class Config(object):
         """
         Reads configuration data from ~/.togglrc.
         """
-        self.cfg = ConfigParser.ConfigParser({'continue_creates': 'false'})
+        self.cfg = ConfigParser.RawConfigParser({'continue_creates': 'false'})
         if self.cfg.read(os.path.expanduser('~/.togglrc')) == []:
             self._create_empty_config()
             raise IOError("Missing ~/.togglrc. A default has been created for editing.")
@@ -200,7 +201,7 @@ class DateAndTime(object):
             value = seconds // length
             if value > 0:
                 seconds = seconds % length
-                time.append('%s%s' % (str(value),
+                time.append('{}{}'.format(str(value),
                     (suffix, (suffix, suffix + 's')[value > 1])[add_s]))
             if seconds < 1:
                 break
@@ -283,7 +284,7 @@ class Logger(object):
         Prints msg if the current logging level >= DEBUG.
         """ 
         if Logger.level >= Logger.DEBUG:
-            print("%s%s" % (msg, end)),
+            print("{}{}".format(msg, end)),
 
     @staticmethod
     def info(msg, end="\n"):
@@ -291,7 +292,7 @@ class Logger(object):
         Prints msg if the current logging level >= INFO.
         """ 
         if Logger.level >= Logger.INFO:
-            print("%s%s" % (msg, end)),
+            print("{}{}".format(msg, end)),
 
 #----------------------------------------------------------------------------
 # toggl
@@ -300,6 +301,7 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
     """
     Makes an HTTP request to toggl.com. Returns the raw text data received.
     """
+    url = "{}{}".format(TOGGL_URL, url)   
     try:
         if method == 'delete':
             r = requests.delete(url, auth=Config().get_auth(), data=data, headers=headers)
@@ -310,11 +312,11 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
         elif method == 'put':
             r = requests.post(url, auth=Config().get_auth(), data=data, headers=headers)
         else:
-            raise NotImplementedError('HTTP method "%s" not implemented.' % method)
+            raise NotImplementedError('HTTP method "{}" not implemented.'.format(method))
         r.raise_for_status() # raise exception on error
         return r.text
     except Exception as e:
-        print('Sent: %s' % data)
+        print('Sent: {}'.format(data))
         print(e)
         print(r.text)
         #sys.exit(1)
@@ -331,7 +333,7 @@ def toggl(url, method, data=None, headers={'content-type' : 'application/json'})
 #----------------------------------------------------------------------------
 # ClientList
 #----------------------------------------------------------------------------
-class ClientList(object):
+class ClientList(six.Iterator):
     """
     A singleton list of clients. A "client object" is a set of properties
     as documented at 
@@ -344,7 +346,7 @@ class ClientList(object):
         """
         Fetches the list of clients from toggl.
         """
-        result = toggl("%s/clients" % TOGGL_URL, 'get')
+        result = toggl("/clients", 'get')
         self.client_list = json.loads(result)
 
     def __iter__(self):
@@ -354,11 +356,11 @@ class ClientList(object):
         self.iter_index = 0
         return self
 
-    def next(self):
+    def __next__(self):
         """
         Returns the next client.
         """
-        if self.iter_index >= len(self.client_list):
+        if not self.client_list or self.iter_index >= len(self.client_list):
             raise StopIteration
         else:
             self.iter_index += 1
@@ -370,7 +372,7 @@ class ClientList(object):
         """
         s = ""
         for client in self.client_list:
-            s = s + "%s\n" % client['name']
+            s = s + "{}\n".format(client['name'])
         return s.rstrip().encode('utf-8') # strip trailing \n
 
 #----------------------------------------------------------------------------
@@ -389,7 +391,7 @@ class WorkspaceList(six.Iterator):
         """
         Fetches the list of workspaces from toggl.
         """
-        result = toggl("%s/workspaces" % TOGGL_URL, "get")
+        result = toggl("/workspaces", "get")
         self.workspace_list = json.loads(result)
 
     def find_by_id(self, wid):
@@ -421,7 +423,7 @@ class WorkspaceList(six.Iterator):
         """
         Returns the next workspace.
         """
-        if self.iter_index >= len(self.workspace_list):
+        if not self.workspace_list or self.iter_index >= len(self.workspace_list):
             raise StopIteration
         else:
             self.iter_index += 1
@@ -431,8 +433,9 @@ class WorkspaceList(six.Iterator):
         """Formats the project list as a string."""
         s = ""
         for workspace in self:
-            s = s + ":%s\n" % workspace['name']
+            s = s + ":{}\n".format(workspace['name'])
         return s.rstrip() # strip trailing \n
+
 #----------------------------------------------------------------------------
 # ProjectList
 #----------------------------------------------------------------------------
@@ -464,7 +467,7 @@ class ProjectList(six.Iterator):
         self.fetch_by_wid(wid)
 
     def fetch_by_wid(self, wid):
-        result = toggl("%s/workspaces/%s/projects" % (TOGGL_URL, wid), 'get')
+        result = toggl("/workspaces/{}/projects".format(wid), 'get')
         self.project_list = json.loads(result)
 
     def find_by_id(self, pid):
@@ -496,7 +499,7 @@ class ProjectList(six.Iterator):
         """
         Returns the next project.
         """
-        if self.iter_index >= len(self.project_list):
+        if not self.project_list or self.iter_index >= len(self.project_list):
             raise StopIteration
         else:
             self.iter_index += 1
@@ -511,8 +514,8 @@ class ProjectList(six.Iterator):
             if 'cid' in project:
                for client in clients:
                    if project['cid'] == client['id']:
-                       client_name = " - %s" % client['name']
-            s = s + ":%s @%s%s\n" % (self.workspace['name'], project['name'], client_name)
+                       client_name = " - {}".format(client['name'])
+            s = s + ":{} @{}{}\n".format(self.workspace['name'], project['name'], client_name)
         return s.rstrip() # strip trailing \n
 
 #----------------------------------------------------------------------------
@@ -559,13 +562,13 @@ class TimeEntry(object):
         if workspace_name is not None:
             workspace = WorkspaceList().find_by_name(workspace_name)
             if workspace == None:
-                raise RuntimeError("Workspace '%s' not found." % workspace_name)
+                raise RuntimeError("Workspace '{}' not found.".format(workspace_name))
             self.data['wid'] = workspace['id']
 
         if project_name is not None:
             project = ProjectList(workspace_name).find_by_name(project_name)
             if project == None:
-                raise RuntimeError("Project '%s' not found." % project_name)
+                raise RuntimeError("Project '{}' not found.".format(project_name))
             self.data['pid'] = project['id']
 
         if duration is not None:
@@ -582,7 +585,7 @@ class TimeEntry(object):
         Adds this time entry as a completed entry. 
         """
         self.validate()
-        toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
+        toggl("/time_entries", "post", self.json())
 
     def continue_entry(self, continued_at=None):
         """
@@ -619,9 +622,9 @@ class TimeEntry(object):
             self.data['duration'] = 0 - (now - int(self.data['duration'])) - duration
             self.data['duronly'] = True # ignore start/stop times from now on
 
-            toggl("%s/time_entries/%s" % (TOGGL_URL, self.data['id']), 'put', data=self.json())
+            toggl("/time_entries/{}".format(self.data['id']), 'put', data=self.json())
 
-            Logger.debug('Continuing entry %s' % self.json())
+            Logger.debug('Continuing entry {}'.format(self.json()))
 
     def delete(self):
         """
@@ -630,7 +633,7 @@ class TimeEntry(object):
         if not self.has('id'):
             raise Exception("Time entry must have an id to be deleted.")
 
-        url = "%s/time_entries/%s" % (TOGGL_URL, self.get('id'))
+        url = "/time_entries/{}".format(self.get('id'))
         toggl(url, 'delete')
         
     def get(self, prop):
@@ -655,7 +658,7 @@ class TimeEntry(object):
         """
         Returns a JSON dump of this entire object as toggl payload.
         """
-        return '{"time_entry": %s}' % json.dumps(self.data)
+        return '{{"time_entry": {}}}'.format(json.dumps(self.data))
 
     def normalized_duration(self):
         """
@@ -695,15 +698,15 @@ class TimeEntry(object):
 
             self.validate()
 
-            toggl("%s/time_entries" % TOGGL_URL, "post", self.json())
+            toggl("/time_entries", "post", self.json())
         else:
             # 'start' is ignored by 'time_entries/start' endpoint. We define it
             # to keep consinstency with toggl server
             self.data['start'] = DateAndTime().now().isoformat()
 
-            toggl("%s/time_entries/start" % TOGGL_URL, "post", self.json())
+            toggl("/time_entries/start", "post", self.json())
 
-        Logger.debug('Started time entry: %s' % self.json())
+        Logger.debug('Started time entry: {}'.format(self.json()))
 
     def stop(self, stop_time=None):
         """
@@ -712,7 +715,7 @@ class TimeEntry(object):
         stop_time(datetime) is an optional datetime when this entry stopped. If
         not given, then stops the time entry now.
         """
-        Logger.debug('Stopping entry %s' % self.json())
+        Logger.debug('Stopping entry {}'.format(self.json()))
         self.validate(['description'])
         if int(self.data['duration']) >= 0:
             raise Exception("toggl: time entry is not currently running.")
@@ -725,13 +728,13 @@ class TimeEntry(object):
         self.set('duration', \
             DateAndTime().duration_since_epoch(stop_time) + int(self.get('duration')))
 
-        toggl("%s/time_entries/%d" % (TOGGL_URL, self.get('id')), 'put', self.json())
+        toggl("/time_entries/{}".format(self.get('id')), 'put', self.json())
 
     def __str__(self):
         """
         Returns a human-friendly string representation of this time entry.
         """
-        if self.data['duration'] > 0:
+        if float(self.data['duration']) > 0:
             is_running = '  '
         else:
             is_running = '* '
@@ -739,22 +742,22 @@ class TimeEntry(object):
         if 'pid' in self.data:
             project = ProjectList().find_by_id(self.data['pid'])
             if project is not None:
-                project_name = " @%s " % project['name']
+                project_name = " @{} ".format(project['name'])
             elif 'wid' in self.data:
                 ProjectList().fetch_by_wid(self.data['wid']);
-                project_name = " @%s " % ProjectList().find_by_id(self.data['pid'])['name']
+                project_name = " @{} ".format(ProjectList().find_by_id(self.data['pid'])['name'])
             else:
                 project_name = " "
                 
         else:
             project_name = " "
 
-        s = "%s%s%s%s" % (is_running, self.data.get('description'), project_name, 
+        s = "{}{}{}{}".format(is_running, self.data.get('description'), project_name, 
             DateAndTime().elapsed_time(int(self.normalized_duration())) \
         )
 
         if VERBOSE:
-            s += " [%s]" % self.data['id']
+            s += " [{}]".format(self.data['id'])
 
         return s
 
@@ -768,16 +771,17 @@ class TimeEntry(object):
         * toggl doesn't require a description, but we do.
         """
         required = [ 'start', 'duration', 'description', 'created_with' ];
+
         for prop in required:
             if not self.has(prop) and prop not in exclude:
                 Logger.debug(self.json())
-                raise Exception("toggl: time entries must have a '%s' property." % prop)
+                raise Exception("toggl: time entries must have a '{}' property.".format(prop))
         return True
 
 #----------------------------------------------------------------------------
 # TimeEntryList
 #----------------------------------------------------------------------------
-class TimeEntryList(object):
+class TimeEntryList(six.Iterator):
     """
     A singleton list of recent TimeEntry objects.
     """
@@ -817,16 +821,16 @@ class TimeEntryList(object):
     		return None
     	return self.time_entries[len(self.time_entries)-1]
 
-    def next(self):
+    def __next__(self):
         """
         Returns the next time entry object.
         """
-        if self.iter_index >= len(self.time_entries):
+        if not self.time_entries or self.iter_index >= len(self.time_entries):
             raise StopIteration
         else:
             self.iter_index += 1
             return self.time_entries[self.iter_index-1]
-    
+
     def now(self):
         """
         Returns the current time entry object or None.
@@ -842,8 +846,8 @@ class TimeEntryList(object):
         method chaining.
         """
         # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
-        url = "%s/time_entries?start_date=%s&end_date=%s" % \
-            (TOGGL_URL, urllib.parse.quote(DateAndTime().start_of_yesterday().isoformat('T')), \
+        url = "/time_entries?start_date={}&end_date={}".format(
+            urllib.parse.quote(DateAndTime().start_of_yesterday().isoformat('T')), \
             urllib.parse.quote(DateAndTime().last_minute_today().isoformat('T')))
         Logger.debug(url)
         entries = json.loads( toggl(url, 'get') )
@@ -880,7 +884,7 @@ class TimeEntryList(object):
             for entry in days[date]:
                 s += str(entry) + "\n"
                 duration += entry.normalized_duration()
-            s += "  (%s)\n" % DateAndTime().elapsed_time(int(duration))
+            s += "  ({})\n".format(DateAndTime().elapsed_time(int(duration)))
         return s.rstrip() # strip trailing \n
     
 #----------------------------------------------------------------------------
@@ -897,7 +901,7 @@ class User(object):
         """
         Fetches user data from toggl.
         """
-        result = toggl("%s/me" % TOGGL_URL, 'get')
+        result = toggl("/me", 'get')
         result_dict = json.loads(result)
 
         # Results come back in two parts. 'since' is how long the user has
@@ -931,7 +935,7 @@ class CLI(object):
     """
     __metaclass__ = Singleton
 
-    def __init__(self):
+    def __init__(self, args=None):
         """
         Initializes the command-line parser and handles the command-line 
         options.
@@ -969,7 +973,7 @@ class CLI(object):
                               help="print debugging output")
 
         # self.args stores the remaining command line args.
-        (options, self.args) = self.parser.parse_args()
+        (options, self.args) = self.parser.parse_args(args)
 
         # Process command-line options.
         Logger.level = Logger.INFO
@@ -995,14 +999,14 @@ class CLI(object):
         if workspace_name is not None:
             workspace = WorkspaceList().find_by_name(workspace_name)
             if workspace == None:
-                raise RuntimeError("Workspace '%s' not found." % workspace_name)
+                raise RuntimeError("Workspace '{}' not found.".format(workspace_name))
             else:
                 ws_name = workspace["name"]
         project_name = self._get_project_arg(args, optional=True)
         if project_name is not None:
             project = ProjectList(ws_name).find_by_name(project_name)
             if project == None:
-                raise RuntimeError("Project '%s' not found." % project_name)
+                raise RuntimeError("Project '{}' not found.".format(project_name))
 
         duration = self._get_duration_arg(args, optional=True)
         if duration is not None:
@@ -1029,7 +1033,7 @@ class CLI(object):
 
         Logger.debug(entry.json())
         entry.add()
-        Logger.info('%s added' % description)
+        Logger.info('{} added'.format(description))
         
     def act(self):
         """
@@ -1096,10 +1100,10 @@ class CLI(object):
 
             entry.continue_entry(continued_at)
 
-            Logger.info("%s continued at %s" % (entry.get('description'), 
+            Logger.info("{} continued at {}".format(entry.get('description'), 
                 DateAndTime().format_time(continued_at or DateAndTime().now())))
         else:
-            Logger.info("Did not find '%s' in list of entries." % args[0] )
+            Logger.info("Did not find '{}' in list of entries.".format(args[0]))
 
     def _show_continue_usage(self):
         Logger.info("continue usage: \n\tcontinue DESC from START_DATE_TIME | 'd'DURATION"
@@ -1240,7 +1244,7 @@ class CLI(object):
         entry.start()
         Logger.debug(entry.json())
         friendly_time = DateAndTime().format_time(DateAndTime().parse_iso_str(entry.get('start')))
-        Logger.info('%s started at %s' % (description, friendly_time))
+        Logger.info('{} started at {}'.format(description, friendly_time))
         
     def _stop_time_entry(self, args):
         """
@@ -1257,10 +1261,14 @@ class CLI(object):
 
             Logger.debug(entry.json())
             friendly_time = DateAndTime().format_time(DateAndTime().parse_iso_str(entry.get('stop')))
-            Logger.info('%s stopped at %s' % (entry.get('description'), friendly_time))
+            Logger.info('"{}" stopped at {} and lasted for {}'.format(entry.get('description'), friendly_time, DateAndTime().elapsed_time(entry.get('duration'))))
         else:
             Logger.info("You're not working on anything right now.")
 
+
+def run(cmd):
+    parsed = re.findall(r"([\"]([^\"]+)\")|([']([^']+)')|(\S+)", cmd) # Simulates quoting of strings with spaces ("some important task")
+    CLI([i[1] or i[3] or i[4] for i in parsed]).act()
+
 if __name__ == "__main__":
-    CLI().act()
-    sys.exit(0)
+    CLI(sys.argv).act()
