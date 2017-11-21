@@ -360,7 +360,7 @@ class ClientList(six.Iterator):
         """
         Returns the next client.
         """
-        if self.iter_index >= len(self.client_list):
+        if not self.client_list or self.iter_index >= len(self.client_list):
             raise StopIteration
         else:
             self.iter_index += 1
@@ -423,7 +423,7 @@ class WorkspaceList(six.Iterator):
         """
         Returns the next workspace.
         """
-        if self.iter_index >= len(self.workspace_list):
+        if not self.workspace_list or self.iter_index >= len(self.workspace_list):
             raise StopIteration
         else:
             self.iter_index += 1
@@ -499,7 +499,7 @@ class ProjectList(six.Iterator):
         """
         Returns the next project.
         """
-        if self.iter_index >= len(self.project_list):
+        if not self.project_list or self.iter_index >= len(self.project_list):
             raise StopIteration
         else:
             self.iter_index += 1
@@ -734,7 +734,7 @@ class TimeEntry(object):
         """
         Returns a human-friendly string representation of this time entry.
         """
-        if self.data['duration'] > 0:
+        if float(self.data['duration']) > 0:
             is_running = '  '
         else:
             is_running = '* '
@@ -771,6 +771,7 @@ class TimeEntry(object):
         * toggl doesn't require a description, but we do.
         """
         required = [ 'start', 'duration', 'description', 'created_with' ];
+
         for prop in required:
             if not self.has(prop) and prop not in exclude:
                 Logger.debug(self.json())
@@ -824,7 +825,7 @@ class TimeEntryList(six.Iterator):
         """
         Returns the next time entry object.
         """
-        if self.iter_index >= len(self.time_entries):
+        if not self.time_entries or self.iter_index >= len(self.time_entries):
             raise StopIteration
         else:
             self.iter_index += 1

@@ -16,7 +16,9 @@ import unittest
 import pytz
 import time
 import toggl
-
+import six
+import traceback
+import sys
 
 def desc(description):
     return "%s%s" % (PREFIX, description)
@@ -30,7 +32,7 @@ class TestClientList(unittest.TestCase):
         self.list = toggl.ClientList()
     
     def test_iterator(self):
-        num_clients = len(self.list.client_list)
+        num_clients = len(self.list.client_list) if self.list.client_list else 0
         count = 0
         for client in self.list:
             count += 1
@@ -356,7 +358,7 @@ def tearDownModule():
     Cleans up toggl with all the unittest entries we just created. This
     relies on TimeEntryList and TimeEntry.delete.
     """
-    print "Removing toggl entries created by the test..."
+    print("Removing toggl entries created by the test...")
     for entry in toggl.TimeEntryList():
         if entry.get('description') is not None and entry.get('description').startswith('unittest_'):
             entry.delete()
@@ -365,4 +367,13 @@ if __name__ == '__main__':
     toggl.CLI() # this initializes Logger to INFO
     #toggl.Logger.level = toggl.Logger.DEBUG
     toggl.Logger.level = toggl.Logger.NONE
-    unittest.main()
+
+    try:
+        unittest.main()
+    except SystemExit:
+        pass
+    except Exception as e:
+        if six.PY3:
+            traceback.print_tb(e.__traceback__)
+        else:
+            traceback.print_tb(sys.exc_info()[2])
