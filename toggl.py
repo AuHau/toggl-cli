@@ -34,6 +34,7 @@ ASCII art from http://patorjk.com/software/taag/#p=display&c=bash&f=Standard
 #   2. Toggl Models - Toggl-specific data classes
 #   3. Command Line Interface - CLI
 
+import re
 import datetime
 import dateutil.parser
 import iso8601
@@ -98,7 +99,7 @@ class Config(object):
         """
         Reads configuration data from ~/.togglrc.
         """
-        self.cfg = ConfigParser.ConfigParser({'continue_creates': 'false'})
+        self.cfg = ConfigParser.RawConfigParser({'continue_creates': 'false'})
         if self.cfg.read(os.path.expanduser('~/.togglrc')) == []:
             self._create_empty_config()
             raise IOError("Missing ~/.togglrc. A default has been created for editing.")
@@ -433,6 +434,7 @@ class WorkspaceList(six.Iterator):
         for workspace in self:
             s = s + ":%s\n" % workspace['name']
         return s.rstrip() # strip trailing \n
+
 #----------------------------------------------------------------------------
 # ProjectList
 #----------------------------------------------------------------------------
@@ -931,7 +933,7 @@ class CLI(object):
     """
     __metaclass__ = Singleton
 
-    def __init__(self):
+    def __init__(self, args):
         """
         Initializes the command-line parser and handles the command-line 
         options.
@@ -969,7 +971,7 @@ class CLI(object):
                               help="print debugging output")
 
         # self.args stores the remaining command line args.
-        (options, self.args) = self.parser.parse_args()
+        (options, self.args) = self.parser.parse_args(args)
 
         # Process command-line options.
         Logger.level = Logger.INFO
@@ -1240,7 +1242,7 @@ class CLI(object):
         entry.start()
         Logger.debug(entry.json())
         friendly_time = DateAndTime().format_time(DateAndTime().parse_iso_str(entry.get('start')))
-        Logger.info('%s started at %s' % (description, friendly_time))
+        Logger.info('% started at %s' % (description, friendly_time))
         
     def _stop_time_entry(self, args):
         """
@@ -1257,10 +1259,14 @@ class CLI(object):
 
             Logger.debug(entry.json())
             friendly_time = DateAndTime().format_time(DateAndTime().parse_iso_str(entry.get('stop')))
-            Logger.info('%s stopped at %s' % (entry.get('description'), friendly_time))
+            Logger.info('"{}" stopped at {} and lasted for {}'.format(entry.get('description'), friendly_time, DateAndTime().elapsed_time(entry.get('duration'))))
         else:
             Logger.info("You're not working on anything right now.")
 
+
+def run(cmd):
+    parsed = re.findall(r"([\"]([^\"]+)\")|([']([^']+)')|(\S+)", cmd) # Simulates quoting of strings with spaces ("some important task")
+    CLI([i[1] or i[3] or i[4] for i in parsed]).act()
+
 if __name__ == "__main__":
-    CLI().act()
-    sys.exit(0)
+    CLI(sys.argv).act()
