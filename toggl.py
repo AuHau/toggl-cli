@@ -1271,4 +1271,4 @@ def run(cmd):
     CLI([i[1] or i[3] or i[4] for i in parsed]).act()
 
 if __name__ == "__main__":
-    CLI(sys.argv).act()
+    CLI(sys.argv[1:]).act()
