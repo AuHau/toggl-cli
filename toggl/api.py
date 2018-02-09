@@ -128,6 +128,9 @@ class ProjectList(six.Iterator):
     __metaclass__ = utils.Singleton
 
     def __init__(self, workspace_name=None):
+        self.workspace = None
+        self.project_list = None
+
         self.fetch(workspace_name)
 
     def fetch(self, workspace_name=None):
@@ -241,13 +244,13 @@ class TimeEntry(object):
 
         if workspace_name is not None:
             workspace = WorkspaceList().find_by_name(workspace_name)
-            if workspace == None:
+            if workspace is None:
                 raise RuntimeError("Workspace '{}' not found.".format(workspace_name))
             self.data['wid'] = workspace['id']
 
         if project_name is not None:
             project = ProjectList(workspace_name).find_by_name(project_name)
-            if project == None:
+            if project is None:
                 raise RuntimeError("Project '{}' not found.".format(project_name))
             self.data['pid'] = project['id']
 
@@ -287,7 +290,7 @@ class TimeEntry(object):
             new_entry.set('duronly', False)
             new_entry.set('guid', None)
             new_entry.set('id', None)
-            if (continued_at):
+            if continued_at:
                 new_entry.set('start', continued_at.isoformat())
             else:
                 new_entry.set('start', None)
@@ -405,7 +408,7 @@ class TimeEntry(object):
         if stop_time is None:
             stop_time = utils.DateAndTime().now()
         self.set('stop', stop_time.isoformat())
-        self.set('duration', \
+        self.set('duration',
                  utils.DateAndTime().duration_since_epoch(stop_time) + int(self.get('duration')))
 
         utils.toggl("/time_entries/{}".format(self.get('id')), 'put', self.json())
@@ -426,7 +429,7 @@ class TimeEntry(object):
             if project is not None:
                 project_name = " @{} ".format(project['name'])
             elif 'wid' in self.data:
-                ProjectList().fetch_by_wid(self.data['wid']);
+                ProjectList().fetch_by_wid(self.data['wid'])
                 project_name = " @{} ".format(ProjectList().find_by_id(self.data['pid'])['name'])
             else:
                 project_name = " "
@@ -434,16 +437,17 @@ class TimeEntry(object):
         else:
             project_name = " "
 
-        s = "{}{}{}{}".format(is_running, self.data.get('description'), project_name,
-                              utils.DateAndTime().elapsed_time(int(self.normalized_duration())) \
-                              )
+        s = "{}{}{}{}".format(
+            is_running, self.data.get('description'), project_name,
+            utils.DateAndTime().elapsed_time(int(self.normalized_duration()))
+        )
 
         if VERBOSE:
             s += " [{}]".format(self.data['id'])
 
         return s
 
-    def validate(self, exclude=[]):
+    def validate(self, exclude=None):
         """
         Ensure this time entry contains the minimum information required
         by toggl, as well as passing some basic sanity checks. If not,
@@ -452,7 +456,10 @@ class TimeEntry(object):
         * toggl requires start, duration, and created_with.
         * toggl doesn't require a description, but we do.
         """
-        required = ['start', 'duration', 'description', 'created_with'];
+        required = ['start', 'duration', 'description', 'created_with']
+
+        if exclude is None:
+            exclude = []
 
         for prop in required:
             if not self.has(prop) and prop not in exclude:
@@ -475,6 +482,7 @@ class TimeEntryList(six.Iterator):
         """
         Fetches time entry data from toggl.
         """
+        self.time_entries = None
         self.reload()
 
     def __iter__(self):
@@ -530,8 +538,9 @@ class TimeEntryList(six.Iterator):
         """
         # Fetch time entries from 00:00:00 yesterday to 23:59:59 today.
         url = "/time_entries?start_date={}&end_date={}".format(
-            urllib.parse.quote(utils.DateAndTime().start_of_yesterday().isoformat('T')), \
-            urllib.parse.quote(utils.DateAndTime().last_minute_today().isoformat('T')))
+            urllib.parse.quote(utils.DateAndTime().start_of_yesterday().isoformat('T')),
+            urllib.parse.quote(utils.DateAndTime().last_minute_today().isoformat('T'))
+        )
         utils.Logger.debug(url)
         entries = json.loads(utils.toggl(url, 'get'))
 
@@ -544,7 +553,7 @@ class TimeEntryList(six.Iterator):
             self.time_entries.append(te)
 
         # Sort the list by start time.
-        sorted(self.time_entries, key=lambda entry: entry.data['start'])
+        sorted(self.time_entries, key=lambda time_entry: time_entry.data['start'])
         return self
 
     def __str__(self):

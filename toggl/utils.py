@@ -14,14 +14,15 @@ from six.moves import configparser as ConfigParser
 class Singleton(type):
     """
     Defines a way to implement the singleton pattern in Python.
-    From: http://stackoverflow.com/questions/31875/is-there-a-simple-elegant-way-to-define-singletons-in-python/33201#33201
+    From:
+    http://stackoverflow.com/questions/31875/is-there-a-simple-elegant-way-to-define-singletons-in-python/33201#33201
 
     To use, simply put the following line in your class definition:
         __metaclass__ = Singleton
     """
 
-    def __init__(cls, name, bases, dict):
-        super(Singleton, cls).__init__(name, bases, dict)
+    def __init__(cls, name, bases, dictionary):
+        super(Singleton, cls).__init__(name, bases, dictionary)
         cls.instance = None
 
     def __call__(cls, *args, **kw):
@@ -47,7 +48,7 @@ class Config(object):
         Reads configuration data from ~/.togglrc.
         """
         self.cfg = ConfigParser.RawConfigParser({'continue_creates': 'false'})
-        if self.cfg.read(os.path.expanduser('~/.togglrc')) == []:
+        if not self.cfg.read(os.path.expanduser('~/.togglrc')):
             self._create_empty_config()
             raise IOError("Missing ~/.togglrc. A default has been created for editing.")
 
@@ -124,12 +125,15 @@ class DateAndTime(object):
 
         return duration
 
-    def elapsed_time(self, seconds, suffixes=['y', 'w', 'd', 'h', 'm', 's'], add_s=False, separator=''):
+    def elapsed_time(self, seconds, suffixes=None, add_s=False, separator=''):
         """
         Takes an amount of seconds and turns it into a human-readable amount
         of time.
         From http://snipplr.com/view.php?codeview&id=5713
         """
+        if suffixes is None:
+            suffixes = ['y', 'w', 'd', 'h', 'm', 's']
+
         # the formatted time string to be returned
         time = []
 
@@ -161,8 +165,8 @@ class DateAndTime(object):
         Formats the given datetime object according to the strftime() options
         from the configuration file.
         """
-        format = Config().get('options', 'time_format')
-        return time.strftime(format)
+        time_format = Config().get('options', 'time_format')
+        return time.strftime(time_format)
 
     def last_minute_today(self):
         """
@@ -247,11 +251,14 @@ class Logger(object):
 # ----------------------------------------------------------------------------
 # toggl
 # ----------------------------------------------------------------------------
-def toggl(url, method, data=None, headers={'content-type': 'application/json'}):
+def toggl(url, method, data=None, headers=None):
     """
     Makes an HTTP request to toggl.com. Returns the raw text data received.
     """
     from .toggl import TOGGL_URL
+
+    if headers is None:
+        headers = {'content-type': 'application/json'}
 
     url = "{}{}".format(TOGGL_URL, url)
     try:
@@ -270,5 +277,4 @@ def toggl(url, method, data=None, headers={'content-type': 'application/json'}):
     except Exception as e:
         print('Sent: {}'.format(data))
         print(e)
-        print(r.text)
         # sys.exit(1)

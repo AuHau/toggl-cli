@@ -23,25 +23,29 @@ class CLI(object):
 
         # Override the option parser epilog formatting rule.
         # See http://stackoverflow.com/questions/1857346/python-optparse-how-to-include-additional-info-in-usage-output
-        optparse.OptionParser.format_epilog = lambda self, formatter: self.epilog
+        optparse.OptionParser.format_epilog = lambda opt_self, formatter: opt_self.epilog
 
-        self.parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
-                                            epilog="\nActions:\n"
-                                                   "  add DESCR [:WORKSPACE] [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
-                                                   "  add DESCR [:WORKSPACE] [@PROJECT] 'd'DURATION\n\tcreates a completed time entry, with start time DURATION ago\n"
-                                                   "  clients\n\tlists all clients\n"
-                                                   "  continue [from DATETIME | 'd'DURATION]\n\trestarts the last entry\n"
-                                                   "  continue DESCR [from DATETIME | 'd'DURATION]\n\trestarts the last entry matching DESCR\n"
-                                                   "  ls\n\tlist recent time entries\n"
-                                                   "  now\n\tprint what you're working on now\n"
-                                                   "  workspaces\n\tlists all workspaces\n"
-                                                   "  projects [:WORKSPACE]\n\tlists all projects\n"
-                                                   "  rm ID\n\tdelete a time entry by id\n"
-                                                   "  start DESCR [:WORKSPACE] [@PROJECT] ['d'DURATION | DATETIME]\n\tstarts a new entry\n"
-                                                   "  stop [DATETIME]\n\tstops the current entry\n"
-                                                   "  www\n\tvisits toggl.com\n"
-                                                   "\n"
-                                                   "  DURATION = [[Hours:]Minutes:]Seconds\n")
+        self.parser = optparse.OptionParser(
+            usage="Usage: %prog [OPTIONS] [ACTION]",
+            epilog="\nActions:\n"
+                   "  add DESCR [:WORKSPACE] [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n"
+                   "\tcreates a completed time entry\n"
+                   "  add DESCR [:WORKSPACE] [@PROJECT] 'd'DURATION\n"
+                   "\tcreates a completed time entry, with start time DURATION ago\n"
+                   "  clients\n\tlists all clients\n"
+                   "  continue [from DATETIME | 'd'DURATION]\n\trestarts the last entry\n"
+                   "  continue DESCR [from DATETIME | 'd'DURATION]\n\trestarts the last entry matching DESCR\n"
+                   "  ls\n\tlist recent time entries\n"
+                   "  now\n\tprint what you're working on now\n"
+                   "  workspaces\n\tlists all workspaces\n"
+                   "  projects [:WORKSPACE]\n\tlists all projects\n"
+                   "  rm ID\n\tdelete a time entry by id\n"
+                   "  start DESCR [:WORKSPACE] [@PROJECT] ['d'DURATION | DATETIME]\n\tstarts a new entry\n"
+                   "  stop [DATETIME]\n\tstops the current entry\n"
+                   "  www\n\tvisits toggl.com\n"
+                   "\n"
+                   "  DURATION = [[Hours:]Minutes:]Seconds\n"
+        )
         self.parser.add_option("-q", "--quiet",
                                action="store_true", dest="quiet", default=False,
                                help="don't print anything")
@@ -78,14 +82,14 @@ class CLI(object):
         ws_name = None  # canonical name from toggl
         if workspace_name is not None:
             workspace = api.WorkspaceList().find_by_name(workspace_name)
-            if workspace == None:
+            if workspace is None:
                 raise RuntimeError("Workspace '{}' not found.".format(workspace_name))
             else:
                 ws_name = workspace["name"]
         project_name = self._get_project_arg(args, optional=True)
         if project_name is not None:
             project = api.ProjectList(ws_name).find_by_name(project_name)
-            if project == None:
+            if project is None:
                 raise RuntimeError("Project '{}' not found.".format(project_name))
 
         duration = self._get_duration_arg(args, optional=True)
@@ -172,7 +176,7 @@ class CLI(object):
                         return
                     else:
                         duration = self._get_duration_arg(args, optional=True)
-                        if (duration is not None):
+                        if duration is not None:
                             continued_at = utils.DateAndTime().now() - datetime.timedelta(seconds=duration)
                         else:
                             continued_at = self._get_datetime_arg(args, optional=True)
@@ -183,13 +187,14 @@ class CLI(object):
             entry.continue_entry(continued_at)
 
             utils.Logger.info("{} continued at {}".format(entry.get('description'),
-                                                    utils.DateAndTime().format_time(continued_at or utils.DateAndTime().now())))
+                                                          utils.DateAndTime().format_time(
+                                                              continued_at or utils.DateAndTime().now())))
         else:
             utils.Logger.info("Did not find '{}' in list of entries.".format(args[0]))
 
     def _show_continue_usage(self):
         utils.Logger.info("continue usage: \n\tcontinue DESC from START_DATE_TIME | 'd'DURATION"
-                    "\n\tcontinue from START_DATE_TIME | 'd'DURATION")
+                          "\n\tcontinue from START_DATE_TIME | 'd'DURATION")
 
     def _delete_time_entry(self, args):
         """
@@ -291,7 +296,7 @@ class CLI(object):
         """
         entry = api.TimeEntryList().now()
 
-        if entry != None:
+        if entry is not None:
             utils.Logger.info(str(entry))
         else:
             utils.Logger.info("You're not working on anything right now.")
@@ -334,7 +339,7 @@ class CLI(object):
         """
 
         entry = api.TimeEntryList().now()
-        if entry != None:
+        if entry is not None:
             if len(args) > 0:
                 entry.stop(utils.DateAndTime().parse_local_datetime_str(args[0]))
             else:
@@ -343,7 +348,7 @@ class CLI(object):
             utils.Logger.debug(entry.json())
             friendly_time = utils.DateAndTime().format_time(utils.DateAndTime().parse_iso_str(entry.get('stop')))
             utils.Logger.info('"{}" stopped at {} and lasted for {}'.format(entry.get('description'), friendly_time,
-                                                                      utils.DateAndTime().elapsed_time(
-                                                                          entry.get('duration'))))
+                                                                            utils.DateAndTime().elapsed_time(
+                                                                                entry.get('duration'))))
         else:
             utils.Logger.info("You're not working on anything right now.")
