@@ -3,3 +3,6 @@
 *.pyc
 *.pyproj
 .idea
+.direnv
+.pytest_cache/
+__pycache__/
