@@ -23,8 +23,7 @@ class ClientList(six.Iterator):
         """
         Fetches the list of clients from toggl.
         """
-        result = utils.toggl("/clients", 'get')
-        self.client_list = json.loads(result)
+        self.client_list = utils.toggl("/clients", 'get')
 
     def __iter__(self):
         """
@@ -69,8 +68,7 @@ class WorkspaceList(six.Iterator):
         """
         Fetches the list of workspaces from toggl.
         """
-        result = utils.toggl("/workspaces", "get")
-        self.workspace_list = json.loads(result)
+        self.workspace_list = utils.toggl("/workspaces", "get")
 
     def find_by_id(self, wid):
         """
@@ -149,8 +147,7 @@ class ProjectList(six.Iterator):
         self.fetch_by_wid(wid)
 
     def fetch_by_wid(self, wid):
-        result = utils.toggl("/workspaces/{}/projects".format(wid), 'get')
-        self.project_list = json.loads(result)
+        self.project_list = utils.toggl("/workspaces/{}/projects".format(wid), 'get')
 
     def find_by_id(self, pid):
         """
@@ -383,11 +380,10 @@ class TimeEntry(object):
 
             utils.toggl("/time_entries", "post", self.json())
         else:
-            # 'start' is ignored by 'time_entries/start' endpoint. We define it
-            # to keep consinstency with toggl server
-            self.data['start'] = utils.DateAndTime().now().isoformat()
+            data = utils.toggl("/time_entries/start", "post", self.json())
 
-            utils.toggl("/time_entries/start", "post", self.json())
+            # We will get the start time from Toggl to keep consistency
+            self.data['start'] = data['data']['start']
 
         utils.Logger.debug('Started time entry: {}'.format(self.json()))
 
@@ -542,7 +538,7 @@ class TimeEntryList(six.Iterator):
             urllib.parse.quote(utils.DateAndTime().last_minute_today().isoformat('T'))
         )
         utils.Logger.debug(url)
-        entries = json.loads(utils.toggl(url, 'get'))
+        entries = utils.toggl(url, 'get')
 
         # Build a list of entries.
         self.time_entries = []
@@ -594,8 +590,7 @@ class User(object):
         """
         Fetches user data from toggl.
         """
-        result = utils.toggl("/me", 'get')
-        result_dict = json.loads(result)
+        result_dict = utils.toggl("/me", 'get')
 
         # Results come back in two parts. 'since' is how long the user has
         # had their toggl account. 'data' is a dictionary of all the other
