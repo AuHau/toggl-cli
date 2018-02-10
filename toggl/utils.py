@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 
 import dateutil.parser
@@ -253,7 +254,7 @@ class Logger(object):
 # ----------------------------------------------------------------------------
 def toggl(url, method, data=None, headers=None):
     """
-    Makes an HTTP request to toggl.com. Returns the raw text data received.
+    Makes an HTTP request to toggl.com. Returns the parsed JSON as dict.
     """
     from .toggl import TOGGL_URL
 
@@ -273,7 +274,7 @@ def toggl(url, method, data=None, headers=None):
         else:
             raise NotImplementedError('HTTP method "{}" not implemented.'.format(method))
         r.raise_for_status()  # raise exception on error
-        return r.text
+        return json.loads(r.text)
     except Exception as e:
         print('Sent: {}'.format(data))
         print(e)
