@@ -1,5 +1,2 @@
-six
-iso8601
-pytz
-requests
-python-dateutil
+# Gets dependencies from setup.py
+.
