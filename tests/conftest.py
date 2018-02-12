@@ -1,2 +1,2 @@
 import pytest
-from .fixtures.cleanup import toggl_cleanup
+from .fixtures.session import toggl_cleanup, tests_debug
