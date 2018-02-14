@@ -1,12 +1,15 @@
 import datetime
 import json
 import os
+from collections import defaultdict
 
+import time
 import dateutil.parser
 import iso8601
 import pytz
 import requests
-from six.moves import configparser as ConfigParser
+from six.moves import configparser
+from builtins import input
 
 
 # ----------------------------------------------------------------------------
@@ -32,10 +35,111 @@ class Singleton(type):
         return cls.instance
 
 
+class ConfigBootstrap(object):
+    """
+    Create config based on the input from the User
+    """
+
+    def _get_value(self, message, values=None, default=None, allow_empty=False, show_values=True):
+        default_msg = ""
+        if default:
+            default_msg = " [default:{}]".format(default)
+
+        values_msg = ""
+        if show_values and values:
+            values_msg = " " + '/'.join(values)
+
+        result = input("\n{}:{}{}\n".format(message, values_msg, default_msg))
+
+        if (not result or result == "") and default:
+            return default
+
+        if not values:
+
+            if allow_empty:
+                return result
+
+            while result == "":
+                result = input("The value must not be empty!\n")
+
+            return result
+
+        while result not in values:
+            result = input("Unrecognized value, please use one of following: {}{}\n".format(
+                '/'.join(values), default_msg
+            ))
+
+        return result
+
+    def _are_credentials_valid(self, *, api_token=None, username=None, password=None):
+        from .toggl import TOGGL_URL
+
+        if api_token:
+            auth = requests.auth.HTTPBasicAuth(api_token, 'api_token')
+
+        elif username and password:
+            auth = requests.auth.HTTPBasicAuth(username, password)
+        else:
+            raise Exception("There has to be specified at least one way of authentication! API token or credentials!")
+
+        url = "{}{}".format(TOGGL_URL, "/me")
+        r = requests.get(url, auth=auth, headers={'content-type': 'application/json'})
+
+        if r.status_code == 200:
+            return True
+        else:
+            return False
+
+    def start(self, validate_credentials=True):
+        print(""" _____                 _   _____  _     _____ 
+|_   _|               | | /  __ \| |   |_   _|
+  | | ___   __ _  __ _| | | /  \/| |     | |  
+  | |/ _ \ / _` |/ _` | | | |    | |     | |  
+  | | (_) | (_| | (_| | | | \__/\| |_____| |_ 
+  \_/\___/ \__, |\__, |_|  \____/\_____/\___/ 
+            __/ | __/ |                       
+           |___/ |___/                        
+
+Welcome to Toggl CLI!\nWe need to setup some configuration before you start using this awesome tool!\n""")
+
+        values = defaultdict(dict)
+        type_auth = self._get_value("Type of authentication you want to use", ["apitoken", "credentials"], "apitoken")
+
+        if type_auth == "apitoken":
+            api_token = self._get_value("API token")
+
+            if validate_credentials:
+                while not self._are_credentials_valid(api_token=api_token):
+                    print("The API token is not valid! We could not sign-up to Toggl with it...")
+                    api_token = self._get_value("API token")
+
+            values["auth"]["api_token"] = api_token
+        else:
+            print("Be aware! Your username and password will be stored in plain text in the ~/.togglerc file!")
+            username = self._get_value("Username")
+            password = self._get_value("Password")
+
+            if validate_credentials:
+                while not self._are_credentials_valid(username=username, password=password):
+                    print("The API token is not valid! We could not sign-up to Toggl with it...")
+                    username = self._get_value("Username")
+                    password = self._get_value("Password")
+
+            values["auth"]["username"] = username
+            values["auth"]["password"] = password
+
+        local_timezone = time.tzname[0]
+        values["options"]["timezone"] = self._get_value("Used timezone", pytz.all_timezones, local_timezone, show_values=False)
+        values["options"]["continue_creates"] = self._get_value("Continue command will create new entry",
+                                                                ["true", "false"], "true")
+
+        return values
+
+
 # ----------------------------------------------------------------------------
 # Config
 # ----------------------------------------------------------------------------
-class Config(object):
+class Config(configparser.RawConfigParser):
     """
     Singleton. toggl configuration data, read from ~/.togglrc.
     Properties:
@@ -44,48 +148,71 @@ class Config(object):
 
     __metaclass__ = Singleton
 
+    DEFAULT_VALUES = {
+        'continue_creates': 'true',
+        'time_format': '%I:%M%p',
+    }
+
+    CONFIG_PATH = os.path.expanduser('~/.togglrc')
+
     def __init__(self):
         """
         Reads configuration data from ~/.togglrc.
         """
-        self.cfg = ConfigParser.RawConfigParser({'continue_creates': 'false'})
-        if not self.cfg.read(os.path.expanduser('~/.togglrc')):
-            self._create_empty_config()
-            raise IOError("Missing ~/.togglrc. A default has been created for editing.")
+        super().__init__(self.DEFAULT_VALUES)
 
-    def _create_empty_config(self):
-        """
-        Creates a blank ~/.togglrc.
-        """
-        cfg = ConfigParser.RawConfigParser()
-        cfg.add_section('auth')
-        cfg.set('auth', 'username', 'user@example.com')
-        cfg.set('auth', 'password', 'toggl_password')
-        cfg.set('auth', 'api_token', 'your_api_token')
-        cfg.add_section('options')
-        cfg.set('options', 'timezone', 'UTC')
-        cfg.set('options', 'time_format', '%I:%M%p')
-        cfg.set('options', 'prefer_token', 'true')
-        cfg.set('options', 'continue_creates', 'true')
-        with open(os.path.expanduser('~/.togglrc'), 'w') as cfgfile:
-            cfg.write(cfgfile)
-        os.chmod(os.path.expanduser('~/.togglrc'), 0o600)
+        if not self.read(self.CONFIG_PATH):
+            self._init_new_config()
 
-    def get(self, section, key):
-        """
-        Returns the value of the configuration variable identified by the
-        given key within the given section of the configuration file. Raises
-        ConfigParser exceptions if the section or key are invalid.
-        """
-        return self.cfg.get(section, key).strip()
+    def _init_new_config(self):
+        values_dict = ConfigBootstrap().start()
+        self.read_dict(values_dict)
+
+        with open(self.CONFIG_PATH, 'w') as cfgfile:
+            self.write(cfgfile)
+        os.chmod(self.CONFIG_PATH, 0o600)
 
     def get_auth(self):
-        if self.get('options', 'prefer_token').lower() == 'true':
-            return requests.auth.HTTPBasicAuth(self.get('auth', 'api_token'),
-                                               'api_token')
+        """
+        Returns HTTPBasicAuth object to be used with request.
+
+        Supports overriding of the configuration using environment variables:
+        TOGGL_API_TOKEN, TOGGL_USERNAME and TOGGL_PASSWORD.
+
+        :raises configparser.Error: When no credentials are available.
+        :return: requests.auth.HTTPBasicAuth
+        """
+        env_api_token = os.getenv("TOGGL_API_TOKEN")
+        env_username = os.getenv("TOGGL_USERNAME")
+        env_password = os.getenv("TOGGL_PASSWORD")
+
+        if env_api_token:
+            return requests.auth.HTTPBasicAuth(env_api_token, 'api_token')
+
+        if env_username and env_password:
+            return requests.auth.HTTPBasicAuth(env_username, env_password)
+
+        use_token = self.get("options", "prefer_token", fallback=None)
+
+        if use_token is None:
+            api_token = self.get('auth', 'api_token', fallback=None)
+
+            if api_token is not None:
+                return requests.auth.HTTPBasicAuth(api_token, 'api_token')
+
+            username = self.get('auth', 'username', fallback=None)
+            password = self.get('auth', 'password', fallback=None)
+
+            if username is None and password is None:
+                raise configparser.Error("There is no authentication configuration!")
+
+            return requests.auth.HTTPBasicAuth(username, password)
+
+        # Fallback to old style configuration with 'prefer_token'
+        if use_token.lower() == 'true':
+            return requests.auth.HTTPBasicAuth(self.get('auth', 'api_token'), 'api_token')
         else:
-            return requests.auth.HTTPBasicAuth(self.get('auth', 'username'),
-                                               self.get('auth', 'password'))
+            return requests.auth.HTTPBasicAuth(self.get('auth', 'username'), self.get('auth', 'password'))
 
 
 # ----------------------------------------------------------------------------
