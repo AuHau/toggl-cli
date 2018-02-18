@@ -151,9 +151,15 @@ class Config(configparser.RawConfigParser):
     DEFAULT_VALUES = {
         'continue_creates': 'true',
         'time_format': '%I:%M%p',
+        'day_first': 'false',
+        'year_first': 'false',
     }
 
     CONFIG_PATH = os.path.expanduser('~/.togglrc')
+
+    ENV_NAME_API_TOKEN = 'TOGGL_API_TOKEN'
+    ENV_NAME_USERNAME = 'TOGGL_USERNAME'
+    ENV_NAME_PASSWORD = 'TOGGL_PASSWORD'
 
     def __init__(self):
         """
@@ -182,9 +188,9 @@ class Config(configparser.RawConfigParser):
         :raises configparser.Error: When no credentials are available.
         :return: requests.auth.HTTPBasicAuth
         """
-        env_api_token = os.getenv("TOGGL_API_TOKEN")
-        env_username = os.getenv("TOGGL_USERNAME")
-        env_password = os.getenv("TOGGL_PASSWORD")
+        env_api_token = os.getenv(self.ENV_NAME_API_TOKEN)
+        env_username = os.getenv(self.ENV_NAME_USERNAME)
+        env_password = os.getenv(self.ENV_NAME_PASSWORD)
 
         if env_api_token:
             return requests.auth.HTTPBasicAuth(env_api_token, 'api_token')
@@ -200,8 +206,8 @@ class Config(configparser.RawConfigParser):
             if api_token is not None:
                 return requests.auth.HTTPBasicAuth(api_token, 'api_token')
 
-            username = self.get('auth', 'username', fallback=None)
-            password = self.get('auth', 'password', fallback=None)
+            username = env_username or self.get('auth', 'username', fallback=None)
+            password = env_password or self.get('auth', 'password', fallback=None)
 
             if username is None and password is None:
                 raise configparser.Error("There is no authentication configuration!")
@@ -309,12 +315,12 @@ class DateAndTime(object):
         """
         return self.tz.localize(datetime.datetime.now())
 
-    def parse_local_datetime_str(self, datetime_str):
+    def parse_local_datetime_str(self, datetime_str, day_first=False, year_first=False):
         """
         Parses a local datetime string (e.g., "2:00pm") and returns
         a localized datetime object.
         """
-        return self.tz.localize(dateutil.parser.parse(datetime_str))
+        return self.tz.localize(dateutil.parser.parse(datetime_str, dayfirst=day_first, yearfirst=year_first))
 
     def parse_iso_str(self, iso_str):
         """

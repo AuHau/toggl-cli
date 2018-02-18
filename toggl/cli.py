@@ -1,10 +1,191 @@
 import datetime
 import optparse
 import os
+import re
 import sys
+import click
 
-from . import api, utils
+from . import api, utils, __version__
 
+DEFAULT_CONFIG_PATH = '~/.togglrc'
+
+
+class DateTimeType(click.ParamType):
+    """
+    Parse a string into datetime object. The parsing utilize `dateutil.parser.parse` function
+    which is very error prone and always returns a datetime object even with best-guess.
+
+    Also special string NOW_STRING is supported which creates datetime with current date and time.
+    """
+    name = 'datetime'
+    NOW_STRING = 'now'
+
+    def __init__(self, allow_now=False):
+        self._allow_now = allow_now
+
+    def convert(self, value, param, ctx):
+        if value == self.NOW_STRING and self._allow_now:
+            return utils.DateAndTime().now()
+
+        try:
+            config = ctx.obj.get('config')
+            day_first = config.getboolean('options', 'day_first')
+            year_first = config.getboolean('options', 'year_first')
+
+            try:
+                return utils.DateAndTime().parse_local_datetime_str(value, day_first, year_first)
+            except ValueError:
+                self.fail("Unknown datetime format!", param, ctx)
+        except AttributeError:
+            try:
+                return utils.DateAndTime().parse_local_datetime_str(value)
+            except ValueError:
+                self.fail("Unknown datetime format!", param, ctx)
+
+
+class DurationType(DateTimeType):
+    """
+    Parse a duration string. If the provided string does not follow duration syntax
+    it fallback to DateTimeType parsing.
+    """
+
+    name = 'datetime|duration'
+
+    """
+    Supported units: d = days, h = hours, m = minutes, s = seconds.
+    
+    Regex matches unique counts per unit (always the last one).
+    Examples of successful matches:
+    1d 1h 1m 1s
+    1h 1d 1s
+    1H 1d 1S
+    1h1D1s
+    1000h
+    
+    TODO: The regex should validate that no duplicates of units are in the string (example: '10h 5h' should not match)
+    """
+    SYNTAX_REGEX = r'(?:(\d+)(d|h|m|s)(?!.*\2)\s?)+?'
+
+    MAPPING = {
+        'd': 'days',
+        'h': 'hours',
+        'm': 'minutes',
+        's': 'seconds',
+    }
+
+    def __init__(self, allow_now=False):
+        super(DurationType, self).__init__(allow_now)
+
+    def convert(self, value, param, ctx):
+        matches = re.findall(self.SYNTAX_REGEX, value, re.IGNORECASE)
+
+        # If nothing matches ==> unknown syntax ==> fallback to DateTime parsing
+        if not matches:
+            return super(DurationType, self).convert(value, param, ctx)
+
+        base = datetime.timedelta()
+        for match in matches:
+            unit = self.MAPPING[match[1]]
+
+            base += datetime.timedelta(**{unit: int(match[0])})
+
+        return base
+
+
+# ----------------------------------------------------------------------------
+# NEW CLI
+# ----------------------------------------------------------------------------
+@click.group()
+@click.option('--quiet', '-q', is_flag=True, help="don't print anything")
+@click.option('--verbose', '-v', is_flag=True, help="print additional info")
+@click.option('--debug', '-d', is_flag=True, help="print debugging output")
+@click.option('--config', type=click.Path(exists=True), envvar='TOGGL_CONFIG',
+              help="sets specific Config file to be used (ENV: TOGGL_CONFIG)")
+@click.version_option(__version__)
+@click.pass_context
+def cli(ctx, quiet, verbose, debug, config):
+    """
+    CLI interface to interact with Toggl tracking application.
+
+    This application implements limited subsets of Toggl's functionality.
+
+    Many of the options can be set through Environmental variables. The names of the variables
+    are denoted in the option's helps with format "(ENV: <name of variable>)"
+
+    The authentication credentials can be also overridden with Environmental variables. Use
+    TOGGL_API_TOKEN or TOGGL_USERNAME, TOGGL_PASSWORD.
+    """
+    ctx.obj['config'] = utils.Config()
+
+    # Process command-line options.
+    utils.Logger.level = utils.Logger.INFO
+    if quiet:
+        utils.Logger.level = utils.Logger.NONE
+        click.echo = lambda *args: None  # Override echo function to be quiet
+    if debug:
+        utils.Logger.level = utils.Logger.DEBUG
+    if verbose:
+        global VERBOSE
+        VERBOSE = True
+
+
+@cli.command('add', short_help='adds finished time entry')
+@click.argument('start', type=DateTimeType(allow_now=True))
+@click.argument('end', type=DurationType())
+@click.argument('descr')
+@click.option('--project', '-p', envvar="TOGGL_PROJECT",
+              help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE",
+              help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
+@click.pass_context
+def add_time_entry(ctx, start, end, descr, project, workspace):
+    """
+    Adds finished time entry to Toggl with DESCR description and start
+    datetime START which can also be a special string 'now' which denotes current
+    datetime. The entry also has END argument which is either specific
+    datetime or duration.
+
+    \b
+    Duration syntax:
+     - 'd' : days
+     - 'h' : hours
+     - 'm' : minutes
+     - 's' : seconds
+
+    Example: 5h 2m 10s - 5 hours 2 minutes 10 seconds from the start time
+    """
+    ws_name = pr_name = None
+
+    if workspace is not None:
+        toggl_workspace = api.WorkspaceList().find_by_name(workspace)
+        if toggl_workspace is None:
+            raise RuntimeError("Workspace '{}' not found.".format(workspace))
+        else:
+            ws_name = workspace["name"]
+
+    if project is not None:
+        toggl_project = api.ProjectList(ws_name).find_by_name(project)
+        if toggl_project is None:
+            raise RuntimeError("Project '{}' not found.".format(project))
+        else:
+            pr_name = toggl_project['name']
+
+    if isinstance(end, datetime.timedelta):
+        end = start + end
+
+    # Create a time entry.
+    entry = api.TimeEntry(
+        description=descr,
+        start_time=start,
+        stop_time=end,
+        duration=(end - start).total_seconds(),
+        project_name=pr_name,
+        workspace_name=ws_name
+    )
+
+    utils.Logger.debug(entry.json())
+    entry.add()
+    utils.Logger.info('{} added'.format(descr))
 
 # ----------------------------------------------------------------------------
 # CLI
