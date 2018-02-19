@@ -5,6 +5,7 @@ import re
 import sys
 import click
 
+from toggl.exceptions import TogglCliException
 from . import api, utils, __version__
 
 DEFAULT_CONFIG_PATH = '~/.togglrc'
@@ -92,6 +93,42 @@ class DurationType(DateTimeType):
         return base
 
 
+class ResourceType(click.ParamType):
+
+    def __init__(self, resource, resource_name):
+        self._resource = resource
+        self._resource_name = resource_name
+
+    def convert(self, value, param, ctx):
+        try:
+            try:
+                resource_id = int(value)
+                return self._convert_id(resource_id, param, ctx)
+            except ValueError:
+                pass
+
+            return self._convert_name(value, param, ctx)
+
+        except AttributeError:
+            raise TogglCliException("The passed resource class {} does not have expected interface! "
+                                    "(find_by_id and find_by_name)".format(self._resource))
+
+    def _convert_id(self, resource_id, param, ctx):
+        resource = self._resource().find_by_id(resource_id)
+
+        if resource is None:
+            self.fail("Unknown {} ID!".format(self._resource_name), param, ctx)
+
+        return resource
+
+    def _convert_name(self, value, param, ctx):
+        resource = self._resource().find_by_name(value)
+
+        if resource is None:
+            self.fail("Unknown {} ID!".format(self._resource_name), param, ctx)
+
+        return resource
+
 # ----------------------------------------------------------------------------
 # NEW CLI
 # ----------------------------------------------------------------------------
@@ -133,9 +170,9 @@ def cli(ctx, quiet, verbose, debug, config):
 @click.argument('start', type=DateTimeType(allow_now=True))
 @click.argument('end', type=DurationType())
 @click.argument('descr')
-@click.option('--project', '-p', envvar="TOGGL_PROJECT",
+@click.option('--project', '-p', envvar="TOGGL_PROJECT", type=ResourceType(api.ProjectList, 'project'),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
-@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE",
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.WorkspaceList, 'workspace'),
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
 def add_time_entry(ctx, start, end, descr, project, workspace):
@@ -154,22 +191,6 @@ def add_time_entry(ctx, start, end, descr, project, workspace):
 
     Example: 5h 2m 10s - 5 hours 2 minutes 10 seconds from the start time
     """
-    ws_name = pr_name = None
-
-    if workspace is not None:
-        toggl_workspace = api.WorkspaceList().find_by_name(workspace)
-        if toggl_workspace is None:
-            raise RuntimeError("Workspace '{}' not found.".format(workspace))
-        else:
-            ws_name = workspace["name"]
-
-    if project is not None:
-        toggl_project = api.ProjectList(ws_name).find_by_name(project)
-        if toggl_project is None:
-            raise RuntimeError("Project '{}' not found.".format(project))
-        else:
-            pr_name = toggl_project['name']
-
     if isinstance(end, datetime.timedelta):
         end = start + end
 
@@ -179,8 +200,8 @@ def add_time_entry(ctx, start, end, descr, project, workspace):
         start_time=start,
         stop_time=end,
         duration=(end - start).total_seconds(),
-        project_name=pr_name,
-        workspace_name=ws_name
+        project_name=project['name'] if project else None,
+        workspace_name=workspace['name'] if workspace else None
     )
 
     utils.Logger.debug(entry.json())
