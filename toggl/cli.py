@@ -129,6 +129,7 @@ class ResourceType(click.ParamType):
 
         return resource
 
+
 # ----------------------------------------------------------------------------
 # NEW CLI
 # ----------------------------------------------------------------------------
@@ -207,6 +208,7 @@ def add_time_entry(ctx, start, end, descr, project, workspace):
     utils.Logger.debug(entry.json())
     entry.add()
     utils.Logger.info('{} added'.format(descr))
+
 
 # ----------------------------------------------------------------------------
 # CLI
