@@ -1,6 +1,6 @@
 import configparser
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import click
 import pytest as pytest
@@ -31,6 +31,11 @@ def datetime_time(hours=None, minutes=None, seconds=None):
 @pytest.fixture()
 def datetime_type():
     return cli.DateTimeType()
+
+
+@pytest.fixture()
+def duration_type():
+    return cli.DurationType()
 
 
 Context = namedtuple('Context', ['obj'])
@@ -84,3 +89,23 @@ class TestDateTimeType(object):
 
         assert remove_tz_helper(datetime_type.convert("2.10.2017", None, Context({'config': config}))) \
                == datetime(2017, 2, 10, 0, 0)
+
+
+class TestDurationType:
+
+    def test_parsing(self, duration_type):
+        assert duration_type.convert("1s", None, {}) == timedelta(seconds=1)
+        assert duration_type.convert("1s1h", None, {}) == timedelta(hours=1, seconds=1)
+        assert duration_type.convert("1h1s", None, {}) == timedelta(hours=1, seconds=1)
+        assert duration_type.convert("2h1h1s", None, {}) == timedelta(hours=1, seconds=1)
+        assert duration_type.convert("1d 2h 1s", None, {}) == timedelta(days=1, hours=2, seconds=1)
+        assert duration_type.convert("1d 2H 2M 1s", None, {}) == timedelta(days=1, minutes=2, hours=2, seconds=1)
+
+    def test_datetime_fallback(self, duration_type):
+        # fallbacks to datetime parsing, but still no known syntax ==> exception
+        with pytest.raises(click.BadParameter):
+            duration_type.convert("random string", None, {})
+
+        assert remove_tz_helper(duration_type.convert("12:12", None, {})) == datetime_time(12, 12, 0)
+        assert remove_tz_helper(duration_type.convert("20.5.2017", None, {})) == datetime(2017, 5, 20, 0, 0)
+

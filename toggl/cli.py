@@ -86,7 +86,7 @@ class DurationType(DateTimeType):
 
         base = datetime.timedelta()
         for match in matches:
-            unit = self.MAPPING[match[1]]
+            unit = self.MAPPING[match[1].lower()]
 
             base += datetime.timedelta(**{unit: int(match[0])})
 
