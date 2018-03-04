@@ -4,7 +4,10 @@ import os
 from collections import defaultdict
 
 import time
+
+import click
 import dateutil.parser
+import inquirer
 import iso8601
 import pytz
 import requests
@@ -40,38 +43,7 @@ class ConfigBootstrap(object):
     Create config based on the input from the User
     """
 
-    def _get_value(self, message, values=None, default=None, allow_empty=False, show_values=True):
-        default_msg = ""
-        if default:
-            default_msg = " [default:{}]".format(default)
-
-        values_msg = ""
-        if show_values and values:
-            values_msg = " " + '/'.join(values)
-
-        result = input("\n{}:{}{}\n".format(message, values_msg, default_msg))
-
-        if (not result or result == "") and default:
-            return default
-
-        if not values:
-
-            if allow_empty:
-                return result
-
-            while result == "":
-                result = input("The value must not be empty!\n")
-
-            return result
-
-        while result not in values:
-            result = input("Unrecognized value, please use one of following: {}{}\n".format(
-                '/'.join(values), default_msg
-            ))
-
-        return result
-
-    def _are_credentials_valid(self, *, api_token=None, username=None, password=None):
+    def _are_credentials_valid(self, api_token=None, username=None, password=None):
         from .toggl import TOGGL_URL
 
         if api_token:
@@ -91,7 +63,7 @@ class ConfigBootstrap(object):
             return False
 
     def start(self, validate_credentials=True):
-        print(""" _____                 _   _____  _     _____ 
+        click.secho(""" _____                 _   _____  _     _____ 
 |_   _|               | | /  __ \| |   |_   _|
   | | ___   __ _  __ _| | | /  \/| |     | |  
   | |/ _ \ / _` |/ _` | | | |    | |     | |  
@@ -99,41 +71,59 @@ class ConfigBootstrap(object):
   \_/\___/ \__, |\__, |_|  \____/\_____/\___/ 
             __/ | __/ |                       
            |___/ |___/                        
+""", fg="red")
+        click.echo("Welcome to Toggl CLI!\n"
+                   "We need to setup some configuration before you start using this awesome tool!\n")
 
-Welcome to Toggl CLI!\nWe need to setup some configuration before you start using this awesome tool!\n""")
-
-        values = defaultdict(dict)
-        type_auth = self._get_value("Type of authentication you want to use", ["apitoken", "credentials"], "apitoken")
-
-        if type_auth == "apitoken":
-            api_token = self._get_value("API token")
-
-            if validate_credentials:
-                while not self._are_credentials_valid(api_token=api_token):
-                    print("The API token is not valid! We could not sign-up to Toggl with it...")
-                    api_token = self._get_value("API token")
-
-            values["auth"]["api_token"] = api_token
-        else:
-            print("Be aware! Your username and password will be stored in plain text in the ~/.togglerc file!")
-            username = self._get_value("Username")
-            password = self._get_value("Password")
-
-            if validate_credentials:
-                while not self._are_credentials_valid(username=username, password=password):
-                    print("The API token is not valid! We could not sign-up to Toggl with it...")
-                    username = self._get_value("Username")
-                    password = self._get_value("Password")
-
-            values["auth"]["username"] = username
-            values["auth"]["password"] = password
+        click.echo("{} Your credentials will be stored in plain-text inside of the configuration!\n".format(
+            click.style("Warning!", fg="yellow", bold=True)
+        ))
 
         local_timezone = time.tzname[0]
-        values["options"]["timezone"] = self._get_value("Used timezone", pytz.all_timezones, local_timezone, show_values=False)
-        values["options"]["continue_creates"] = self._get_value("Continue command will create new entry",
-                                                                ["true", "false"], "true")
+        questions = [
+            inquirer.List('type_auth', message="Type of authentication you want to use",
+                          choices=["API token", "Credentials"]),
 
-        return values
+            inquirer.Password('API token', message="Your API token", ignore=lambda x: x['type_auth'] != 'API token',
+                              validate=lambda answers, current: not validate_credentials
+                                                                or self._are_credentials_valid(api_token=current)),
+
+            inquirer.Text('username', message="Your Username", ignore=lambda x: x['type_auth'] != 'Credentials'),
+
+            inquirer.Password('password', message="Your Password", ignore=lambda x: x['type_auth'] != 'Credentials',
+                              validate=lambda answers, current: not validate_credentials
+                                        or self._are_credentials_valid(username=answers['username'], password=current)),
+
+            inquirer.Text('timezone', 'Used timezone', default=local_timezone, show_default=True,
+                          validate=lambda answers, current: current in pytz.all_timezones),
+
+            inquirer.Confirm('continue_creates', message="Continue command will create new entry", default=True)
+        ]
+
+        answers = inquirer.prompt(questions)
+
+        if answers is None:
+            click.secho("We were not able to setup the needed configuration and we are unfortunately not able to "
+                        "proceed without it", bg="white", fg="red")
+            exit(-1)
+
+        if answers['type_auth'] == "API token":
+            auth = {
+                'api_token': answers['API token']
+            }
+        else:
+            auth = {
+                'username': answers['username'],
+                'password': answers['password']
+            }
+
+        return {
+            'auth': auth,
+            'options': {
+                'timezone': answers['timezone'],
+                'continue_creates': answers['continue_creates'],
+            }
+        }
 
 
 # ----------------------------------------------------------------------------
@@ -149,10 +139,10 @@ class Config(configparser.RawConfigParser):
     __metaclass__ = Singleton
 
     DEFAULT_VALUES = {
-        'continue_creates': 'true',
+        'continue_creates': 'True',
         'time_format': '%I:%M%p',
-        'day_first': 'false',
-        'year_first': 'false',
+        'day_first': 'False',
+        'year_first': 'False',
     }
 
     CONFIG_PATH = os.path.expanduser('~/.togglrc')
