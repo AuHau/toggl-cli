@@ -7,6 +7,7 @@ import pytest as pytest
 import pytz
 
 from toggl import cli
+from toggl.exceptions import TogglCliException
 
 
 def remove_tz_helper(datetime_object):
@@ -109,3 +110,46 @@ class TestDurationType:
         assert remove_tz_helper(duration_type.convert("12:12", None, {})) == datetime_time(12, 12, 0)
         assert remove_tz_helper(duration_type.convert("20.5.2017", None, {})) == datetime(2017, 5, 20, 0, 0)
 
+
+class TestResourceType:
+
+    def test_by_id(self, mocker):
+        instance_mock = mocker.Mock()
+        instance_mock.find_by_id.return_value = 'placeholder'
+        resource_mock = mocker.MagicMock(return_value=instance_mock)
+        resource_mock.__name__ = "MockClass"
+
+        resource_type = cli.ResourceType(resource_mock)
+        assert resource_type.convert(10, None, {}) == 'placeholder'
+
+        # When nothing is found BadParameter is raised
+        instance_mock.find_by_id.return_value = None
+        with pytest.raises(click.BadParameter):
+            resource_type.convert(10, None, {})
+
+    def test_by_name(self, mocker):
+        instance_mock = mocker.Mock()
+        instance_mock.find_by_name.return_value = 'placeholder'
+        resource_mock = mocker.MagicMock(return_value=instance_mock)
+        resource_mock.__name__ = "MockClass"
+
+        resource_type = cli.ResourceType(resource_mock)
+        assert resource_type.convert('asdf', None, {}) == 'placeholder'
+
+        # When nothing is found BadParameter is raised
+        instance_mock.find_by_name.return_value = None
+        with pytest.raises(click.BadParameter):
+            resource_type.convert('asdf', None, {})
+
+    def test_interface_detection(self):
+        class Mock:
+            def __call__(self, *args, **kwargs):
+                return self
+
+        resource_type = cli.ResourceType(Mock)
+
+        with pytest.raises(TogglCliException):
+            resource_type.convert(10, None, {})  # find_by_id() fails
+
+        with pytest.raises(TogglCliException):
+            resource_type.convert("asd", None, {})  # find_by_name() fails

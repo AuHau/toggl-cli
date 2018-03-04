@@ -95,7 +95,7 @@ class DurationType(DateTimeType):
 
 class ResourceType(click.ParamType):
 
-    def __init__(self, resource, resource_name):
+    def __init__(self, resource, resource_name=None):
         self._resource = resource
         self._resource_name = resource_name
 
@@ -117,7 +117,7 @@ class ResourceType(click.ParamType):
         resource = self._resource().find_by_id(resource_id)
 
         if resource is None:
-            self.fail("Unknown {} ID!".format(self._resource_name), param, ctx)
+            self.fail("Unknown {} ID!".format(self._resource_name or self._resource.__name__), param, ctx)
 
         return resource
 
@@ -125,7 +125,7 @@ class ResourceType(click.ParamType):
         resource = self._resource().find_by_name(value)
 
         if resource is None:
-            self.fail("Unknown {} ID!".format(self._resource_name), param, ctx)
+            self.fail("Unknown {} ID!".format(self._resource_name or self._resource.__name__), param, ctx)
 
         return resource
 
