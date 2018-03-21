@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+from abc import ABCMeta
 from collections import defaultdict
 
 import time
@@ -13,6 +14,7 @@ import pytz
 import requests
 from six.moves import configparser
 from builtins import input
+from six import with_metaclass
 
 
 # ----------------------------------------------------------------------------
@@ -38,29 +40,119 @@ class Singleton(type):
         return cls.instance
 
 
+class CachedFactory(type):
+    """
+    Similar to Singleton patter, except there are more instances cached based on a input parameter.
+    It utilizes Factory pattern and forbids direct instantion of the class.
+    """
+
+    SENTINEL_KEY = '20800fa4-c75d-4c2c-9c99-fb35122e1a18'
+
+    def __new__(mcs, name, bases, namespace):
+        mcs.cache = {}
+
+        def new__init__(self):
+            raise ValueError('Cannot directly instantiate new object, you have to use \'factory\' method for that!')
+
+        old_init = namespace.get('__init__')
+        namespace['__init__'] = new__init__
+
+        def factory(cls_obj, key=sentinel, *args, **kwargs):
+            # Key with None are not cached
+            if key is None:
+                obj = cls_obj.__new__(cls_obj, key, *args, **kwargs)
+                old_init(obj, key, *args, **kwargs)
+                return obj
+
+            cached_key = mcs.SENTINEL_KEY if key == sentinel else key
+
+            if cached_key in mcs.cache:
+                return mcs.cache[cached_key]
+
+            if key == sentinel:
+                obj = cls_obj.__new__(cls_obj, *args, **kwargs)
+                old_init(obj, *args, **kwargs)
+            else:
+                obj = cls_obj.__new__(cls_obj, key, *args, **kwargs)
+                old_init(obj, key, *args, **kwargs)
+
+            mcs.cache[cached_key] = obj
+
+            return obj
+
+        namespace['factory'] = classmethod(factory)
+        return super().__new__(mcs, name, bases, namespace)
+
+
+class ABCCachedFactory(CachedFactory, ABCMeta):
+    pass
+
+
 class ConfigBootstrap(object):
     """
     Create config based on the input from the User
     """
 
-    def _are_credentials_valid(self, api_token=None, username=None, password=None):
-        from .toggl import TOGGL_URL
+    def __init__(self):
+        self.workspaces = None
 
-        if api_token:
-            auth = requests.auth.HTTPBasicAuth(api_token, 'api_token')
+    def _are_credentials_valid(self, answers, credential):
+        config = self._build_tmp_config(answers, credential)
 
-        elif username and password:
-            auth = requests.auth.HTTPBasicAuth(username, password)
-        else:
-            raise Exception("There has to be specified at least one way of authentication! API token or credentials!")
-
-        url = "{}{}".format(TOGGL_URL, "/me")
-        r = requests.get(url, auth=auth, headers={'content-type': 'application/json'})
-
-        if r.status_code == 200:
+        try:
+            toggl("/me", "get", config=config)
             return True
-        else:
+        except Exception as e:
+            Logger.debug(e)
             return False
+
+    def _build_tmp_config(self, answers, credential=None):
+        config = Config.factory(None)
+        config.add_section("auth")
+
+        if answers['type_auth'] == "API token":
+            config.set('auth', 'api_token', credential or answers['API token'])
+        else:
+            config.set('auth', 'username', answers['username'])
+            config.set('auth', 'password', credential or answers['password'])
+
+        return config
+
+    def _get_workspaces(self, answers):
+        from toggl.api import WorkspaceList
+        config = self._build_tmp_config(answers)
+
+        if self.workspaces is None:
+            self.workspaces = []
+            for workspace in WorkspaceList(config):
+                self.workspaces.append(workspace['name'])
+
+        return self.workspaces
+
+    def _map_answers(self, answers):
+        from toggl.api import WorkspaceList
+
+        config = self._build_tmp_config(answers)
+        default_workspace_id = WorkspaceList(config).find_by_name(answers['default workspace'])['id']
+
+        if answers['type_auth'] == "API token":
+            auth = {
+                'api_token': answers['API token']
+            }
+        else:
+            auth = {
+                'username': answers['username'],
+                'password': answers['password']
+            }
+
+        return {
+            'auth': auth,
+            'options': {
+                'default_workspace': default_workspace_id,
+                'timezone': answers['timezone'],
+                'continue_creates': answers['continue_creates'],
+            }
+        }
 
     def start(self, validate_credentials=True):
         click.secho(""" _____                 _   _____  _     _____ 
@@ -86,13 +178,16 @@ class ConfigBootstrap(object):
 
             inquirer.Password('API token', message="Your API token", ignore=lambda x: x['type_auth'] != 'API token',
                               validate=lambda answers, current: not validate_credentials
-                                                                or self._are_credentials_valid(api_token=current)),
+                                                                or self._are_credentials_valid(answers, current)),
 
             inquirer.Text('username', message="Your Username", ignore=lambda x: x['type_auth'] != 'Credentials'),
 
             inquirer.Password('password', message="Your Password", ignore=lambda x: x['type_auth'] != 'Credentials',
                               validate=lambda answers, current: not validate_credentials
-                                        or self._are_credentials_valid(username=answers['username'], password=current)),
+                                        or self._are_credentials_valid(answers)),
+
+            inquirer.List('default workspace', message="Default workspace which will be used when no workspace is provided",
+                          choices=lambda answers: self._get_workspaces(answers)),
 
             inquirer.Text('timezone', 'Used timezone', default=local_timezone, show_default=True,
                           validate=lambda answers, current: current in pytz.all_timezones),
@@ -107,36 +202,23 @@ class ConfigBootstrap(object):
                         "proceed without it", bg="white", fg="red")
             exit(-1)
 
-        if answers['type_auth'] == "API token":
-            auth = {
-                'api_token': answers['API token']
-            }
-        else:
-            auth = {
-                'username': answers['username'],
-                'password': answers['password']
-            }
+        click.echo("\nConfiguration succesfully finished!\nNow continuing with your command:\n\n")
 
-        return {
-            'auth': auth,
-            'options': {
-                'timezone': answers['timezone'],
-                'continue_creates': answers['continue_creates'],
-            }
-        }
+        return self._map_answers(answers)
 
 
 # ----------------------------------------------------------------------------
 # Config
 # ----------------------------------------------------------------------------
-class Config(configparser.RawConfigParser):
+sentinel = object()
+
+
+class Config(with_metaclass(ABCCachedFactory, configparser.RawConfigParser)):
     """
     Singleton. toggl configuration data, read from ~/.togglrc.
     Properties:
         auth - (username, password) tuple.
     """
-
-    __metaclass__ = Singleton
 
     DEFAULT_VALUES = {
         'continue_creates': 'True',
@@ -145,28 +227,32 @@ class Config(configparser.RawConfigParser):
         'year_first': 'False',
     }
 
-    CONFIG_PATH = os.path.expanduser('~/.togglrc')
+    DEFAULT_CONFIG_PATH = os.path.expanduser('~/.togglrc')
 
     ENV_NAME_API_TOKEN = 'TOGGL_API_TOKEN'
     ENV_NAME_USERNAME = 'TOGGL_USERNAME'
     ENV_NAME_PASSWORD = 'TOGGL_PASSWORD'
 
-    def __init__(self):
+    def __init__(self, config_path=sentinel):
         """
         Reads configuration data from ~/.togglrc.
         """
         super().__init__(self.DEFAULT_VALUES)
 
-        if not self.read(self.CONFIG_PATH):
+        self.config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path
+
+        # There are use-cases when we do not want to load config from config file
+        # and just build the config during runtime
+        if self.config_path is not None and not self.read(self.config_path):
             self._init_new_config()
 
     def _init_new_config(self):
         values_dict = ConfigBootstrap().start()
         self.read_dict(values_dict)
 
-        with open(self.CONFIG_PATH, 'w') as cfgfile:
+        with open(self.config_path, 'w') as cfgfile:
             self.write(cfgfile)
-        os.chmod(self.CONFIG_PATH, 0o600)
+        os.chmod(self.config_path, 0o600)
 
     def get_auth(self):
         """
@@ -375,7 +461,7 @@ class Logger(object):
 # ----------------------------------------------------------------------------
 # toggl
 # ----------------------------------------------------------------------------
-def toggl(url, method, data=None, headers=None):
+def toggl(url, method, data=None, headers=None, config=None):
     """
     Makes an HTTP request to toggl.com. Returns the parsed JSON as dict.
     """
@@ -384,21 +470,22 @@ def toggl(url, method, data=None, headers=None):
     if headers is None:
         headers = {'content-type': 'application/json'}
 
+    if config is None:
+        config = Config.factory()
+
     url = "{}{}".format(TOGGL_URL, url)
-    try:
-        if method == 'delete':
-            r = requests.delete(url, auth=Config().get_auth(), data=data, headers=headers)
-        elif method == 'get':
-            r = requests.get(url, auth=Config().get_auth(), data=data, headers=headers)
-        elif method == 'post':
-            r = requests.post(url, auth=Config().get_auth(), data=data, headers=headers)
-        elif method == 'put':
-            r = requests.post(url, auth=Config().get_auth(), data=data, headers=headers)
-        else:
-            raise NotImplementedError('HTTP method "{}" not implemented.'.format(method))
-        r.raise_for_status()  # raise exception on error
-        return json.loads(r.text)
-    except Exception as e:
-        print('Sent: {}'.format(data))
-        print(e)
-        # sys.exit(1)
+    if method == 'delete':
+        r = requests.delete(url, auth=config.get_auth(), data=data, headers=headers)
+    elif method == 'get':
+        r = requests.get(url, auth=config.get_auth(), data=data, headers=headers)
+    elif method == 'post':
+        r = requests.post(url, auth=config.get_auth(), data=data, headers=headers)
+    elif method == 'put':
+        r = requests.post(url, auth=config.get_auth(), data=data, headers=headers)
+    else:
+        raise NotImplementedError('HTTP method "{}" not implemented.'.format(method))
+
+    # TODO: Better error handling
+    r.raise_for_status()  # raise exception on error
+    return json.loads(r.text)
+

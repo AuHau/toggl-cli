@@ -4,8 +4,70 @@ import time
 import six
 from six.moves import urllib
 
+from toggl.exceptions import TogglValidationException, TogglException
 from . import utils
+from abc import ABCMeta, abstractmethod
 
+from builtins import int
+
+
+class TogglEntity(object):
+    __metaclass__ = ABCMeta
+
+    def __init__(self, entity_id=None, config=None):
+        if not self._ENTITY_URL:
+            raise TogglException("The _ENTITY_URL attribute has to be set!")
+
+        self.id = entity_id
+        self.config = config
+
+    def save(self):
+        self.validate()
+
+        if self.id is not None:  # Update
+            utils.toggl("/{}/{}".format(self._ENTITY_URL, self.id), "put", self.json(), config=self.config)
+        else:  # Create
+            utils.toggl("/{}".format(self._ENTITY_URL), "post", self.json(), config=self.config)
+
+    def delete(self):
+        utils.toggl("/{}/{}".format(self._ENTITY_URL, self.id), "delete")
+        self.id = None  # Invalidate the object, so when save() is called after delete a new object is created
+
+    def __cmp__(self, other):
+        if not isinstance(other, self.__class__):
+            raise TogglException("You are trying to compare instances of different classes!")
+
+        return self.id == other.id
+
+    def json(self):
+        return json.dumps(self.to_dict())
+
+    @abstractmethod
+    def validate(self):
+        pass
+
+    def to_dict(self):
+        entity_dict = vars(self)
+
+        try:  # New objects does not have ID
+            del entity_dict['id']
+        except KeyError:
+            pass
+
+        if hasattr(self, '_FILTERED_KEYS'):
+            for key in self._FILTERED_KEYS:
+                try:
+                    del entity_dict[key]
+                except KeyError:
+                    pass
+
+        return entity_dict
+
+    def __setattr__(self, key, value):
+        if hasattr(self, '_READ_ONLY') and key in self._READ_ONLY:
+            raise TogglException("You are trying to assign value to read-only attribute '{}'!".format(key))
+
+        super(TogglEntity, self).__setattr__(key, value)
 
 # ----------------------------------------------------------------------------
 # ClientList
@@ -23,7 +85,17 @@ class ClientList(six.Iterator):
         """
         Fetches the list of clients from toggl.
         """
-        self.client_list = utils.toggl("/clients", 'get')
+        self.client_list = []
+
+        fetched_clients = utils.toggl("/clients", 'get')
+
+        if fetched_clients is None:
+            return
+
+        for client in fetched_clients:
+            self.client_list.append(
+                Client(client['name'], client['wid'], client.get('note'), client['id'])
+            )
 
     def __iter__(self):
         """
@@ -43,13 +115,29 @@ class ClientList(six.Iterator):
             return self.client_list[self.iter_index - 1]
 
     def __str__(self):
-        """
-        Formats the list of clients as a string.
-        """
-        s = ""
-        for client in self.client_list:
-            s = s + "{}\n".format(client['name'])
-        return s.rstrip().encode('utf-8')  # strip trailing \n
+        return "ClientList with {} clients".format(len(self.client_list))
+
+
+class Client(TogglEntity):
+    _ENTITY_URL = "clients"
+
+    def __init__(self, name, wid=None, note=None, _client_id=None,):
+        self.id = _client_id
+        self.name = name
+        self.note = note
+        self.wid = wid
+
+        super(Client, self).__init__()
+
+    def validate(self, validate_workspace_existence=True):
+        if self.name is None or self.wid is None:
+            raise TogglValidationException("Name and Workspace ID are required!")
+
+        if not isinstance(self.wid, int):
+            raise TogglValidationException("Workspace ID must be an integer!")
+
+        if validate_workspace_existence and WorkspaceList().find_by_id(self.wid) is None:
+            raise TogglValidationException("Workspace ID does not exists!")
 
 
 # ----------------------------------------------------------------------------
@@ -57,18 +145,16 @@ class ClientList(six.Iterator):
 # ----------------------------------------------------------------------------
 class WorkspaceList(six.Iterator):
     """
-    A utils.Singleton list of workspace. A workspace object is a dictionary as
-    documented at
+    A list of workspace. A workspace object is a dictionary as documented at
     https://github.com/toggl/toggl_api_docs/blob/master/chapters/workspaces.md
     """
 
-    __metaclass__ = utils.Singleton
-
-    def __init__(self):
+    def __init__(self, config=None):
         """
         Fetches the list of workspaces from toggl.
         """
-        self.workspace_list = utils.toggl("/workspaces", "get")
+        self.config = config
+        self.workspace_list = utils.toggl("/workspaces", "get", config=config)
 
     def find_by_id(self, wid):
         """

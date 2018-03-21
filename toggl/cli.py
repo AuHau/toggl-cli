@@ -94,6 +94,11 @@ class DurationType(DateTimeType):
 
 
 class ResourceType(click.ParamType):
+    """
+    Takes an Resource class and based on the type of value it calls either
+    find_by_id() for integer value or find_by_name() for string value and return
+    the appropriate entry.
+    """
 
     def __init__(self, resource, resource_name=None):
         self._resource = resource
@@ -153,7 +158,7 @@ def cli(ctx, quiet, verbose, debug, config):
     The authentication credentials can be also overridden with Environmental variables. Use
     TOGGL_API_TOKEN or TOGGL_USERNAME, TOGGL_PASSWORD.
     """
-    ctx.obj['config'] = utils.Config()
+    ctx.obj['config'] = utils.Config.factory()
 
     # Process command-line options.
     utils.Logger.level = utils.Logger.INFO
@@ -208,6 +213,28 @@ def add_time_entry(ctx, start, end, descr, project, workspace):
     utils.Logger.debug(entry.json())
     entry.add()
     utils.Logger.info('{} added'.format(descr))
+
+
+@cli.group('clients', short_help='clients management (default: listing)', invoke_without_command=True)
+@click.pass_context
+def clients(ctx):
+    if ctx.invoked_subcommand is None:
+        for client in api.ClientList():
+            # TODO: Add option for simple print without colors & machine readable format
+            click.echo("{} {}".format(
+                client.name,
+                click.style("[#{}]".format(client.id), fg="white", dim=1),
+            ))
+
+
+@clients.command('create', short_help='create new client')
+@click.option('--name', '-n', prompt='Name of the client',
+              help='Specifies the name of the client', )
+@click.option('--note', help='Specifies a note linked to the client', )
+@click.option('--workspace', '-w', help='Specifies a workspace where the client will be created', )
+@click.pass_context
+def add_client(ctx, name, note, workspace):
+    client = api.Client(name,)
 
 
 # ----------------------------------------------------------------------------
