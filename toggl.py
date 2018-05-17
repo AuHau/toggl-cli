@@ -515,7 +515,7 @@ class ProjectList(six.Iterator):
                for client in clients:
                    if project['cid'] == client['id']:
                        client_name = " - {}".format(client['name'])
-            s = s + ":{} @{}{}\n".format(self.workspace['name'], project['name'], client_name)
+            s = s + ":{} @{}{} #{}\n".format(self.workspace['name'], project['name'], client_name, project['id'])
         return s.rstrip() # strip trailing \n
 
 #----------------------------------------------------------------------------
@@ -531,7 +531,7 @@ class TimeEntry(object):
     """
 
     def __init__(self, description=None, start_time=None, stop_time=None,
-                 duration=None, workspace_name = None, project_name=None,
+                 duration=None, workspace_name = None, project=None,
                  data_dict=None):
         """
         Constructor. None of the parameters are required at object creation,
@@ -565,10 +565,7 @@ class TimeEntry(object):
                 raise RuntimeError("Workspace '{}' not found.".format(workspace_name))
             self.data['wid'] = workspace['id']
 
-        if project_name is not None:
-            project = ProjectList(workspace_name).find_by_name(project_name)
-            if project == None:
-                raise RuntimeError("Project '{}' not found.".format(project_name))
+        if project is not None:
             self.data['pid'] = project['id']
 
         if duration is not None:
@@ -947,8 +944,8 @@ class CLI(object):
         
         self.parser = optparse.OptionParser(usage="Usage: %prog [OPTIONS] [ACTION]", \
             epilog="\nActions:\n"
-            "  add DESCR [:WORKSPACE] [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
-            "  add DESCR [:WORKSPACE] [@PROJECT] 'd'DURATION\n\tcreates a completed time entry, with start time DURATION ago\n"
+            "  add DESCR [:WORKSPACE] [@PROJECT | #PROJECT_ID] START_DATETIME ('d'DURATION | END_DATETIME)\n\tcreates a completed time entry\n"
+            "  add DESCR [:WORKSPACE] [@PROJECT | #PROJECT_ID] 'd'DURATION\n\tcreates a completed time entry, with start time DURATION ago\n"
             "  clients\n\tlists all clients\n"
             "  continue [from DATETIME | 'd'DURATION]\n\trestarts the last entry\n"
             "  continue DESCR [from DATETIME | 'd'DURATION]\n\trestarts the last entry matching DESCR\n"
@@ -957,7 +954,7 @@ class CLI(object):
             "  workspaces\n\tlists all workspaces\n"
             "  projects [:WORKSPACE]\n\tlists all projects\n"
             "  rm ID\n\tdelete a time entry by id\n"
-            "  start DESCR [:WORKSPACE] [@PROJECT] ['d'DURATION | DATETIME]\n\tstarts a new entry\n"
+            "  start DESCR [:WORKSPACE] [@PROJECT | #PROJECT_ID] ['d'DURATION | DATETIME]\n\tstarts a new entry\n"
             "  stop [DATETIME]\n\tstops the current entry\n"
             "  www\n\tvisits toggl.com\n"
             "\n"
@@ -988,9 +985,9 @@ class CLI(object):
     def _add_time_entry(self, args):
         """
         Creates a completed time entry.
-        args should be: DESCR [:WORKSPACE] [@PROJECT] START_DATE_TIME
+        args should be: DESCR [:WORKSPACE] [@PROJECT | #PROJECT_ID] START_DATE_TIME
             'd'DURATION | STOP_DATE_TIME
-        or: DESCR [:WORKSPACE] [@PROJECT] 'd'DURATION
+        or: DESCR [:WORKSPACE] [@PROJECT | #PROJECT_ID] 'd'DURATION
         """
         # Process the args.
         description = self._get_str_arg(args)
@@ -1002,11 +999,7 @@ class CLI(object):
                 raise RuntimeError("Workspace '{}' not found.".format(workspace_name))
             else:
                 ws_name = workspace["name"]
-        project_name = self._get_project_arg(args, optional=True)
-        if project_name is not None:
-            project = ProjectList(ws_name).find_by_name(project_name)
-            if project == None:
-                raise RuntimeError("Project '{}' not found.".format(project_name))
+        project = self._get_project_arg(args, workspace_name, optional=True)
 
         duration = self._get_duration_arg(args, optional=True)
         if duration is not None:
@@ -1027,7 +1020,7 @@ class CLI(object):
             start_time=start_time,
             stop_time=stop_time,
             duration=duration,
-            project_name=project_name,
+            project=project,
             workspace_name=workspace_name
         )
 
@@ -1173,23 +1166,36 @@ class CLI(object):
         else:
             return args.pop(0)[1:]
 
-    def _get_project_arg(self, args, optional=False):
+    def _get_project_arg(self, args, workspace_name, optional=False):
         """
-        If the first entry in args is a project name (e.g., '@project')
-        then return the name of the project, or None.
+        If the first entry in args is a project name (e.g., '@project') or
+        project ID (e.g., '#123456') then return the name of the project, or
+        None.
         """
         if len(args) == 0:
             if optional:
                 return None
             else:
                 self.print_help()
-        elif args[0][0] != '@':
+        elif args[0][0] == '@':
+            project_name = args.pop(0)[1:]
+            project = ProjectList(workspace_name).find_by_name(project_name)
+            if project:
+                return project
+            else:
+                raise RuntimeError("Project name '{}' not found.".format(project_name))
+        elif args[0][0] == '#':
+            project_id = int(args.pop(0)[1:])
+            project = ProjectList(workspace_name).find_by_id(project_id)
+            if project:
+                return project
+            else:
+                raise RuntimeError("Project ID '{}' not found.".format(project_id))
+        else:
             if optional:
                 return None
             else:
                 self.print_help()
-        else:
-            return args.pop(0)[1:]
 
     def _get_str_arg(self, args, optional=False):
         """
@@ -1222,11 +1228,11 @@ class CLI(object):
     def _start_time_entry(self, args):
         """
         Starts a new time entry.
-        args should be: DESCR [:WORKSPACE] [@PROJECT] ['d'DURATION | DATETIME]
+        args should be: DESCR [:WORKSPACE] [@PROJECT | #PROJECT_ID] ['d'DURATION | DATETIME]
         """
         description = self._get_str_arg(args, optional=False)
         workspace_name = self._get_workspace_arg(args, optional=True)
-        project_name = self._get_project_arg(args, optional=True)
+        project = self._get_project_arg(args, workspace_name, optional=True)
         duration = self._get_duration_arg(args, optional=True)
         if duration is not None:
             start_time = DateAndTime().now() - datetime.timedelta(seconds=duration)
@@ -1238,7 +1244,7 @@ class CLI(object):
         entry = TimeEntry(
             description=description,
             start_time=start_time,
-            project_name=project_name,
+            project=project,
             workspace_name=workspace_name
         )
         entry.start()

@@ -71,9 +71,9 @@ Usage
       -d, --debug    print debugging output
     
     Actions:
-      add DESCR [:WORKSPACE] [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)
+      add DESCR [:WORKSPACE] [@PROJECT | #PROJECT_ID] START_DATETIME ('d'DURATION | END_DATETIME)
             creates a completed time entry
-      add DESCR [:WORKSPACE] [@PROJECT] 'd'DURATION
+      add DESCR [:WORKSPACE] [@PROJECT | #PROJECT_ID] 'd'DURATION
             creates a completed time entry, with start time DURATION ago
       clients
             lists all clients
@@ -91,7 +91,7 @@ Usage
             lists all projects
       rm ID
             delete a time entry by id
-      start DESCR [:WORKSPACE] [@PROJECT] ['d'DURATION | DATETIME]
+      start DESCR [:WORKSPACE] [@PROJECT | #PROJECT_ID] ['d'DURATION | DATETIME]
             starts a new entry
       stop [DATETIME]
             stops the current entry
