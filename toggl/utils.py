@@ -15,6 +15,7 @@ import requests
 from six.moves import configparser
 from builtins import input
 from six import with_metaclass
+from tzlocal import get_localzone
 
 
 # ----------------------------------------------------------------------------
@@ -171,7 +172,7 @@ class ConfigBootstrap(object):
             click.style("Warning!", fg="yellow", bold=True)
         ))
 
-        local_timezone = time.tzname[0]
+        local_timezone = str(get_localzone())
         questions = [
             inquirer.List('type_auth', message="Type of authentication you want to use",
                           choices=["API token", "Credentials"]),
@@ -190,7 +191,7 @@ class ConfigBootstrap(object):
                           choices=lambda answers: self._get_workspaces(answers)),
 
             inquirer.Text('timezone', 'Used timezone', default=local_timezone, show_default=True,
-                          validate=lambda answers, current: current in pytz.all_timezones),
+                          validate=lambda answers, current: current in pytz.all_timezones_set),
 
             inquirer.Confirm('continue_creates', message="Continue command will create new entry", default=True)
         ]
@@ -202,7 +203,7 @@ class ConfigBootstrap(object):
                         "proceed without it", bg="white", fg="red")
             exit(-1)
 
-        click.echo("\nConfiguration succesfully finished!\nNow continuing with your command:\n\n")
+        click.echo("\nConfiguration successfully finished!\nNow continuing with your command:\n\n")
 
         return self._map_answers(answers)
 
