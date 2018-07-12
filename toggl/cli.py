@@ -14,7 +14,7 @@ DEFAULT_CONFIG_PATH = '~/.togglrc'
 class DateTimeType(click.ParamType):
     """
     Parse a string into datetime object. The parsing utilize `dateutil.parser.parse` function
-    which is very error prone and always returns a datetime object even with best-guess.
+    which is very error resilient and always returns a datetime object with a best-guess.
 
     Also special string NOW_STRING is supported which creates datetime with current date and time.
     """
@@ -55,7 +55,7 @@ class DurationType(DateTimeType):
     """
     Supported units: d = days, h = hours, m = minutes, s = seconds.
     
-    Regex matches unique counts per unit (always the last one).
+    Regex matches unique counts per unit (always the last one, so for '1h 1m 2h', it will parse 2 hours).
     Examples of successful matches:
     1d 1h 1m 1s
     1h 1d 1s
@@ -122,7 +122,7 @@ class ResourceType(click.ParamType):
         resource = self._resource().find_by_id(resource_id)
 
         if resource is None:
-            self.fail("Unknown {} ID!".format(self._resource_name or self._resource.__name__), param, ctx)
+            self.fail("Unknown {}'s ID!".format(self._resource_name), param, ctx)
 
         return resource
 
@@ -130,7 +130,7 @@ class ResourceType(click.ParamType):
         resource = self._resource().find_by_name(value)
 
         if resource is None:
-            self.fail("Unknown {} ID!".format(self._resource_name or self._resource.__name__), param, ctx)
+            self.fail("Unknown {}'s name!".format(self._resource_name), param, ctx)
 
         return resource
 
