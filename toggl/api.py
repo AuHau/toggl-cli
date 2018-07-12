@@ -7,12 +7,12 @@ from six.moves import urllib
 from toggl.exceptions import TogglValidationException, TogglException
 from . import utils
 from abc import ABCMeta, abstractmethod
+from six import with_metaclass
 
 from builtins import int
 
 
-class TogglEntity(object):
-    __metaclass__ = ABCMeta
+class TogglEntity(with_metaclass(ABCMeta, object)):
 
     def __init__(self, entity_id=None, config=None):
         if not self._ENTITY_URL:
@@ -42,6 +42,8 @@ class TogglEntity(object):
     def json(self):
         return json.dumps(self.to_dict())
 
+
+
     @abstractmethod
     def validate(self):
         pass
@@ -67,6 +69,10 @@ class TogglEntity(object):
         if hasattr(self, '_READ_ONLY') and key in self._READ_ONLY:
             raise TogglException("You are trying to assign value to read-only attribute '{}'!".format(key))
 
+        if key == 'id' and value is not None:
+            raise TogglException("You are trying to change ID which is not allowed, you can only set it to None to "
+                                 "create new object!")
+
         super(TogglEntity, self).__setattr__(key, value)
 
 # ----------------------------------------------------------------------------
@@ -78,8 +84,6 @@ class ClientList(six.Iterator):
     as documented at
     https://github.com/toggl/toggl_api_docs/blob/master/chapters/clients.md
     """
-
-    __metaclass__ = utils.Singleton
 
     def __init__(self):
         """
@@ -93,8 +97,10 @@ class ClientList(six.Iterator):
             return
 
         for client in fetched_clients:
+            client_object = Client(client['name'], client['wid'], client.get('note'))
+            client_object.id = client['id']
             self.client_list.append(
-                Client(client['name'], client['wid'], client.get('note'), client['id'])
+                client_object
             )
 
     def __iter__(self):
@@ -121,8 +127,7 @@ class ClientList(six.Iterator):
 class Client(TogglEntity):
     _ENTITY_URL = "clients"
 
-    def __init__(self, name, wid=None, note=None, _client_id=None,):
-        self.id = _client_id
+    def __init__(self, name, wid=None, note=None):
         self.name = name
         self.note = note
         self.wid = wid

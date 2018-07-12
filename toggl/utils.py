@@ -40,7 +40,7 @@ class Singleton(type):
         return cls.instance
 
 
-class CachedFactory(type):
+class CachedFactoryMeta(type):
     """
     Similar to Singleton patter, except there are more instances cached based on a input parameter.
     It utilizes Factory pattern and forbids direct instantion of the class.
@@ -84,7 +84,7 @@ class CachedFactory(type):
         return super().__new__(mcs, name, bases, namespace)
 
 
-class ABCCachedFactory(CachedFactory, ABCMeta):
+class ABCCachedFactoryMeta(CachedFactoryMeta, ABCMeta):
     pass
 
 
@@ -213,7 +213,7 @@ class ConfigBootstrap(object):
 sentinel = object()
 
 
-class Config(with_metaclass(ABCCachedFactory, configparser.RawConfigParser)):
+class Config(with_metaclass(ABCCachedFactoryMeta, configparser.RawConfigParser)):
     """
     Singleton. toggl configuration data, read from ~/.togglrc.
     Properties:
