@@ -14,9 +14,11 @@ from builtins import int
 
 class TogglEntity(with_metaclass(ABCMeta, object)):
 
+    _ENTITY_URL = None
+
     def __init__(self, entity_id=None, config=None):
-        if not self._ENTITY_URL:
-            raise TogglException("The _ENTITY_URL attribute has to be set!")
+        if self._ENTITY_URL is None:
+            raise TogglException("The _ENTITY_URL attribute has to be set and not None!")
 
         self.id = entity_id
         self.config = config
@@ -27,7 +29,8 @@ class TogglEntity(with_metaclass(ABCMeta, object)):
         if self.id is not None:  # Update
             utils.toggl("/{}/{}".format(self._ENTITY_URL, self.id), "put", self.json(), config=self.config)
         else:  # Create
-            utils.toggl("/{}".format(self._ENTITY_URL), "post", self.json(), config=self.config)
+            data = utils.toggl("/{}".format(self._ENTITY_URL), "post", self.json(), config=self.config)
+            self.id = data['data']['id']  # Store the returned ID
 
     def delete(self):
         utils.toggl("/{}/{}".format(self._ENTITY_URL, self.id), "delete")
@@ -41,8 +44,6 @@ class TogglEntity(with_metaclass(ABCMeta, object)):
 
     def json(self):
         return json.dumps(self.to_dict())
-
-
 
     @abstractmethod
     def validate(self):
@@ -69,11 +70,12 @@ class TogglEntity(with_metaclass(ABCMeta, object)):
         if hasattr(self, '_READ_ONLY') and key in self._READ_ONLY:
             raise TogglException("You are trying to assign value to read-only attribute '{}'!".format(key))
 
-        if key == 'id' and value is not None:
-            raise TogglException("You are trying to change ID which is not allowed, you can only set it to None to "
-                                 "create new object!")
+        # if key == 'id' and value is not None:
+        #     raise TogglException("You are trying to change ID which is not allowed, you can only set it to None to "
+        #                          "create new object!")
 
         super(TogglEntity, self).__setattr__(key, value)
+
 
 # ----------------------------------------------------------------------------
 # ClientList
@@ -127,12 +129,12 @@ class ClientList(six.Iterator):
 class Client(TogglEntity):
     _ENTITY_URL = "clients"
 
-    def __init__(self, name, wid=None, note=None):
+    def __init__(self, name, wid=None, note=None, config=None):
         self.name = name
         self.note = note
         self.wid = wid
 
-        super(Client, self).__init__()
+        super(Client, self).__init__(id, config)
 
     def validate(self, validate_workspace_existence=True):
         if self.name is None or self.wid is None:

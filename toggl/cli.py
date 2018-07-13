@@ -153,7 +153,7 @@ def cli(ctx, quiet, verbose, debug, config):
     This application implements limited subsets of Toggl's functionality.
 
     Many of the options can be set through Environmental variables. The names of the variables
-    are denoted in the option's helps with format "(ENV: <name of variable>)"
+    are denoted in the option's helps with format "(ENV: <name of variable>)".
 
     The authentication credentials can be also overridden with Environmental variables. Use
     TOGGL_API_TOKEN or TOGGL_USERNAME, TOGGL_PASSWORD.
