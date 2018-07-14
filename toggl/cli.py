@@ -219,7 +219,7 @@ def add_time_entry(ctx, start, end, descr, project, workspace):
 @click.pass_context
 def clients(ctx):
     if ctx.invoked_subcommand is None:
-        for client in api.ClientList():
+        for client in api.Client.objects.all():
             # TODO: Add option for simple print without colors & machine readable format
             click.echo("{} {}".format(
                 client.name,

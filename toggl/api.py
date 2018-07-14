@@ -4,7 +4,7 @@ import time
 import six
 from six.moves import urllib
 
-from toggl.exceptions import TogglValidationException, TogglException
+from toggl.exceptions import TogglValidationException, TogglException, TogglMultipleResults
 from . import utils
 from abc import ABCMeta, abstractmethod
 from six import with_metaclass
@@ -12,14 +12,109 @@ from six import with_metaclass
 from builtins import int
 
 
-class TogglEntity(with_metaclass(ABCMeta, object)):
+def compare_dicts(a,b):
+    """
+    Will compare dicts A and B.
+    Dict A's keys and values must match keys in B, but not other way.
+
+    >>> compare_dicts({'x':123, 'y':456}, {'x':123, 'y':456})
+    True
+    >>> compare_dicts({'x':123, 'y':456}, {'x':123, 'y':456, 'z':789})
+    True
+    >>> compare_dicts({'x':123, 'y':456}, {'x':123, 'z':789})
+    False
+
+    :param a: dict
+    :param b: dict
+    :return:
+    :rtype: bool
+    """
+    for key in a:
+        if key not in b:
+            return False
+
+        if a[key] != b[key]:
+            return False
+
+    return True
+
+
+class TogglSet(object):
+    def __init__(self, entity_cls):
+        self.entity_cls = entity_cls
+
+    def _convert_entity(self, raw_entity):
+        entity_id = raw_entity.pop('id')
+        entity_object = self.entity_cls(**raw_entity)
+        entity_object.id = entity_id
+
+        return entity_object
+
+    def get(self, id=None, **conditions):
+        if id is not None:
+            conditions['id'] = id
+
+        entries = self.filter(**conditions)
+
+        if len(entries) > 1:
+            raise TogglMultipleResults()
+
+        return entries[0]
+
+    def filter(self, **conditions):
+        fetched_entities = utils.toggl("/{}".format(self.entity_cls._ENTITY_URL), 'get')
+
+        if fetched_entities is None:
+            return []
+
+        searched_entities = []
+        for entity in fetched_entities:
+            if compare_dicts(conditions, entity):
+                searched_entities.append(
+                    self._convert_entity(entity)
+                )
+
+        return searched_entities
+
+    def all(self):
+        entity_list = []
+
+        fetched_entities = utils.toggl("/{}".format(self.entity_cls._ENTITY_URL), 'get')
+
+        if fetched_entities is None:
+            return []
+
+        for entity in fetched_entities:
+            entity_list.append(
+                self._convert_entity(entity)
+            )
+
+        return entity_list
+
+
+class TogglEntityBase(ABCMeta):
+
+    def __new__(cls, name, bases, attrs, **kwargs):
+        new_class = super().__new__(cls, name, bases, attrs, **kwargs)
+
+        parents = [b for b in bases if isinstance(b, TogglEntityBase)]
+        if not parents:
+            return new_class
+
+        url = attrs.get('_ENTITY_URL')
+        if url is None:
+            raise TogglException("The _ENTITY_URL attribute has to be set and not None!")
+
+        setattr(new_class, 'objects', TogglSet(new_class))
+
+        return new_class
+
+
+class TogglEntity(with_metaclass(TogglEntityBase, object)):
 
     _ENTITY_URL = None
 
     def __init__(self, entity_id=None, config=None):
-        if self._ENTITY_URL is None:
-            raise TogglException("The _ENTITY_URL attribute has to be set and not None!")
-
         self.id = entity_id
         self.config = config
 
@@ -78,63 +173,17 @@ class TogglEntity(with_metaclass(ABCMeta, object)):
 
 
 # ----------------------------------------------------------------------------
-# ClientList
+# Entities definitions
 # ----------------------------------------------------------------------------
-class ClientList(six.Iterator):
-    """
-    A utils.Singleton list of clients. A "client object" is a set of properties
-    as documented at
-    https://github.com/toggl/toggl_api_docs/blob/master/chapters/clients.md
-    """
-
-    def __init__(self):
-        """
-        Fetches the list of clients from toggl.
-        """
-        self.client_list = []
-
-        fetched_clients = utils.toggl("/clients", 'get')
-
-        if fetched_clients is None:
-            return
-
-        for client in fetched_clients:
-            client_object = Client(client['name'], client['wid'], client.get('note'))
-            client_object.id = client['id']
-            self.client_list.append(
-                client_object
-            )
-
-    def __iter__(self):
-        """
-        Start iterating over the clients.
-        """
-        self.iter_index = 0
-        return self
-
-    def __next__(self):
-        """
-        Returns the next client.
-        """
-        if not self.client_list or self.iter_index >= len(self.client_list):
-            raise StopIteration
-        else:
-            self.iter_index += 1
-            return self.client_list[self.iter_index - 1]
-
-    def __str__(self):
-        return "ClientList with {} clients".format(len(self.client_list))
-
-
 class Client(TogglEntity):
     _ENTITY_URL = "clients"
 
-    def __init__(self, name, wid=None, note=None, config=None):
+    def __init__(self, name, wid=None, note=None, config=None, **kwargs):
         self.name = name
         self.note = note
         self.wid = wid
 
-        super(Client, self).__init__(id, config)
+        super(Client, self).__init__(config=config)
 
     def validate(self, validate_workspace_existence=True):
         if self.name is None or self.wid is None:

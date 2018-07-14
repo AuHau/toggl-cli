@@ -9,5 +9,9 @@ class TogglValidationException(TogglException):
     pass
 
 
+class TogglMultipleResults(TogglException):
+    pass
+
+
 class TogglCliException(TogglException, click.ClickException):
     pass
