@@ -12,7 +12,7 @@ from six import with_metaclass
 from builtins import int
 
 
-def compare_dicts(a,b):
+def compare_dicts(a, b):
     """
     Will compare dicts A and B.
     Dict A's keys and values must match keys in B, but not other way.
@@ -59,10 +59,13 @@ class TogglSet(object):
         if len(entries) > 1:
             raise TogglMultipleResults()
 
+        if not entries:
+            return None
+
         return entries[0]
 
     def filter(self, **conditions):
-        fetched_entities = utils.toggl("/{}".format(self.entity_cls._ENTITY_URL), 'get')
+        fetched_entities = utils.toggl("/{}s".format(self.entity_cls._ENTITY_URL), 'get')
 
         if fetched_entities is None:
             return []
@@ -79,7 +82,7 @@ class TogglSet(object):
     def all(self):
         entity_list = []
 
-        fetched_entities = utils.toggl("/{}".format(self.entity_cls._ENTITY_URL), 'get')
+        fetched_entities = utils.toggl("/{}s".format(self.entity_cls._ENTITY_URL), 'get')
 
         if fetched_entities is None:
             return []
@@ -111,20 +114,21 @@ class TogglEntityBase(ABCMeta):
 
 
 class TogglEntity(with_metaclass(TogglEntityBase, object)):
-
     _ENTITY_URL = None
+
+    _validate_workspace = True
 
     def __init__(self, entity_id=None, config=None):
         self.id = entity_id
-        self.config = config
+        self._config = config
 
     def save(self):
         self.validate()
 
         if self.id is not None:  # Update
-            utils.toggl("/{}/{}".format(self._ENTITY_URL, self.id), "put", self.json(), config=self.config)
+            utils.toggl("/{}s/{}".format(self._ENTITY_URL, self.id), "put", self.json(), config=self._config)
         else:  # Create
-            data = utils.toggl("/{}".format(self._ENTITY_URL), "post", self.json(), config=self.config)
+            data = utils.toggl("/{}s".format(self._ENTITY_URL), "post", self.json(), config=self._config)
             self.id = data['data']['id']  # Store the returned ID
 
     def delete(self):
@@ -138,19 +142,26 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
         return self.id == other.id
 
     def json(self):
-        return json.dumps(self.to_dict())
+        return json.dumps({self._ENTITY_URL: self.to_dict()})
 
     @abstractmethod
     def validate(self):
         pass
 
     def to_dict(self):
-        entity_dict = vars(self)
+        # Have to make copy, otherwise will modify directly instance's dict
+        entity_dict = json.loads(json.dumps(vars(self)))
 
-        try:  # New objects does not have ID
+        try:  # New objects does not have ID ==> try/except
             del entity_dict['id']
         except KeyError:
             pass
+
+        # Protected attributes are not serialized
+        keys = list(entity_dict.keys())
+        for key in keys:
+            if key.startswith('_'):
+                del entity_dict[key]
 
         if hasattr(self, '_FILTERED_KEYS'):
             for key in self._FILTERED_KEYS:
@@ -176,12 +187,16 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
 # Entities definitions
 # ----------------------------------------------------------------------------
 class Client(TogglEntity):
-    _ENTITY_URL = "clients"
+    _ENTITY_URL = "client"
 
     def __init__(self, name, wid=None, note=None, config=None, **kwargs):
         self.name = name
         self.note = note
         self.wid = wid
+
+        if self.wid is None:
+            self._validate_workspace = False
+            self.wid = User().get('default_wid')
 
         super(Client, self).__init__(config=config)
 
@@ -192,9 +207,11 @@ class Client(TogglEntity):
         if not isinstance(self.wid, int):
             raise TogglValidationException("Workspace ID must be an integer!")
 
-        if validate_workspace_existence and WorkspaceList().find_by_id(self.wid) is None:
+        if self._validate_workspace and validate_workspace_existence and WorkspaceList().find_by_id(self.wid) is None:
             raise TogglValidationException("Workspace ID does not exists!")
 
+    def __str__(self):
+        return "{} #{}".format(self.name, self.id)
 
 # ----------------------------------------------------------------------------
 # WorkspaceList

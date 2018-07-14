@@ -215,27 +215,55 @@ def add_time_entry(ctx, start, end, descr, project, workspace):
     utils.Logger.info('{} added'.format(descr))
 
 
-@cli.group('clients', short_help='clients management (default: listing)', invoke_without_command=True)
+@cli.group('clients', short_help='clients management')
 @click.pass_context
 def clients(ctx):
-    if ctx.invoked_subcommand is None:
-        for client in api.Client.objects.all():
-            # TODO: Add option for simple print without colors & machine readable format
-            click.echo("{} {}".format(
-                client.name,
-                click.style("[#{}]".format(client.id), fg="white", dim=1),
-            ))
+    pass
 
 
-@clients.command('create', short_help='create new client')
+@clients.command('add', short_help='create new client', help='asdf')
 @click.option('--name', '-n', prompt='Name of the client',
               help='Specifies the name of the client', )
 @click.option('--note', help='Specifies a note linked to the client', )
-@click.option('--workspace', '-w', help='Specifies a workspace where the client will be created', )
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.WorkspaceList, 'workspace'),
+              help='Specifies a workspace where the client will be created Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
-def add_client(ctx, name, note, workspace):
-    client = api.Client(name,)
+def clients_add(ctx, name, note, workspace):
+    client = api.Client(
+        name,
+        workspace['id'] if workspace else None,
+        note
+    )
 
+    client.save()
+    click.echo("Client '{}' with #{} created.".format(client.name, client.id))
+
+
+@clients.command('ls', short_help='list clients')
+@click.pass_context
+def clients_ls(ctx):
+    for client in api.Client.objects.all():
+        # TODO: Add option for simple print without colors & machine readable format
+        click.echo("{} {}".format(
+            client.name,
+            click.style("[#{}]".format(client.id), fg="white", dim=1),
+        ))
+
+
+@clients.command('get', short_help='retrieve details of a client')
+@click.argument('spec')
+@click.pass_context
+def clients_get(ctx, spec):
+    client = api.Client.objects.get(spec) or api.Client.objects.get(name=spec)
+
+    if client is not None:
+        click.echo("""{} #{}
+workspace: #{}
+note: {}
+""".format(client.name, client.id, client.wid, client.note))
+        exit(0)
+
+    click.echo("Client not found!", color='red')
 
 # ----------------------------------------------------------------------------
 # CLI
