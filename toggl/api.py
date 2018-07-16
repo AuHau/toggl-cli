@@ -112,12 +112,17 @@ class TogglEntityBase(ABCMeta):
 
 class TogglEntity(with_metaclass(TogglEntityBase, object)):
     _validate_workspace = True
+    _can_update = True
+    _can_delete = True
 
     def __init__(self, entity_id=None, config=None):
         self.id = entity_id
         self._config = config
 
     def save(self):
+        if not self._can_update:
+            raise TogglException("Saving this entity is not allowed!")
+
         self.validate()
 
         if self.id is not None:  # Update
@@ -127,6 +132,9 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
             self.id = data['data']['id']  # Store the returned ID
 
     def delete(self):
+        if not self._can_delete:
+            raise TogglException("Deleting this entity is not allowed!")
+
         utils.toggl("/{}/{}".format(self.get_url(), self.id), "delete")
         self.id = None  # Invalidate the object, so when save() is called after delete a new object is created
 
