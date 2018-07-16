@@ -33,7 +33,7 @@ def compare_dicts(a, b):
         if key not in b:
             return False
 
-        if a[key] != b[key]:
+        if str(a[key]) != str(b[key]):
             return False
 
     return True
@@ -132,7 +132,7 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
             self.id = data['data']['id']  # Store the returned ID
 
     def delete(self):
-        utils.toggl("/{}/{}".format(self._ENTITY_URL, self.id), "delete")
+        utils.toggl("/{}s/{}".format(self._ENTITY_URL, self.id), "delete")
         self.id = None  # Invalidate the object, so when save() is called after delete a new object is created
 
     def __cmp__(self, other):

@@ -265,6 +265,19 @@ note: {}
 
     click.echo("Client not found!", color='red')
 
+@clients.command('rm', short_help='delete a specific client')
+@click.argument('spec')
+@click.pass_context
+def clients_rm(ctx, spec):
+    client = api.Client.objects.get(spec) or api.Client.objects.get(name=spec)
+
+    if client is None:
+        click.echo("Client not found!", color='red')
+        exit(0)
+
+    client.delete()
+    click.echo("Client successfully deleted!")
+
 # ----------------------------------------------------------------------------
 # CLI
 # ----------------------------------------------------------------------------
