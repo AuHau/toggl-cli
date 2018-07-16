@@ -1,4 +1,5 @@
 import json
+import re
 import time
 
 import six
@@ -65,7 +66,7 @@ class TogglSet(object):
         return entries[0]
 
     def filter(self, **conditions):
-        fetched_entities = utils.toggl("/{}s".format(self.entity_cls._ENTITY_URL), 'get')
+        fetched_entities = utils.toggl("/{}".format(self.entity_cls.get_url()), 'get')
 
         if fetched_entities is None:
             return []
@@ -82,7 +83,7 @@ class TogglSet(object):
     def all(self):
         entity_list = []
 
-        fetched_entities = utils.toggl("/{}s".format(self.entity_cls._ENTITY_URL), 'get')
+        fetched_entities = utils.toggl("/{}".format(self.entity_cls.get_url()), 'get')
 
         if fetched_entities is None:
             return []
@@ -104,18 +105,12 @@ class TogglEntityBase(ABCMeta):
         if not parents:
             return new_class
 
-        url = attrs.get('_ENTITY_URL')
-        if url is None:
-            raise TogglException("The _ENTITY_URL attribute has to be set and not None!")
-
         setattr(new_class, 'objects', TogglSet(new_class))
 
         return new_class
 
 
 class TogglEntity(with_metaclass(TogglEntityBase, object)):
-    _ENTITY_URL = None
-
     _validate_workspace = True
 
     def __init__(self, entity_id=None, config=None):
@@ -126,13 +121,13 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
         self.validate()
 
         if self.id is not None:  # Update
-            utils.toggl("/{}s/{}".format(self._ENTITY_URL, self.id), "put", self.json(), config=self._config)
+            utils.toggl("/{}/{}".format(self.get_url(), self.id), "put", self.json(), config=self._config)
         else:  # Create
-            data = utils.toggl("/{}s".format(self._ENTITY_URL), "post", self.json(), config=self._config)
+            data = utils.toggl("/{}".format(self.get_url()), "post", self.json(), config=self._config)
             self.id = data['data']['id']  # Store the returned ID
 
     def delete(self):
-        utils.toggl("/{}s/{}".format(self._ENTITY_URL, self.id), "delete")
+        utils.toggl("/{}/{}".format(self.get_url(), self.id), "delete")
         self.id = None  # Invalidate the object, so when save() is called after delete a new object is created
 
     def __cmp__(self, other):
@@ -142,7 +137,17 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
         return self.id == other.id
 
     def json(self):
-        return json.dumps({self._ENTITY_URL: self.to_dict()})
+        return json.dumps({self.get_name(): self.to_dict()})
+
+    @classmethod
+    def get_name(cls):
+        name = cls.__name__
+        name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+
+    @classmethod
+    def get_url(cls):
+        return cls.get_name() + 's'
 
     @abstractmethod
     def validate(self):
