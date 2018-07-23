@@ -3,6 +3,7 @@ import re
 import time
 
 import six
+from requests import HTTPError
 from six.moves import urllib
 
 from toggl.exceptions import TogglValidationException, TogglException, TogglMultipleResults
@@ -41,8 +42,15 @@ def compare_dicts(a, b):
 
 
 class TogglSet(object):
-    def __init__(self, entity_cls):
+    def __init__(self, url, entity_cls):
+        self.url = url
         self.entity_cls = entity_cls
+
+    def build_list_url(self, wid):
+        return '/workspaces/{}/{}'.format(wid, self.url)
+
+    def build_detail_url(self, id):
+        return '/{}/{}'.format(self.url, id)
 
     def _convert_entity(self, raw_entity):
         entity_id = raw_entity.pop('id')
@@ -51,11 +59,15 @@ class TogglSet(object):
 
         return entity_object
 
-    def get(self, id=None, **conditions):
+    def get(self, id=None, config=None, **conditions):
         if id is not None:
-            conditions['id'] = id
+            try:
+                fetched_entity = utils.toggl(self.build_detail_url(id), 'get', config=config)
+                return self._convert_entity(fetched_entity['data'])
+            except HTTPError:
+                return None
 
-        entries = self.filter(**conditions)
+        entries = self.filter(config=config, **conditions)
 
         if len(entries) > 1:
             raise TogglMultipleResults()
@@ -65,29 +77,27 @@ class TogglSet(object):
 
         return entries[0]
 
-    def filter(self, **conditions):
-        fetched_entities = utils.toggl("/{}".format(self.entity_cls.get_url()), 'get')
+    def filter(self, wid=None, config=None, **conditions):
+        fetched_entities = self.all(wid, config)
 
         if fetched_entities is None:
             return []
 
         searched_entities = []
         for entity in fetched_entities:
-            if compare_dicts(conditions, entity):
-                searched_entities.append(
-                    self._convert_entity(entity)
-                )
+            if compare_dicts(conditions, entity.to_dict()):  # TODO: Usage of 'to_dict()' is not best
+                searched_entities.append(entity)
 
         return searched_entities
 
-    def all(self):
-        entity_list = []
-
-        fetched_entities = utils.toggl("/{}".format(self.entity_cls.get_url()), 'get')
+    def all(self, wid=None, config=None):
+        wid = wid or User().get('default_wid')
+        fetched_entities = utils.toggl(self.build_list_url(wid), 'get', config=config)
 
         if fetched_entities is None:
             return []
 
+        entity_list = []
         for entity in fetched_entities:
             entity_list.append(
                 self._convert_entity(entity)
@@ -105,7 +115,7 @@ class TogglEntityBase(ABCMeta):
         if not parents:
             return new_class
 
-        setattr(new_class, 'objects', TogglSet(new_class))
+        setattr(new_class, 'objects', TogglSet(new_class.get_url(), new_class))
 
         return new_class
 
@@ -115,9 +125,14 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
     _can_update = True
     _can_delete = True
 
-    def __init__(self, entity_id=None, config=None):
+    def __init__(self, entity_id=None, wid=None, config=None):
         self.id = entity_id
+        self.wid = wid
         self._config = config
+
+        if self.wid is None:
+            self._validate_workspace = False
+            self.wid = User().get('default_wid')
 
     def save(self):
         if not self._can_update:
@@ -158,8 +173,15 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
         return cls.get_name() + 's'
 
     @abstractmethod
-    def validate(self):
-        pass
+    def validate(self, validate_workspace_existence=True):
+        if self._validate_workspace and validate_workspace_existence and WorkspaceList().find_by_id(self.wid) is None:
+            raise TogglValidationException("Workspace ID does not exists!")
+
+        if self.wid is None:
+            raise TogglValidationException("Workspace is required!")
+
+        if not isinstance(self.wid, int):
+            raise TogglValidationException("Workspace ID must be an integer!")
 
     def to_dict(self):
         # Have to make copy, otherwise will modify directly instance's dict
@@ -200,28 +222,18 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
 # Entities definitions
 # ----------------------------------------------------------------------------
 class Client(TogglEntity):
-    _ENTITY_URL = "client"
 
     def __init__(self, name, wid=None, note=None, config=None, **kwargs):
         self.name = name
         self.note = note
-        self.wid = wid
 
-        if self.wid is None:
-            self._validate_workspace = False
-            self.wid = User().get('default_wid')
-
-        super(Client, self).__init__(config=config)
+        super(Client, self).__init__(wid=wid, config=config)
 
     def validate(self, validate_workspace_existence=True):
-        if self.name is None or self.wid is None:
-            raise TogglValidationException("Name and Workspace ID are required!")
+        super(Client, self).validate(validate_workspace_existence)
 
-        if not isinstance(self.wid, int):
-            raise TogglValidationException("Workspace ID must be an integer!")
-
-        if self._validate_workspace and validate_workspace_existence and WorkspaceList().find_by_id(self.wid) is None:
-            raise TogglValidationException("Workspace ID does not exists!")
+        if self.name is None:
+            raise TogglValidationException("Name is required!")
 
     def __str__(self):
         return "{} #{}".format(self.name, self.id)
