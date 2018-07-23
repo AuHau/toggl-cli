@@ -120,10 +120,16 @@ class TogglEntityBase(ABCMeta):
         return new_class
 
 
+# TODO: Premium fields and check for current Workspace to be Premium
 class TogglEntity(with_metaclass(TogglEntityBase, object)):
     _validate_workspace = True
     _can_update = True
     _can_delete = True
+
+    required_fields = tuple()
+    int_fields = tuple()
+    float_fields = tuple()
+    bool_fields = tuple()
 
     def __init__(self, entity_id=None, wid=None, config=None):
         self.id = entity_id
@@ -172,16 +178,31 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
     def get_url(cls):
         return cls.get_name() + 's'
 
-    @abstractmethod
     def validate(self, validate_workspace_existence=True):
         if self._validate_workspace and validate_workspace_existence and WorkspaceList().find_by_id(self.wid) is None:
             raise TogglValidationException("Workspace ID does not exists!")
 
         if self.wid is None:
-            raise TogglValidationException("Workspace is required!")
+            raise TogglValidationException("Workspace ID is required!")
 
         if not isinstance(self.wid, int):
             raise TogglValidationException("Workspace ID must be an integer!")
+
+        for field in self.required_fields:
+            if getattr(self, field) is None:
+                raise TogglValidationException("Attribute '{}' is required!".format(field))
+
+        for field in self.int_fields:
+            if getattr(self, field) is not None and not isinstance(getattr(self, field), int):
+                raise TogglValidationException("Attribute '{}' has to be integer!".format(field))
+
+        for field in self.bool_fields:
+            if getattr(self, field) is not None and not isinstance(getattr(self, field), bool):
+                raise TogglValidationException("Attribute '{}' has to be boolean!".format(field))
+
+        for field in self.float_fields:
+            if getattr(self, field) is not None and not isinstance(getattr(self, field), float):
+                raise TogglValidationException("Attribute '{}' has to be float!".format(field))
 
     def to_dict(self):
         # Have to make copy, otherwise will modify directly instance's dict
@@ -223,78 +244,46 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
 # ----------------------------------------------------------------------------
 class Client(TogglEntity):
 
+    required_fields = ('name',)
+
     def __init__(self, name, wid=None, note=None, config=None, **kwargs):
         self.name = name
         self.note = note
 
         super(Client, self).__init__(wid=wid, config=config)
 
-    def validate(self, validate_workspace_existence=True):
-        super(Client, self).validate(validate_workspace_existence)
-
-        if self.name is None:
-            raise TogglValidationException("Name is required!")
-
     def __str__(self):
         return "{} #{}".format(self.name, self.id)
 
-# ----------------------------------------------------------------------------
-# WorkspaceList
-# ----------------------------------------------------------------------------
-class WorkspaceList(six.Iterator):
-    """
-    A list of workspace. A workspace object is a dictionary as documented at
-    https://github.com/toggl/toggl_api_docs/blob/master/chapters/workspaces.md
-    """
 
-    def __init__(self, config=None):
-        """
-        Fetches the list of workspaces from toggl.
-        """
-        self.config = config
-        self.workspace_list = utils.toggl("/workspaces", "get", config=config)
+class Project(TogglEntity):
 
-    def find_by_id(self, wid):
-        """
-        Returns the workspace object with the given id, or None.
-        """
-        for workspace in self:
-            if workspace['id'] == wid:
-                return workspace
-        return None
+    required_fields = ('name',)
+    bool_fields = ('active', 'is_private', 'billable', 'auto_estimates')
+    int_fields = ('estimated_hours', 'color')
+    float_fields = ('rate',)
 
-    def find_by_name(self, name_prefix):
-        """
-        Returns the workspace object with the given name (or prefix), or None.
-        """
-        for workspace in self:
-            if workspace['name'].startswith(name_prefix):
-                return workspace
-        return None
+    def __init__(self, name, wid=None, cid=None, active=True, is_private=True,
+                 billable=True, auto_estimates=False,
+                 estimated_hours=None, color=None, rate=None, config=None, **kwargs):
 
-    def __iter__(self):
-        """
-        Start iterating over the workspaces.
-        """
-        self.iter_index = 0
-        return self
+        self.name = name
+        self.cid = cid
+        self.active = active
+        self.is_private = is_private
+        self.billable = billable
+        self.auto_estimates = auto_estimates
+        self.estimated_hours = estimated_hours
+        self.color = color
+        self.rate = rate
 
-    def __next__(self):
-        """
-        Returns the next workspace.
-        """
-        if not self.workspace_list or self.iter_index >= len(self.workspace_list):
-            raise StopIteration
-        else:
-            self.iter_index += 1
-            return self.workspace_list[self.iter_index - 1]
+        super(Project, self).__init__(wid=wid, config=config)
 
-    def __str__(self):
-        """Formats the project list as a string."""
-        s = ""
-        for workspace in self:
-            s = s + ":{}\n".format(workspace['name'])
-        return s.rstrip()  # strip trailing \n
+    def validate(self, validate_workspace_existence=True):
+        super(Project, self).validate(validate_workspace_existence)
+
+        if self.cid is not None and not Client.objects.get(self.cid):
+            raise TogglValidationException("Customer specified by ID does not exists!")
 
 
 # ----------------------------------------------------------------------------
@@ -380,6 +369,66 @@ class ProjectList(six.Iterator):
                         client_name = " - {}".format(client['name'])
             s = s + ":{} @{}{}\n".format(self.workspace['name'], project['name'], client_name)
         return s.rstrip()  # strip trailing \n
+
+
+# ----------------------------------------------------------------------------
+# WorkspaceList
+# ----------------------------------------------------------------------------
+class WorkspaceList(six.Iterator):
+    """
+    A list of workspace. A workspace object is a dictionary as documented at
+    https://github.com/toggl/toggl_api_docs/blob/master/chapters/workspaces.md
+    """
+
+    def __init__(self, config=None):
+        """
+        Fetches the list of workspaces from toggl.
+        """
+        self.config = config
+        self.workspace_list = utils.toggl("/workspaces", "get", config=config)
+
+    def find_by_id(self, wid):
+        """
+        Returns the workspace object with the given id, or None.
+        """
+        for workspace in self:
+            if workspace['id'] == wid:
+                return workspace
+        return None
+
+    def find_by_name(self, name_prefix):
+        """
+        Returns the workspace object with the given name (or prefix), or None.
+        """
+        for workspace in self:
+            if workspace['name'].startswith(name_prefix):
+                return workspace
+        return None
+
+    def __iter__(self):
+        """
+        Start iterating over the workspaces.
+        """
+        self.iter_index = 0
+        return self
+
+    def __next__(self):
+        """
+        Returns the next workspace.
+        """
+        if not self.workspace_list or self.iter_index >= len(self.workspace_list):
+            raise StopIteration
+        else:
+            self.iter_index += 1
+            return self.workspace_list[self.iter_index - 1]
+
+    def __str__(self):
+        """Formats the project list as a string."""
+        s = ""
+        for workspace in self:
+            s = s + ":{}\n".format(workspace['name'])
+        return s.rstrip()  # strip trailing \n
+
 
 
 # ----------------------------------------------------------------------------

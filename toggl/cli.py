@@ -99,6 +99,7 @@ class ResourceType(click.ParamType):
     find_by_id() for integer value or find_by_name() for string value and return
     the appropriate entry.
     """
+    name = 'resource-type'
 
     def __init__(self, resource, resource_name=None):
         self._resource = resource
@@ -131,6 +132,48 @@ class ResourceType(click.ParamType):
 
         if resource is None:
             self.fail("Unknown {}'s name!".format(self._resource_name), param, ctx)
+
+        return resource
+
+
+class NewResourceType(click.ParamType):
+    """
+    Takes an Resource class and based on the type of value it calls either
+    find_by_id() for integer value or find_by_name() for string value and return
+    the appropriate entry.
+    """
+    name = 'resource-type'
+
+    def __init__(self, resource_cls):
+        self._resource_cls = resource_cls
+
+    def convert(self, value, param, ctx):
+        try:
+            try:
+                resource_id = int(value)
+                return self._convert_id(resource_id, param, ctx)
+            except ValueError:
+                pass
+
+            return self._convert_name(value, param, ctx)
+
+        except AttributeError:
+            raise TogglCliException("The passed resource class {} does not have expected interface! "
+                                    "(find_by_id and find_by_name)".format(self._resource_cls))
+
+    def _convert_id(self, resource_id, param, ctx):
+        resource = self._resource_cls.objects.get(resource_id)
+
+        if resource is None:
+            self.fail("Unknown {}'s ID!".format(self._resource_cls.get_name()), param, ctx)
+
+        return resource
+
+    def _convert_name(self, value, param, ctx):
+        resource = self._resource_cls.objects.get(name=value)
+
+        if resource is None:
+            self.fail("Unknown {}'s name!".format(self._resource_cls.get_name()), param, ctx)
 
         return resource
 
@@ -215,18 +258,22 @@ def add_time_entry(ctx, start, end, descr, project, workspace):
     utils.Logger.info('{} added'.format(descr))
 
 
+# ----------------------------------------------------------------------------
+# Clients
+# ----------------------------------------------------------------------------
+
 @cli.group('clients', short_help='clients management')
 @click.pass_context
 def clients(ctx):
     pass
 
 
-@clients.command('add', short_help='create new client', help='asdf')
+@clients.command('add', short_help='create new client')
 @click.option('--name', '-n', prompt='Name of the client',
               help='Specifies the name of the client', )
 @click.option('--note', help='Specifies a note linked to the client', )
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.WorkspaceList, 'workspace'),
-              help='Specifies a workspace where the client will be created Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
+              help='Specifies a workspace where the client will be created. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
 def clients_add(ctx, name, note, workspace):
     client = api.Client(
@@ -278,6 +325,101 @@ def clients_rm(ctx, spec):
 
     client.delete()
     click.echo("Client successfully deleted!")
+
+
+# ----------------------------------------------------------------------------
+# Projects
+# ----------------------------------------------------------------------------
+
+@cli.group('projects', short_help='projects management')
+@click.pass_context
+def projects(ctx):
+    pass
+
+
+@projects.command('add', short_help='create new project')
+@click.option('--name', '-n', prompt='Name of the project',
+              help='Specifies the name of the project', )
+@click.option('--client', '-c', envvar="TOGGL_CLIENT", type=NewResourceType(api.Client),
+              help='Specifies a client to which the project will be assigned to. Can be ID or name of the client ('
+                   'ENV: TOGGL_CLIENT)')
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.WorkspaceList, 'workspace'),
+              help='Specifies a workspace where the project will be created. Can be ID or name of the workspace (ENV: '
+                   'TOGGL_WORKSPACE)')
+@click.option('--public', '-p', is_flag=True, help='Specifies whether project is accessible for all workspace users ('
+                                             '=public) or just only project\'s users.')
+@click.option('--billable/--no-billable', default=True, help='Specifies whether project is billable or not. '
+                                                             '(Premium only)')
+@click.option('--auto-estimates/--no-auto-estimates', default=False, help='Specifies whether the estimated hours are automatically calculated based on task estimations or manually fixed based on the value of \'estimated_hours\' ')
+@click.option('--rate', '-r', type=click.FLOAT, help='Hourly rate of the project (Premium only)')
+@click.option('--color', type=click.INT, help='ID of color used for the project')
+@click.pass_context
+def projects_add(ctx, name, client, workspace, public, billable, auto_estimates, rate, color):
+    project = api.Project(
+        name,
+        workspace['id'] if workspace else None,
+        client['id'] if client else None,
+        True,
+        not public,
+        billable,
+        auto_estimates,
+        None,
+        color,
+        rate
+    )
+
+    project.save()
+    click.echo("Project '{}' with #{} created.".format(project.name, project.id))
+
+
+@projects.command('ls', short_help='list projects')
+@click.pass_context
+def projects_ls(ctx):
+    for client in api.Project.objects.all():
+        # TODO: Add option for simple print without colors & machine readable format
+        click.echo("{} {}".format(
+            client.name,
+            click.style("[#{}]".format(client.id), fg="white", dim=1),
+        ))
+
+
+@projects.command('get', short_help='retrieve details of a client')
+@click.argument('spec')
+@click.pass_context
+def projects_get(ctx, spec):
+    project = api.Project.objects.get(spec) or api.Project.objects.get(name=spec)
+
+    if project is not None:
+        click.echo("""{} #{}
+workspace: #{}
+customer: #{}
+active: {}
+is private: {}
+is billable: {}
+auto estimates: {}
+estimated hours: {}
+color: {}
+rate: {}
+""".format(project.name, project.id, project.wid, project.cid, project.active, project.is_private, project.billable,
+           project.auto_estimates, project.estimated_hours, project.color, project.rate))
+        exit(0)
+
+    click.echo("Project not found!", color='red')
+
+
+@projects.command('rm', short_help='delete a specific client')
+@click.argument('spec')
+@click.pass_context
+def projects_rm(ctx, spec):
+    project = api.Project.objects.get(spec) or api.Project.objects.get(name=spec)
+
+    if project is None:
+        click.echo("Project not found!", color='red')
+        exit(0)
+
+    project.delete()
+    click.echo("Project successfully deleted!")
+
 
 # ----------------------------------------------------------------------------
 # CLI
