@@ -101,49 +101,6 @@ class ResourceType(click.ParamType):
     """
     name = 'resource-type'
 
-    def __init__(self, resource, resource_name=None):
-        self._resource = resource
-        self._resource_name = resource_name
-
-    def convert(self, value, param, ctx):
-        try:
-            try:
-                resource_id = int(value)
-                return self._convert_id(resource_id, param, ctx)
-            except ValueError:
-                pass
-
-            return self._convert_name(value, param, ctx)
-
-        except AttributeError:
-            raise TogglCliException("The passed resource class {} does not have expected interface! "
-                                    "(find_by_id and find_by_name)".format(self._resource))
-
-    def _convert_id(self, resource_id, param, ctx):
-        resource = self._resource().find_by_id(resource_id)
-
-        if resource is None:
-            self.fail("Unknown {}'s ID!".format(self._resource_name), param, ctx)
-
-        return resource
-
-    def _convert_name(self, value, param, ctx):
-        resource = self._resource().find_by_name(value)
-
-        if resource is None:
-            self.fail("Unknown {}'s name!".format(self._resource_name), param, ctx)
-
-        return resource
-
-
-class NewResourceType(click.ParamType):
-    """
-    Takes an Resource class and based on the type of value it calls either
-    find_by_id() for integer value or find_by_name() for string value and return
-    the appropriate entry.
-    """
-    name = 'resource-type'
-
     def __init__(self, resource_cls):
         self._resource_cls = resource_cls
 
@@ -191,7 +148,7 @@ def entity_detail(cls, spec):
     entity = cls.objects.get(spec) or cls.objects.get(name=spec)
 
     if entity is None:
-        click.echo("{} not found!".format(cls.__name__.capitalize()), color='red')
+        click.echo("{} not found!".format(cls.get_name().capitalize()), color='red')
         exit(1)
 
     mapped_fields = {field.key: field for _, field in cls.mapping_fields.items()}
@@ -224,11 +181,11 @@ def entity_remove(cls, spec):
     entity = cls.objects.get(spec) or cls.objects.get(name=spec)
 
     if entity is None:
-        click.echo("{} not found!".format(cls.__name__.capitalize()), color='red')
+        click.echo("{} not found!".format(cls.get_name().capitalize()), color='red')
         exit(1)
 
     entity.delete()
-    click.echo("{} successfully deleted!".format(cls.__name__.capitalize()))
+    click.echo("{} successfully deleted!".format(cls.get_name().capitalize()))
 
 
 # ----------------------------------------------------------------------------
@@ -272,9 +229,9 @@ def cli(ctx, quiet, verbose, debug, config):
 @click.argument('start', type=DateTimeType(allow_now=True))
 @click.argument('end', type=DurationType())
 @click.argument('descr')
-@click.option('--project', '-p', envvar="TOGGL_PROJECT", type=NewResourceType(api.Project),
+@click.option('--project', '-p', envvar="TOGGL_PROJECT", type=ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
-@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.WorkspaceList, 'workspace'),
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.Workspace),
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
 def add_time_entry(ctx, start, end, descr, project, workspace):
@@ -325,7 +282,7 @@ def clients(ctx):
 @click.option('--name', '-n', prompt='Name of the client',
               help='Specifies the name of the client', )
 @click.option('--note', help='Specifies a note linked to the client', )
-@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.WorkspaceList, 'workspace'),
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.Workspace),
               help='Specifies a workspace where the client will be created. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
 def clients_add(ctx, name, note, workspace):
@@ -371,10 +328,10 @@ def projects(ctx):
 @projects.command('add', short_help='create new project')
 @click.option('--name', '-n', prompt='Name of the project',
               help='Specifies the name of the project', )
-@click.option('--client', '-c', envvar="TOGGL_CLIENT", type=NewResourceType(api.Client),
+@click.option('--client', '-c', envvar="TOGGL_CLIENT", type=ResourceType(api.Client),
               help='Specifies a client to which the project will be assigned to. Can be ID or name of the client ('
                    'ENV: TOGGL_CLIENT)')
-@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.WorkspaceList, 'workspace'),
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.Workspace),
               help='Specifies a workspace where the project will be created. Can be ID or name of the workspace (ENV: '
                    'TOGGL_WORKSPACE)')
 @click.option('--public', '-p', is_flag=True, help='Specifies whether project is accessible for all workspace users ('

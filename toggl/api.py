@@ -178,7 +178,7 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
 
     def validate(self, validate_workspace_existence=True):
         if not self.get_name() == 'Workspace':
-            if self._validate_workspace and validate_workspace_existence and WorkspaceList().find_by_id(self.wid) is None:
+            if self._validate_workspace and validate_workspace_existence and Workspace.objects.get(self.wid) is None:
                 raise TogglValidationException("Workspace ID does not exists!")
 
             if self.wid is None:
@@ -254,6 +254,9 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
         else:
             raise TogglException('Unknown cardinality \'{}\''.format(mapping.cardinality))
 
+    def __str__(self):
+        return "{} #{}: {}".format(self.get_name().capitalize(), self.id, self.name)
+
 
 # ----------------------------------------------------------------------------
 # Entities definitions
@@ -266,43 +269,6 @@ class Client(TogglEntity):
         self.note = note
 
         super(Client, self).__init__(wid=wid, config=config)
-
-    def __str__(self):
-        return "Client #{}: {".format(self.name, self.id)
-
-
-class Project(TogglEntity):
-    required_fields = {'name', }
-    bool_fields = {'active', 'is_private', 'billable', 'auto_estimates'}
-    int_fields = {'estimated_hours', 'color'}
-    float_fields = {'rate', }
-    mapping_fields = {
-        'client': MappedField('cid', 'client', Client, 'one')
-    }
-
-    def __init__(self, name, wid=None, cid=None, active=True, is_private=True,
-                 billable=True, auto_estimates=False,
-                 estimated_hours=None, color=None, rate=None, config=None, **kwargs):
-        self.name = name
-        self.cid = cid
-        self.active = active
-        self.is_private = is_private
-        self.billable = billable
-        self.auto_estimates = auto_estimates
-        self.estimated_hours = estimated_hours
-        self.color = color
-        self.rate = rate
-
-        super(Project, self).__init__(wid=wid, config=config)
-
-    def validate(self, validate_workspace_existence=True):
-        super(Project, self).validate(validate_workspace_existence)
-
-        if self.cid is not None and not Client.objects.get(self.cid):
-            raise TogglValidationException("Customer specified by ID does not exists!")
-
-    def __str__(self):
-        return "Project #{}: {}".format(self.id, self.name)
 
 
 class WorkspaceSet(TogglSet):
@@ -333,70 +299,40 @@ class Workspace(TogglEntity):
 
         super(Workspace, self).__init__(config=config)
 
-    def __str__(self):
-        return "Workspace #{}: {}".format(self.id, self.name)
-
 
 Workspace.objects = WorkspaceSet('/workspaces', Workspace)
 
 
-# ----------------------------------------------------------------------------
-# WorkspaceList
-# ----------------------------------------------------------------------------
-class WorkspaceList(six.Iterator):
-    """
-    A list of workspace. A workspace object is a dictionary as documented at
-    https://github.com/toggl/toggl_api_docs/blob/master/chapters/workspaces.md
-    """
+class Project(TogglEntity):
+    required_fields = {'name', }
+    bool_fields = {'active', 'is_private', 'billable', 'auto_estimates'}
+    int_fields = {'estimated_hours', 'color'}
+    float_fields = {'rate', }
+    mapping_fields = {
+        'client': MappedField('cid', 'client', Client, 'one'),
+        'workspace': MappedField('wid', 'workspace', Workspace, 'one'),
+    }
 
-    def __init__(self, config=None):
-        """
-        Fetches the list of workspaces from toggl.
-        """
-        self.config = config
-        self.workspace_list = utils.toggl("/workspaces", "get", config=config)
+    def __init__(self, name, wid=None, cid=None, active=True, is_private=True,
+                 billable=True, auto_estimates=False,
+                 estimated_hours=None, color=None, rate=None, config=None, **kwargs):
+        self.name = name
+        self.cid = cid
+        self.active = active
+        self.is_private = is_private
+        self.billable = billable
+        self.auto_estimates = auto_estimates
+        self.estimated_hours = estimated_hours
+        self.color = color
+        self.rate = rate
 
-    def find_by_id(self, wid):
-        """
-        Returns the workspace object with the given id, or None.
-        """
-        for workspace in self:
-            if workspace['id'] == wid:
-                return workspace
-        return None
+        super(Project, self).__init__(wid=wid, config=config)
 
-    def find_by_name(self, name_prefix):
-        """
-        Returns the workspace object with the given name (or prefix), or None.
-        """
-        for workspace in self:
-            if workspace['name'].startswith(name_prefix):
-                return workspace
-        return None
+    def validate(self, validate_workspace_existence=True):
+        super(Project, self).validate(validate_workspace_existence)
 
-    def __iter__(self):
-        """
-        Start iterating over the workspaces.
-        """
-        self.iter_index = 0
-        return self
-
-    def __next__(self):
-        """
-        Returns the next workspace.
-        """
-        if not self.workspace_list or self.iter_index >= len(self.workspace_list):
-            raise StopIteration
-        else:
-            self.iter_index += 1
-            return self.workspace_list[self.iter_index - 1]
-
-    def __str__(self):
-        """Formats the project list as a string."""
-        s = ""
-        for workspace in self:
-            s = s + ":{}\n".format(workspace['name'])
-        return s.rstrip()  # strip trailing \n
+        if self.cid is not None and not Client.objects.get(self.cid):
+            raise TogglValidationException("Client specified by ID does not exists!")
 
 
 # ----------------------------------------------------------------------------
