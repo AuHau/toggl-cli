@@ -178,6 +178,59 @@ class NewResourceType(click.ParamType):
         return resource
 
 
+def entity_listing(cls):
+    for entity in cls.objects.all():
+        # TODO: Add option for simple print without colors & machine readable format
+        click.echo("{} {}".format(
+            entity.name,
+            click.style("[#{}]".format(entity.id), fg="white", dim=1),
+        ))
+
+
+def entity_detail(cls, spec):
+    entity = cls.objects.get(spec) or cls.objects.get(name=spec)
+
+    if entity is None:
+        click.echo("{} not found!".format(cls.__name__.capitalize()), color='red')
+        exit(1)
+
+    mapped_fields = {field.key: field for _, field in cls.mapping_fields.items()}
+    entity_dict = entity.to_dict()
+    del entity_dict['name']
+
+    entity_string = ''
+    for key, value in sorted(entity_dict.items()):
+        if key in mapped_fields:
+            mapping = mapped_fields[key]
+            entity_string += '\n{}: {}'.format(
+                mapping.attr.replace('_', ' '),
+                getattr(entity, mapping.attr).name
+            )
+            continue
+
+        entity_string += '\n{}: {}'.format(
+            key.replace('_', ' '),
+            value
+        )
+
+    click.echo("""{} {}
+{}""".format(
+        click.style(entity.name, fg="green"),
+        click.style('#' + str(entity.id), fg="green", dim=1),
+        entity_string[1:]))
+
+def entity_remove(cls, spec):
+    entity = cls.objects.get(spec) or cls.objects.get(name=spec)
+
+    if entity is None:
+        click.echo("{} not found!".format(cls.__name__.capitalize()), color='red')
+        exit(1)
+
+    entity.delete()
+    click.echo("{} successfully deleted!".format(cls.__name__.capitalize()))
+
+
+
 # ----------------------------------------------------------------------------
 # NEW CLI
 # ----------------------------------------------------------------------------
@@ -289,43 +342,21 @@ def clients_add(ctx, name, note, workspace):
 @clients.command('ls', short_help='list clients')
 @click.pass_context
 def clients_ls(ctx):
-    for client in api.Client.objects.all():
-        # TODO: Add option for simple print without colors & machine readable format
-        click.echo("{} {}".format(
-            client.name,
-            click.style("[#{}]".format(client.id), fg="white", dim=1),
-        ))
+    entity_listing(api.Client)
 
 
 @clients.command('get', short_help='retrieve details of a client')
 @click.argument('spec')
 @click.pass_context
 def clients_get(ctx, spec):
-    client = api.Client.objects.get(spec) or api.Client.objects.get(name=spec)
-
-    if client is not None:
-        click.echo("""{} #{}
-workspace: #{}
-note: {}
-""".format(client.name, client.id, client.wid, client.note))
-        exit(0)
-
-    click.echo("Client not found!", color='red')
+    entity_detail(api.Client, spec)
 
 
 @clients.command('rm', short_help='delete a specific client')
 @click.argument('spec')
 @click.pass_context
 def clients_rm(ctx, spec):
-    client = api.Client.objects.get(spec) or api.Client.objects.get(name=spec)
-
-    if client is None:
-        click.echo("Client not found!", color='red')
-        exit(0)
-
-    client.delete()
-    click.echo("Client successfully deleted!")
-
+    entity_remove(api.Client, spec)
 
 # ----------------------------------------------------------------------------
 # Projects
@@ -375,51 +406,21 @@ def projects_add(ctx, name, client, workspace, public, billable, auto_estimates,
 @projects.command('ls', short_help='list projects')
 @click.pass_context
 def projects_ls(ctx):
-    for project in api.Project.objects.all():
-        # TODO: Add option for simple print without colors & machine readable format
-        click.echo("{} {}".format(
-            project.name,
-            click.style("[#{}]".format(project.id), fg="white", dim=1),
-        ))
+    entity_listing(api.Project)
 
 
-@projects.command('get', short_help='retrieve details of a client')
+@projects.command('get', short_help='retrieve details of a project')
 @click.argument('spec')
 @click.pass_context
 def projects_get(ctx, spec):
-    project = api.Project.objects.get(spec) or api.Project.objects.get(name=spec)
-
-    if project is None:
-        click.echo("Project not found!", color='red')
-        exit(1)
-
-    client = project.client.name if project.client is not None else 'None'
-
-    click.echo("""{} #{}
-workspace: #{}
-client: {}
-active: {}
-is private: {}
-is billable: {}
-auto estimates: {}
-estimated hours: {}
-color: {}
-rate: {}""".format(project.name, project.id, project.wid, client, project.active, project.is_private, project.billable,
-           project.auto_estimates, project.estimated_hours, project.color, project.rate))
+    entity_detail(api.Project, spec)
 
 
 @projects.command('rm', short_help='delete a specific client')
 @click.argument('spec')
 @click.pass_context
 def projects_rm(ctx, spec):
-    project = api.Project.objects.get(spec) or api.Project.objects.get(name=spec)
-
-    if project is None:
-        click.echo("Project not found!", color='red')
-        exit(0)
-
-    project.delete()
-    click.echo("Project successfully deleted!")
+    entity_remove(api.Project, spec)
 
 
 # ----------------------------------------------------------------------------
