@@ -219,7 +219,7 @@ def cli(ctx, quiet, verbose, debug, config):
 @click.argument('start', type=DateTimeType(allow_now=True))
 @click.argument('end', type=DurationType())
 @click.argument('descr')
-@click.option('--project', '-p', envvar="TOGGL_PROJECT", type=ResourceType(api.ProjectList, 'project'),
+@click.option('--project', '-p', envvar="TOGGL_PROJECT", type=NewResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.WorkspaceList, 'workspace'),
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
