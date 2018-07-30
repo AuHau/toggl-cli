@@ -486,7 +486,7 @@ def toggl(url, method, data=None, headers=None, config=None):
     else:
         raise NotImplementedError('HTTP method "{}" not implemented.'.format(method))
 
-    # TODO: Better error handling
+    # TODO: Better error handling (eq. Toggl's custom Exceptions)
     r.raise_for_status()  # raise exception on error
     return json.loads(r.text)
 

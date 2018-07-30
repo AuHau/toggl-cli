@@ -14,28 +14,21 @@ from six import with_metaclass
 from builtins import int
 
 
-def compare_dicts(a, b):
+def evaluate_conditions(conditions, entity):
     """
-    Will compare dicts A and B.
-    Dict A's keys and values must match keys in B, but not other way.
+    Will compare conditions dict and entity.
+    Condition's keys and values must match the entities attributes, but not the other way around.
 
-    >>> compare_dicts({'x':123, 'y':456}, {'x':123, 'y':456})
-    True
-    >>> compare_dicts({'x':123, 'y':456}, {'x':123, 'y':456, 'z':789})
-    True
-    >>> compare_dicts({'x':123, 'y':456}, {'x':123, 'z':789})
-    False
-
-    :param a: dict
-    :param b: dict
+    :param entity: TogglEntity
+    :param conditions: dict
     :return:
     :rtype: bool
     """
-    for key in a:
-        if key not in b:
+    for key in conditions:
+        if not getattr(entity, key, False):
             return False
 
-        if str(a[key]) != str(b[key]):
+        if str(getattr(entity, key)) != str(conditions[key]):
             return False
 
     return True
@@ -83,12 +76,7 @@ class TogglSet(object):
         if fetched_entities is None:
             return []
 
-        searched_entities = []
-        for entity in fetched_entities:
-            if compare_dicts(conditions, entity.to_dict()):  # TODO: Usage of 'to_dict()' is not best
-                searched_entities.append(entity)
-
-        return searched_entities
+        return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity)]
 
     def all(self, wid=None, config=None):
         wid = wid or User().get('default_wid')
