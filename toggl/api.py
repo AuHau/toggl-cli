@@ -14,7 +14,7 @@ from six import with_metaclass
 
 from builtins import int
 
-MappedField = namedtuple('MappedField', ['key', 'cls', 'cardinality'])
+MappedField = namedtuple('MappedField', ['key', 'attr', 'cls', 'cardinality'])
 
 
 def evaluate_conditions(conditions, entity):
@@ -114,6 +114,7 @@ class TogglEntityBase(ABCMeta):
 # TODO: Premium fields and check for current Workspace to be Premium
 class TogglEntity(with_metaclass(TogglEntityBase, object)):
     _validate_workspace = True
+    _can_create = True
     _can_update = True
     _can_delete = True
 
@@ -125,16 +126,21 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
 
     def __init__(self, entity_id=None, wid=None, config=None):
         self.id = entity_id
-        self.wid = wid
         self._config = config
 
-        if self.wid is None:
+        if wid is None:
+            if not self.get_name() == 'workspace':
+                self.wid = User().get('default_wid')
             self._validate_workspace = False
-            self.wid = User().get('default_wid')
+        else:
+            self.wid = wid
 
     def save(self):
-        if not self._can_update:
-            raise TogglException("Saving this entity is not allowed!")
+        if not self._can_update and self.id is not None:
+            raise TogglException("Updating this entity is not allowed!")
+
+        if not self._can_create and self.id is None:
+            raise TogglException("Creating this entity is not allowed!")
 
         self.validate()
 
@@ -171,14 +177,15 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
         return cls.get_name() + 's'
 
     def validate(self, validate_workspace_existence=True):
-        if self._validate_workspace and validate_workspace_existence and WorkspaceList().find_by_id(self.wid) is None:
-            raise TogglValidationException("Workspace ID does not exists!")
+        if not self.get_name() == 'Workspace':
+            if self._validate_workspace and validate_workspace_existence and WorkspaceList().find_by_id(self.wid) is None:
+                raise TogglValidationException("Workspace ID does not exists!")
 
-        if self.wid is None:
-            raise TogglValidationException("Workspace ID is required!")
+            if self.wid is None:
+                raise TogglValidationException("Workspace ID is required!")
 
-        if not isinstance(self.wid, int):
-            raise TogglValidationException("Workspace ID must be an integer!")
+            if not isinstance(self.wid, int):
+                raise TogglValidationException("Workspace ID must be an integer!")
 
         for field in self.required_fields:
             if getattr(self, field) is None:
@@ -261,16 +268,16 @@ class Client(TogglEntity):
         super(Client, self).__init__(wid=wid, config=config)
 
     def __str__(self):
-        return "Client #{}: {}".format(self.name, self.id)
+        return "Client #{}: {".format(self.name, self.id)
 
 
 class Project(TogglEntity):
-    required_fields = ('name',)
-    bool_fields = ('active', 'is_private', 'billable', 'auto_estimates')
-    int_fields = ('estimated_hours', 'color')
-    float_fields = ('rate',)
+    required_fields = {'name', }
+    bool_fields = {'active', 'is_private', 'billable', 'auto_estimates'}
+    int_fields = {'estimated_hours', 'color'}
+    float_fields = {'rate', }
     mapping_fields = {
-        'client': MappedField('cid', Client, 'one')
+        'client': MappedField('cid', 'client', Client, 'one')
     }
 
     def __init__(self, name, wid=None, cid=None, active=True, is_private=True,
@@ -296,6 +303,42 @@ class Project(TogglEntity):
 
     def __str__(self):
         return "Project #{}: {}".format(self.id, self.name)
+
+
+class WorkspaceSet(TogglSet):
+    def build_list_url(self, wid):
+        return self.url
+
+
+class Workspace(TogglEntity):
+    _can_create = False
+    _can_delete = False
+
+    required_fields = ('name',)
+    bool_fields = {'premium', 'admin', 'only_admins_may_create_projects', 'only_admins_see_billable_rates'}
+    int_fields = {'rounding', 'rounding_minutes'}
+    float_fields = {'default_hourly_rate', }
+
+    def __init__(self, name, premium, admin, default_hourly_rate, default_currency, only_admins_may_create_projects,
+                 only_admins_see_billable_rates, rounding, rounding_minutes, config=None, **kwargs):
+        self.name = name
+        self.premium = premium
+        self.admin = admin
+        self.default_hourly_rate = default_hourly_rate
+        self.default_currency = default_currency
+        self.only_admins_may_create_projects = only_admins_may_create_projects
+        self.only_admins_see_billable_rates = only_admins_see_billable_rates
+        self.rounding = rounding
+        self.rounding_minutes = rounding_minutes
+
+        super(Workspace, self).__init__(config=config)
+
+    def __str__(self):
+        return "Workspace #{}: {}".format(self.id, self.name)
+
+
+Workspace.objects = WorkspaceSet('/workspaces', Workspace)
+
 
 # ----------------------------------------------------------------------------
 # WorkspaceList

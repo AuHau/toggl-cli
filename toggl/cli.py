@@ -219,6 +219,7 @@ def entity_detail(cls, spec):
         click.style('#' + str(entity.id), fg="green", dim=1),
         entity_string[1:]))
 
+
 def entity_remove(cls, spec):
     entity = cls.objects.get(spec) or cls.objects.get(name=spec)
 
@@ -228,7 +229,6 @@ def entity_remove(cls, spec):
 
     entity.delete()
     click.echo("{} successfully deleted!".format(cls.__name__.capitalize()))
-
 
 
 # ----------------------------------------------------------------------------
@@ -358,10 +358,10 @@ def clients_get(ctx, spec):
 def clients_rm(ctx, spec):
     entity_remove(api.Client, spec)
 
+
 # ----------------------------------------------------------------------------
 # Projects
 # ----------------------------------------------------------------------------
-
 @cli.group('projects', short_help='projects management')
 @click.pass_context
 def projects(ctx):
@@ -421,6 +421,29 @@ def projects_get(ctx, spec):
 @click.pass_context
 def projects_rm(ctx, spec):
     entity_remove(api.Project, spec)
+
+
+# ----------------------------------------------------------------------------
+# Workspaces
+# ----------------------------------------------------------------------------
+
+@cli.group('workspaces', short_help='workspaces management')
+@click.pass_context
+def workspaces(ctx):
+    pass
+
+
+@workspaces.command('ls', short_help='list workspaces')
+@click.pass_context
+def workspaces_ls(ctx):
+    entity_listing(api.Workspace)
+
+
+@workspaces.command('get', short_help='retrieve details of a workspace')
+@click.argument('spec')
+@click.pass_context
+def workspaces_get(ctx, spec):
+    entity_detail(api.Workspace, spec)
 
 
 # ----------------------------------------------------------------------------
