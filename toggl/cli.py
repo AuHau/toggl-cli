@@ -375,11 +375,11 @@ def projects_add(ctx, name, client, workspace, public, billable, auto_estimates,
 @projects.command('ls', short_help='list projects')
 @click.pass_context
 def projects_ls(ctx):
-    for client in api.Project.objects.all():
+    for project in api.Project.objects.all():
         # TODO: Add option for simple print without colors & machine readable format
         click.echo("{} {}".format(
-            client.name,
-            click.style("[#{}]".format(client.id), fg="white", dim=1),
+            project.name,
+            click.style("[#{}]".format(project.id), fg="white", dim=1),
         ))
 
 
@@ -389,22 +389,23 @@ def projects_ls(ctx):
 def projects_get(ctx, spec):
     project = api.Project.objects.get(spec) or api.Project.objects.get(name=spec)
 
-    if project is not None:
-        click.echo("""{} #{}
+    if project is None:
+        click.echo("Project not found!", color='red')
+        exit(1)
+
+    client = project.client.name if project.client is not None else 'None'
+
+    click.echo("""{} #{}
 workspace: #{}
-customer: #{}
+client: {}
 active: {}
 is private: {}
 is billable: {}
 auto estimates: {}
 estimated hours: {}
 color: {}
-rate: {}
-""".format(project.name, project.id, project.wid, project.cid, project.active, project.is_private, project.billable,
+rate: {}""".format(project.name, project.id, project.wid, client, project.active, project.is_private, project.billable,
            project.auto_estimates, project.estimated_hours, project.color, project.rate))
-        exit(0)
-
-    click.echo("Project not found!", color='red')
 
 
 @projects.command('rm', short_help='delete a specific client')

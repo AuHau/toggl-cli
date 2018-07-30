@@ -1,6 +1,7 @@
 import json
 import re
 import time
+from collections import namedtuple
 
 import six
 from requests import HTTPError
@@ -12,6 +13,8 @@ from abc import ABCMeta, abstractmethod
 from six import with_metaclass
 
 from builtins import int
+
+MappedField = namedtuple('MappedField', ['key', 'cls', 'cardinality'])
 
 
 def evaluate_conditions(conditions, entity):
@@ -118,6 +121,7 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
     int_fields = tuple()
     float_fields = tuple()
     bool_fields = tuple()
+    mapping_fields = dict()
 
     def __init__(self, entity_id=None, wid=None, config=None):
         self.id = entity_id
@@ -226,12 +230,28 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
 
         super(TogglEntity, self).__setattr__(key, value)
 
+    def __getattr__(self, item):
+        if item not in self.mapping_fields:
+            raise AttributeError()
+
+        mapping = self.mapping_fields[item]
+        id = getattr(self, mapping.key)
+
+        if id is None:
+            return None
+
+        if mapping.cardinality == 'one':
+            return mapping.cls.objects.get(id)
+        elif mapping.cardinality == 'many':
+            return mapping.cls.objects.filter(id=id)
+        else:
+            raise TogglException('Unknown cardinality \'{}\''.format(mapping.cardinality))
+
 
 # ----------------------------------------------------------------------------
 # Entities definitions
 # ----------------------------------------------------------------------------
 class Client(TogglEntity):
-
     required_fields = ('name',)
 
     def __init__(self, name, wid=None, note=None, config=None, **kwargs):
@@ -241,20 +261,21 @@ class Client(TogglEntity):
         super(Client, self).__init__(wid=wid, config=config)
 
     def __str__(self):
-        return "{} #{}".format(self.name, self.id)
+        return "Client #{}: {}".format(self.name, self.id)
 
 
 class Project(TogglEntity):
-
     required_fields = ('name',)
     bool_fields = ('active', 'is_private', 'billable', 'auto_estimates')
     int_fields = ('estimated_hours', 'color')
     float_fields = ('rate',)
+    mapping_fields = {
+        'client': MappedField('cid', Client, 'one')
+    }
 
     def __init__(self, name, wid=None, cid=None, active=True, is_private=True,
                  billable=True, auto_estimates=False,
                  estimated_hours=None, color=None, rate=None, config=None, **kwargs):
-
         self.name = name
         self.cid = cid
         self.active = active
@@ -273,6 +294,8 @@ class Project(TogglEntity):
         if self.cid is not None and not Client.objects.get(self.cid):
             raise TogglValidationException("Customer specified by ID does not exists!")
 
+    def __str__(self):
+        return "Project #{}: {}".format(self.id, self.name)
 
 # ----------------------------------------------------------------------------
 # WorkspaceList
@@ -331,7 +354,6 @@ class WorkspaceList(six.Iterator):
         for workspace in self:
             s = s + ":{}\n".format(workspace['name'])
         return s.rstrip()  # strip trailing \n
-
 
 
 # ----------------------------------------------------------------------------
