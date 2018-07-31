@@ -1,99 +1,64 @@
 import json
-from collections import namedtuple
 
-from .base import TogglEntity, TogglSet
+from . import base
 from .. import utils
 from ..exceptions import TogglValidationException, TogglException
-
-MappedField = namedtuple('MappedField', ['key', 'attr', 'cls', 'cardinality'])
 
 
 # ----------------------------------------------------------------------------
 # Entities definitions
 # ----------------------------------------------------------------------------
-class Client(TogglEntity):
-    required_fields = ('name',)
-
-    def __init__(self, name, wid=None, note=None, config=None, **kwargs):
-        self.name = name
-        self.note = note
-
-        super(Client, self).__init__(wid=wid, config=config)
+class Client(base.WorkspaceEntity):
+    name = base.StringField(required=True)
+    notes = base.StringField()
 
 
-class WorkspaceSet(TogglSet):
-    def build_list_url(self, wid):
-        return self.url
-
-
-class Workspace(TogglEntity):
+class Workspace(base.TogglEntity):
     _can_create = False
     _can_delete = False
 
-    required_fields = ('name',)
-    bool_fields = {'premium', 'admin', 'only_admins_may_create_projects', 'only_admins_see_billable_rates'}
-    int_fields = {'rounding', 'rounding_minutes'}
-    float_fields = {'default_hourly_rate', }
-
-    def __init__(self, name, premium, admin, default_hourly_rate, default_currency, only_admins_may_create_projects,
-                 only_admins_see_billable_rates, rounding, rounding_minutes, config=None, **kwargs):
-        self.name = name
-        self.premium = premium
-        self.admin = admin
-        self.default_hourly_rate = default_hourly_rate
-        self.default_currency = default_currency
-        self.only_admins_may_create_projects = only_admins_may_create_projects
-        self.only_admins_see_billable_rates = only_admins_see_billable_rates
-        self.rounding = rounding
-        self.rounding_minutes = rounding_minutes
-
-        super(Workspace, self).__init__(config=config)
+    name = base.StringField(required=True)
+    premium = base.BooleanField()
+    admin = base.BooleanField()
+    only_admins_may_create_projects = base.BooleanField()
+    only_admins_see_billable_rates = base.BooleanField()
+    rounding = base.IntegerField()
+    rounding_minutes = base.IntegerField()
+    default_hourly_rate = base.FloatField()
 
 
-Workspace.objects = WorkspaceSet('/workspaces', Workspace)
+Workspace.objects = base.WorkspaceSet('/workspaces', Workspace)
 
 
-class Project(TogglEntity):
+class Project(base.WorkspaceEntity):
     required_fields = {'name', }
     bool_fields = {'active', 'is_private', 'billable', 'auto_estimates'}
     int_fields = {'estimated_hours', 'color'}
     float_fields = {'rate', }
-    mapping_fields = {
-        'client': MappedField('cid', 'client', Client, 'one'),
-        'workspace': MappedField('wid', 'workspace', Workspace, 'one'),
-    }
 
-    def __init__(self, name, wid=None, cid=None, active=True, is_private=True,
-                 billable=True, auto_estimates=False,
-                 estimated_hours=None, color=None, rate=None, config=None, **kwargs):
-        self.name = name
-        self.cid = cid
-        self.active = active
-        self.is_private = is_private
-        self.billable = billable
-        self.auto_estimates = auto_estimates
-        self.estimated_hours = estimated_hours
-        self.color = color
-        self.rate = rate
+    name = base.StringField(required=True)
+    cid = base.IntegerField()
+    active = base.BooleanField(default=True)
+    is_private = base.BooleanField(default=True)
+    billable = base.BooleanField(default=True)
+    auto_estimates = base.BooleanField(default=False)
+    estimated_hours = base.IntegerField()
+    color = base.IntegerField()
+    rate = base.FloatField()
 
-        super(Project, self).__init__(wid=wid, config=config)
-
-    def validate(self, validate_workspace_existence=True):
-        super(Project, self).validate(validate_workspace_existence)
+    def validate(self):
+        super(Project, self).validate()
 
         if self.cid is not None and not Client.objects.get(self.cid):
             raise TogglValidationException("Client specified by ID does not exists!")
 
 
-class WorkspaceUser(TogglEntity):
+class WorkspaceUser(base.TogglEntity):
     _can_get_detail = False
 
     required_fields = {'email', }
     bool_fields = {'active', 'admin'}
     int_fields = {'uid', }
-    mapping_fields = {
-        'workspace': MappedField('wid', 'workspace', Workspace, 'one'),
-    }
 
     def __init__(self, email, name=None, wid=None, uid=None, active=True, admin=False, config=None, **kwargs):
         self.email = email
@@ -107,7 +72,7 @@ class WorkspaceUser(TogglEntity):
     @classmethod
     def invite(cls, *emails, wid=None, config=None):
         if wid is None:
-            wid = OldUser().get('default_wid')
+            wid = base.OldUser().get('default_wid')
 
         emails_json = json.dumps({'emails': emails})
         data = utils.toggl("/workspaces/{}/invite".format(wid), "post", emails_json, config=config)

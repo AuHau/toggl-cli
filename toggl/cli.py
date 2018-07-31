@@ -1,4 +1,5 @@
 import datetime
+import logging
 import optparse
 import os
 import re
@@ -165,19 +166,11 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name')
         click.echo("{} not found!".format(cls.get_name(verbose=True)), color='red')
         exit(1)
 
-    mapped_fields = {field.key: field for _, field in cls.mapping_fields.items()}
     entity_dict = entity.to_dict()
     del entity_dict[primary_field]
 
     entity_string = ''
     for key, value in sorted(entity_dict.items()):
-        if key in mapped_fields:
-            mapping = mapped_fields[key]
-            entity_string += '\n{}: {}'.format(
-                mapping.attr.replace('_', ' '),
-                getattr(entity, mapping.attr).name
-            )
-            continue
 
         entity_string += '\n{}: {}'.format(
             key.replace('_', ' '),
@@ -297,13 +290,14 @@ def clients(ctx):
               help='Specifies the name of the client', )
 @click.option('--note', help='Specifies a note linked to the client', )
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.Workspace),
-              help='Specifies a workspace where the client will be created. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
+              help='Specifies a workspace where the client will be created. Can be ID or name of the workspace '
+                   '(ENV: TOGGL_WORKSPACE)')
 @click.pass_context
 def clients_add(ctx, name, note, workspace):
     client = api.Client(
-        name,
-        workspace['id'] if workspace else None,
-        note
+        name=name,
+        wid=workspace['id'] if workspace else None,
+        notes=note
     )
 
     client.save()

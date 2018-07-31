@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging
 import os
 from abc import ABCMeta
 from collections import defaultdict
@@ -16,6 +17,8 @@ from six.moves import configparser
 from builtins import input
 from six import with_metaclass
 from tzlocal import get_localzone
+
+logger = logging.getLogger('toggl.utils')
 
 
 # ----------------------------------------------------------------------------
@@ -100,6 +103,7 @@ class ConfigBootstrap(object):
     def _are_credentials_valid(self, answers, credential):
         config = self._build_tmp_config(answers, credential)
 
+        # TODO: Narrow down the Exception when proper Exception raising is created for toggl() function.
         try:
             toggl("/me", "get", config=config)
             return True
@@ -120,21 +124,21 @@ class ConfigBootstrap(object):
         return config
 
     def _get_workspaces(self, answers):
-        from toggl.api import WorkspaceList
+        from toggl.api import Workspace
         config = self._build_tmp_config(answers)
 
         if self.workspaces is None:
             self.workspaces = []
-            for workspace in WorkspaceList(config):
-                self.workspaces.append(workspace['name'])
+            for workspace in Workspace.objects.all(config=config):
+                self.workspaces.append(workspace.name)
 
         return self.workspaces
 
     def _map_answers(self, answers):
-        from toggl.api import WorkspaceList
+        from toggl.api import Workspace
 
         config = self._build_tmp_config(answers)
-        default_workspace_id = WorkspaceList(config).find_by_name(answers['default workspace'])['id']
+        default_workspace_id = Workspace.objects.get(name=answers['default workspace'], config=config).id
 
         if answers['type_auth'] == "API token":
             auth = {
@@ -148,6 +152,10 @@ class ConfigBootstrap(object):
 
         return {
             'auth': auth,
+            'logging': {
+                'file_logging': answers['file_logging'],
+                'file_logging_path': answers.get('file_logging_path')
+            },
             'options': {
                 'default_workspace': default_workspace_id,
                 'timezone': answers['timezone'],
@@ -193,14 +201,17 @@ class ConfigBootstrap(object):
             inquirer.Text('timezone', 'Used timezone', default=local_timezone, show_default=True,
                           validate=lambda answers, current: current in pytz.all_timezones_set),
 
-            inquirer.Confirm('continue_creates', message="Continue command will create new entry", default=True)
+            inquirer.Confirm('continue_creates', message="Continue command will create new entry", default=True),
+            inquirer.Confirm('file_logging', message="Enable logging of togglCli actions into file?", default=False),
+            inquirer.Path('file_logging_path', message="Path to the log file", ignore=lambda x: not x['file_logging'],
+                          default='~/.toggl_log'),
         ]
 
         answers = inquirer.prompt(questions)
 
         if answers is None:
             click.secho("We were not able to setup the needed configuration and we are unfortunately not able to "
-                        "proceed without it", bg="white", fg="red")
+                        "proceed without it.", bg="white", fg="red")
             exit(-1)
 
         click.echo("\nConfiguration successfully finished!\nNow continuing with your command:\n\n")
@@ -226,6 +237,8 @@ class Config(with_metaclass(ABCCachedFactoryMeta, configparser.RawConfigParser))
         'time_format': '%I:%M%p',
         'day_first': 'False',
         'year_first': 'False',
+        'file_logging': 'False',
+        'file_logging_path': 'None',
     }
 
     DEFAULT_CONFIG_PATH = os.path.expanduser('~/.togglrc')
@@ -475,6 +488,7 @@ def toggl(url, method, data=None, headers=None, config=None):
         config = Config.factory()
 
     url = "{}{}".format(TOGGL_URL, url)
+    logger.debug('Sending to {} \'{}\' data: {}'.format(method.upper(), url, json.dumps(data)))
     if method == 'delete':
         r = requests.delete(url, auth=config.get_auth(), data=data, headers=headers)
     elif method == 'get':
@@ -488,5 +502,6 @@ def toggl(url, method, data=None, headers=None, config=None):
 
     # TODO: Better error handling (eq. Toggl's custom Exceptions)
     r.raise_for_status()  # raise exception on error
-    return json.loads(r.text)
+    response = json.loads(r.text)
+    return response
 
