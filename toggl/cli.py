@@ -4,6 +4,7 @@ import os
 import re
 import sys
 import click
+from prettytable import PrettyTable
 
 from toggl.exceptions import TogglCliException
 from . import api, utils, __version__
@@ -122,7 +123,7 @@ class ResourceType(click.ParamType):
         resource = self._resource_cls.objects.get(resource_id)
 
         if resource is None:
-            self.fail("Unknown {}'s ID!".format(self._resource_cls.get_name()), param, ctx)
+            self.fail("Unknown {}'s ID!".format(self._resource_cls.get_name(verbose=True)), param, ctx)
 
         return resource
 
@@ -130,30 +131,43 @@ class ResourceType(click.ParamType):
         resource = self._resource_cls.objects.get(name=value)
 
         if resource is None:
-            self.fail("Unknown {}'s name!".format(self._resource_cls.get_name()), param, ctx)
+            self.fail("Unknown {}'s name!".format(self._resource_cls.get_name(verbose=True)), param, ctx)
 
         return resource
 
 
-def entity_listing(cls):
-    for entity in cls.objects.all():
-        # TODO: Add option for simple print without colors & machine readable format
-        click.echo("{} {}".format(
-            entity.name,
-            click.style("[#{}]".format(entity.id), fg="white", dim=1),
-        ))
+def entity_listing(cls, fields=('id', 'name',)):
+    entities = cls.objects.all()
+    if not entities:
+        click.echo('No entries were found!')
+        exit(0)
+
+    table = PrettyTable()
+    table.field_names = [click.style(field.capitalize(), fg='white', dim=1) for field in fields]
+    table.border = False
+    table.align = 'l'
+
+    for entity in entities:
+        table.add_row([str(getattr(entity, field)) for field in fields])
+
+    click.echo(table)
 
 
-def entity_detail(cls, spec):
-    entity = cls.objects.get(spec) or cls.objects.get(name=spec)
+def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name'):
+    entity = None
+    for field in field_lookup:
+        entity = cls.objects.get(**{field: spec})
+
+        if entity is not None:
+            break
 
     if entity is None:
-        click.echo("{} not found!".format(cls.get_name().capitalize()), color='red')
+        click.echo("{} not found!".format(cls.get_name(verbose=True)), color='red')
         exit(1)
 
     mapped_fields = {field.key: field for _, field in cls.mapping_fields.items()}
     entity_dict = entity.to_dict()
-    del entity_dict['name']
+    del entity_dict[primary_field]
 
     entity_string = ''
     for key, value in sorted(entity_dict.items()):
@@ -172,7 +186,7 @@ def entity_detail(cls, spec):
 
     click.echo("""{} {}
 {}""".format(
-        click.style(entity.name, fg="green"),
+        click.style(getattr(entity, primary_field), fg="green"),
         click.style('#' + str(entity.id), fg="green", dim=1),
         entity_string[1:]))
 
@@ -181,11 +195,11 @@ def entity_remove(cls, spec):
     entity = cls.objects.get(spec) or cls.objects.get(name=spec)
 
     if entity is None:
-        click.echo("{} not found!".format(cls.get_name().capitalize()), color='red')
+        click.echo("{} not found!".format(cls.get_name(verbose=True)), color='red')
         exit(1)
 
     entity.delete()
-    click.echo("{} successfully deleted!".format(cls.get_name().capitalize()))
+    click.echo("{} successfully deleted!".format(cls.get_name(verbose=True)))
 
 
 # ----------------------------------------------------------------------------
@@ -401,6 +415,37 @@ def workspaces_ls(ctx):
 @click.pass_context
 def workspaces_get(ctx, spec):
     entity_detail(api.Workspace, spec)
+
+
+# ----------------------------------------------------------------------------
+# Users
+# ----------------------------------------------------------------------------
+@cli.group('users', short_help='users management')
+@click.pass_context
+def users(ctx):
+    pass
+
+
+@users.command('ls', short_help='list users')
+@click.pass_context
+def users_ls(ctx):
+    entity_listing(api.WorkspaceUser, ('id', 'email', 'active'))
+
+
+@users.command('get', short_help='retrieve details of a user')
+@click.argument('spec')
+@click.pass_context
+def users_get(ctx, spec):
+    entity_detail(api.WorkspaceUser, spec, ('id', 'email'), 'email')
+
+
+@users.command('invite', short_help='invite new user into workspace')
+@click.argument('email')
+@click.pass_context
+def users_invite(ctx, email):
+    api.WorkspaceUser.invite(email)
+
+    click.echo("User '{}' was successfully invited! He needs to accept the invitation now.".format(email))
 
 
 # ----------------------------------------------------------------------------

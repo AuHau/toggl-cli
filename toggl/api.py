@@ -38,9 +38,11 @@ def evaluate_conditions(conditions, entity):
 
 
 class TogglSet(object):
-    def __init__(self, url, entity_cls):
+    def __init__(self, url, entity_cls, can_get_detail=True, can_get_list=True):
         self.url = url
         self.entity_cls = entity_cls
+        self.can_get_detail = can_get_detail
+        self.can_get_list = can_get_list
 
     def build_list_url(self, wid):
         return '/workspaces/{}/{}'.format(wid, self.url)
@@ -57,11 +59,14 @@ class TogglSet(object):
 
     def get(self, id=None, config=None, **conditions):
         if id is not None:
-            try:
-                fetched_entity = utils.toggl(self.build_detail_url(id), 'get', config=config)
-                return self._convert_entity(fetched_entity['data'])
-            except HTTPError:
-                return None
+            if self.can_get_detail:
+                try:
+                    fetched_entity = utils.toggl(self.build_detail_url(id), 'get', config=config)
+                    return self._convert_entity(fetched_entity['data'])
+                except HTTPError:
+                    return None
+            else:
+                conditions['id'] = id
 
         entries = self.filter(config=config, **conditions)
 
@@ -82,7 +87,7 @@ class TogglSet(object):
         return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity)]
 
     def all(self, wid=None, config=None):
-        wid = wid or User().get('default_wid')
+        wid = wid or OldUser().get('default_wid')
         fetched_entities = utils.toggl(self.build_list_url(wid), 'get', config=config)
 
         if fetched_entities is None:
@@ -106,7 +111,7 @@ class TogglEntityBase(ABCMeta):
         if not parents:
             return new_class
 
-        setattr(new_class, 'objects', TogglSet(new_class.get_url(), new_class))
+        setattr(new_class, 'objects', TogglSet(new_class.get_url(), new_class, new_class._can_get_detail))
 
         return new_class
 
@@ -117,6 +122,7 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
     _can_create = True
     _can_update = True
     _can_delete = True
+    _can_get_detail = True
 
     required_fields = tuple()
     int_fields = tuple()
@@ -130,7 +136,7 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
 
         if wid is None:
             if not self.get_name() == 'workspace':
-                self.wid = User().get('default_wid')
+                self.wid = OldUser().get('default_wid')
             self._validate_workspace = False
         else:
             self.wid = wid
@@ -167,10 +173,15 @@ class TogglEntity(with_metaclass(TogglEntityBase, object)):
         return json.dumps({self.get_name(): self.to_dict()})
 
     @classmethod
-    def get_name(cls):
+    def get_name(cls, verbose=False):
         name = cls.__name__
         name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+        name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+
+        if verbose:
+            return name.replace('_', ' ').capitalize()
+
+        return name
 
     @classmethod
     def get_url(cls):
@@ -333,6 +344,37 @@ class Project(TogglEntity):
 
         if self.cid is not None and not Client.objects.get(self.cid):
             raise TogglValidationException("Client specified by ID does not exists!")
+
+
+class WorkspaceUser(TogglEntity):
+    _can_get_detail = False
+
+    required_fields = {'email', }
+    bool_fields = {'active', 'admin'}
+    int_fields = {'uid', }
+    mapping_fields = {
+        'workspace': MappedField('wid', 'workspace', Workspace, 'one'),
+    }
+
+    def __init__(self, email, name=None, wid=None, uid=None, active=True, admin=False, config=None, **kwargs):
+        self.email = email
+        self.name = name
+        self.uid = uid
+        self.active = active
+        self.admin = admin
+
+        super(WorkspaceUser, self).__init__(wid=wid, config=config)
+
+    @classmethod
+    def invite(cls, *emails, wid=None, config=None):
+        if wid is None:
+            wid = OldUser().get('default_wid')
+
+        emails_json = json.dumps({'emails': emails})
+        data = utils.toggl("/workspaces/{}/invite".format(wid), "post", emails_json, config=config)
+
+        if 'notifications' in data and data['notifications']:
+            raise TogglException(data['notifications'])
 
 
 # ----------------------------------------------------------------------------
@@ -716,7 +758,7 @@ class TimeEntryList(six.Iterator):
 # ----------------------------------------------------------------------------
 # User
 # ----------------------------------------------------------------------------
-class User(object):
+class OldUser(object):
     """
     utils.Singleton toggl user data.
     """
