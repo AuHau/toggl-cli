@@ -6,6 +6,7 @@ from abc import ABCMeta
 from collections import defaultdict
 
 import time
+from pprint import pformat
 
 import click
 import dateutil.parser
@@ -488,7 +489,7 @@ def toggl(url, method, data=None, headers=None, config=None):
         config = Config.factory()
 
     url = "{}{}".format(TOGGL_URL, url)
-    logger.debug('Sending to {} \'{}\' data: {}'.format(method.upper(), url, json.dumps(data)))
+    logger.info('Sending to {} \'{}\' data: {}'.format(method.upper(), url, json.dumps(data)))
     if method == 'delete':
         r = requests.delete(url, auth=config.get_auth(), data=data, headers=headers)
     elif method == 'get':
@@ -503,5 +504,6 @@ def toggl(url, method, data=None, headers=None, config=None):
     # TODO: Better error handling (eq. Toggl's custom Exceptions)
     r.raise_for_status()  # raise exception on error
     response = json.loads(r.text)
+    logger.debug('Response data:\n' + pformat(response))
     return response
 

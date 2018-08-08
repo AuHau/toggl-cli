@@ -12,6 +12,8 @@ from . import api, utils, __version__
 
 DEFAULT_CONFIG_PATH = '~/.togglrc'
 
+logger = logging.getLogger('toggl.cli')
+
 
 class DateTimeType(click.ParamType):
     """
@@ -218,18 +220,35 @@ def cli(ctx, quiet, verbose, debug, config):
     The authentication credentials can be also overridden with Environmental variables. Use
     TOGGL_API_TOKEN or TOGGL_USERNAME, TOGGL_PASSWORD.
     """
-    ctx.obj['config'] = utils.Config.factory()
+    config = utils.Config.factory()
+    ctx.obj['config'] = config
 
-    # Process command-line options.
-    utils.Logger.level = utils.Logger.INFO
-    if quiet:
-        utils.Logger.level = utils.Logger.NONE
-        click.echo = lambda *args: None  # Override echo function to be quiet
-    if debug:
-        utils.Logger.level = utils.Logger.DEBUG
+    main_logger = logging.getLogger('toggl')
+    main_logger.setLevel(logging.DEBUG)
+
+    default = logging.StreamHandler()
+    default_formatter = logging.Formatter('%(levelname)s: %(message)s')
+    default.setFormatter(default_formatter)
+
     if verbose:
-        global VERBOSE
-        VERBOSE = True
+        default.setLevel(logging.INFO)
+    elif debug:
+        default.setLevel(logging.DEBUG)
+    else:
+        default.setLevel(logging.WARN)
+
+    if quiet:
+        # Is this good idea?
+        click.echo = lambda *args, **kwargs: None
+    else:
+        main_logger.addHandler(default)
+
+    if config.getboolean('logging', 'file_logging'):
+        log_path = config.get('logging', 'file_logging_path')
+        fh = logging.FileHandler(log_path)
+        fh_formater = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        fh.setFormatter(fh_formater)
+        main_logger.addHandler(fh)
 
 
 @cli.command('add', short_help='adds finished time entry')
