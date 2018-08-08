@@ -168,14 +168,18 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name')
         click.echo("{} not found!".format(cls.get_name(verbose=True)), color='red')
         exit(1)
 
-    entity_dict = entity.to_dict()
+    entity_dict = {}
+    for field in entity.__fields__:
+        entity_dict[field.name] = getattr(entity, field.name)
+
     del entity_dict[primary_field]
+    del entity_dict['id']
 
     entity_string = ''
     for key, value in sorted(entity_dict.items()):
 
         entity_string += '\n{}: {}'.format(
-            key.replace('_', ' '),
+            key.replace('_', ' ').capitalize(),
             value
         )
 
@@ -371,16 +375,14 @@ def projects(ctx):
 @click.pass_context
 def projects_add(ctx, name, client, workspace, public, billable, auto_estimates, rate, color):
     project = api.Project(
-        name,
-        workspace['id'] if workspace else None,
-        client['id'] if client else None,
-        True,
-        not public,
-        billable,
-        auto_estimates,
-        None,
-        color,
-        rate
+        name=name,
+        wid=workspace['id'] if workspace else None,
+        cid=client['id'] if client else None,
+        is_private=not public,
+        billable=billable,
+        auto_estimates=auto_estimates,
+        color=color,
+        rate=rate
     )
 
     project.save()

@@ -5,12 +5,10 @@ from .. import utils
 from ..exceptions import TogglValidationException, TogglException
 
 
-# ----------------------------------------------------------------------------
-# Entities definitions
-# ----------------------------------------------------------------------------
-class Client(base.WorkspaceEntity):
-    name = base.StringField(required=True)
-    notes = base.StringField()
+# Workspace entity
+class WorkspaceSet(base.TogglSet):
+    def build_list_url(self, wid):
+        return self.url
 
 
 class Workspace(base.TogglEntity):
@@ -27,17 +25,24 @@ class Workspace(base.TogglEntity):
     default_hourly_rate = base.FloatField()
 
 
-Workspace.objects = base.WorkspaceSet('/workspaces', Workspace)
+Workspace.objects = WorkspaceSet('/workspaces', Workspace)
 
 
-class Project(base.WorkspaceEntity):
-    required_fields = {'name', }
-    bool_fields = {'active', 'is_private', 'billable', 'auto_estimates'}
-    int_fields = {'estimated_hours', 'color'}
-    float_fields = {'rate', }
+class WorkspaceEntity(base.TogglEntity):
+    workspace = base.MappingField(Workspace, 'wid', default=lambda config: base.OldUser(config).get('default_wid'))
 
+
+# ----------------------------------------------------------------------------
+# Entities definitions
+# ----------------------------------------------------------------------------
+class Client(WorkspaceEntity):
     name = base.StringField(required=True)
-    cid = base.IntegerField()
+    notes = base.StringField()
+
+
+class Project(WorkspaceEntity):
+    name = base.StringField(required=True)
+    customer = base.MappingField(Client, 'cid')
     active = base.BooleanField(default=True)
     is_private = base.BooleanField(default=True)
     billable = base.BooleanField(default=True)
@@ -49,7 +54,7 @@ class Project(base.WorkspaceEntity):
     def validate(self):
         super(Project, self).validate()
 
-        if self.cid is not None and not Client.objects.get(self.cid):
+        if self.customer is not None and not Client.objects.get(self.cid):
             raise TogglValidationException("Client specified by ID does not exists!")
 
 

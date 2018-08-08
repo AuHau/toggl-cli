@@ -1,13 +1,17 @@
 import json
+import logging
 import re
 from abc import ABCMeta
 from builtins import int
+from enum import Enum
 from inspect import Signature, Parameter
 
 from requests import HTTPError
 
 from .. import utils
 from ..exceptions import TogglValidationException, TogglException, TogglMultipleResults
+
+logger = logging.getLogger('toggl.models.base')
 
 
 def evaluate_conditions(conditions, entity):
@@ -151,6 +155,9 @@ class TogglField:
 
         instance.__dict__[self.name] = value
 
+    def __str__(self):
+        return '{} - {}'.format(self.__class__.__name__, self.name)
+
 
 class StringField(TogglField):
     field_type = str
@@ -166,6 +173,74 @@ class FloatField(TogglField):
 
 class BooleanField(TogglField):
     field_type = bool
+
+
+class MappingCardinality(Enum):
+    ONE = 'one'
+    MANY = 'many'
+
+
+class MappingField(TogglField):
+
+    def __init__(self, mapped_cls, mapped_field, cardinality=MappingCardinality.ONE, read_only=False, *args, **kwargs):
+        super(MappingField, self).__init__(*args, **kwargs)
+
+        if not issubclass(mapped_cls, TogglEntity):
+            raise TypeError('Mapped class has to be TogglEntity subclass!')
+
+        self.mapped_cls = mapped_cls
+        self.mapped_field = mapped_field
+        self.cardinality = cardinality
+        self.read_only = read_only
+
+    def __get__(self, instance, owner):
+        if self.cardinality == MappingCardinality.ONE:
+            try:
+                id = instance.__dict__[self.mapped_field]
+
+                # Hack to resolve default if the ID is defined but None
+                if id is None:
+                    raise KeyError
+            except KeyError:
+                default = self.default
+
+                # No default, no point of continuing
+                if default is None:
+                    return None
+
+                if callable(default):
+                    default = default(instance._config)
+
+                if isinstance(default, TogglEntity):
+                    return default
+
+                id = default
+
+            return self.mapped_cls.objects.get(id)
+
+        elif self.cardinality == MappingCardinality.MANY:
+            raise NotImplementedError("Not implemented yet")
+        else:
+            raise TogglException('{}: Unknown cardinality \'{}\''.format(self.name, self.cardinality))
+
+    def __set__(self, instance, value):
+        if self.read_only:
+            raise AttributeError('Field is read only!')
+
+        if self.cardinality == MappingCardinality.ONE:
+            try:
+                if not isinstance(value, self.mapped_cls):
+                    logger.warning('Assigning class \'{}\' to MappedField with class \'{}\'.'.format(type(value),
+                                                                                                     self.mapped_cls))
+
+                instance.__dict__[self.mapped_field] = value.id
+            except AttributeError:
+                if not isinstance(value, int):
+                    logger.warning('Assigning as ID to mapped field value which is not integer!')
+
+                instance.__dict__[self.mapped_field] = value.id
+        else:
+            raise NotImplementedError('Field with MANY cardinality is not supported for attribute assignment')
 
 
 def _make_signature(fields):
@@ -223,9 +298,26 @@ class TogglEntity(metaclass=TogglEntityBase):
             if field.name in {'id'}:
                 continue
 
-            if field.name not in kwargs and field.default is None and field.required:
-                raise TypeError('We need "{}" attribute!'.format(field.name))
-            setattr(self, field.name, kwargs.get(field.name))
+            if isinstance(field, MappingField):
+                # User supplied most probably the whole mapped object
+                if field.name in kwargs:
+                    setattr(self, field.name, kwargs.get(field.name))
+                    continue
+
+                # Most probably converting API call with direct ID of the object
+                if field.mapped_field in kwargs:
+                    setattr(self, field.mapped_field, kwargs.get(field.mapped_field))
+                    continue
+
+                if field.default is None and field.required:
+                    raise TypeError('We need "{}" attribute!'.format(field.mapped_field))
+                continue
+
+            if field.name not in kwargs:
+                if field.default is None and field.required:
+                    raise TypeError('We need "{}" attribute!'.format(field.name))
+            else: # Set the attribute only when there is some value to set, so default values could work properly
+                setattr(self, field.name, kwargs[field.name])
 
     def save(self):
         if not self._can_update and self.id is not None:
@@ -278,30 +370,14 @@ class TogglEntity(metaclass=TogglEntityBase):
             field.validate(getattr(self, field.name, None))
 
     def to_dict(self):
-        # Have to make copy, otherwise will modify directly instance's dict
-        entity_dict = json.loads(json.dumps(self.__dict__))
-
-        try:  # New objects does not have ID ==> try/except
-            del entity_dict['id']
-        except KeyError:
-            pass
-
-        # Protected attributes are not serialized
-        keys = list(entity_dict.keys())
-        for key in keys:
-            if key.startswith('_'):
-                del entity_dict[key]
+        entity_dict = {}
+        for field in self.__fields__:
+            try:
+                entity_dict[field.mapped_field] = getattr(self, field.name).id
+            except AttributeError:
+                entity_dict[field.name] = getattr(self, field.name, None)
 
         return entity_dict
 
     def __str__(self):
-        return "{} #{}".format(self.get_name().capitalize(), self.id)
-
-
-class WorkspaceEntity(TogglEntity):
-    wid = IntegerField('Workspace', default=lambda: OldUser().get('default_workspace'))
-
-
-class WorkspaceSet(TogglSet):
-    def build_list_url(self, wid):
-        return self.url
+        return "{} (#{})".format(getattr(self, 'name'), self.id)
