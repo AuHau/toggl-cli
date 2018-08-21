@@ -1,2 +1,2 @@
 
-from .models import Client, Workspace, Project, WorkspaceUser
+from .models import Client, Workspace, Project, User, WorkspaceUser

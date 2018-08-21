@@ -170,7 +170,11 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name')
 
     entity_dict = {}
     for field in entity.__fields__:
-        entity_dict[field.name] = getattr(entity, field.name)
+        try:
+            # In case it is ChoiceField translate the key to label
+            entity_dict[field.name] = field.get_label(getattr(entity, field.name))
+        except AttributeError:
+            entity_dict[field.name] = getattr(entity, field.name)
 
     del entity_dict[primary_field]
     del entity_dict['id']
@@ -444,14 +448,14 @@ def users(ctx):
 @users.command('ls', short_help='list users')
 @click.pass_context
 def users_ls(ctx):
-    entity_listing(api.WorkspaceUser, ('id', 'email', 'active'))
+    entity_listing(api.User, ('id', 'email', 'fullname'))
 
 
 @users.command('get', short_help='retrieve details of a user')
 @click.argument('spec')
 @click.pass_context
 def users_get(ctx, spec):
-    entity_detail(api.WorkspaceUser, spec, ('id', 'email'), 'email')
+    entity_detail(api.User, spec, ('id', 'email', 'fullname'), 'email')
 
 
 @users.command('invite', short_help='invite new user into workspace')

@@ -7,6 +7,7 @@ from enum import Enum
 from inspect import Signature, Parameter
 
 from requests import HTTPError
+from validate_email import validate_email
 
 from .. import utils
 from ..exceptions import TogglValidationException, TogglException, TogglMultipleResults
@@ -124,12 +125,13 @@ class TogglSet(object):
 class TogglField:
     field_type = object
 
-    def __init__(self, verbose_name=None, required=False, default=None, is_premium=False):
+    def __init__(self, verbose_name=None, required=False, default=None, is_premium=False, is_read_only=False):
         self.name = None
         self.verbose_name = verbose_name
         self.required = required
         self.default = default
         self.is_premium = is_premium
+        self.is_read_only = is_read_only
 
     def validate(self, value):
         if self.required and self.default is None and not value:
@@ -142,6 +144,9 @@ class TogglField:
             return self.default() if callable(self.default) else self.default
 
     def __set__(self, instance, value):
+        if self.is_read_only:
+            raise TogglException('Attribute \'{}\' is read only!'.format(self.name))
+
         if value is None and not self.required:
             instance.__dict__[self.name] = value
             return
@@ -151,7 +156,8 @@ class TogglField:
             try:
                 value = self.field_type(value)
             except ValueError:
-                raise TypeError('Expected for field \'{}\' type {} got {}'.format(self.name, self.field_type, type(value)))
+                raise TypeError(
+                    'Expected for field \'{}\' type {} got {}'.format(self.name, self.field_type, type(value)))
 
         instance.__dict__[self.name] = value
 
@@ -173,6 +179,43 @@ class FloatField(TogglField):
 
 class BooleanField(TogglField):
     field_type = bool
+
+
+class EmailField(StringField):
+
+    def validate(self, value):
+        super(EmailField, self).validate(value)
+
+        if not validate_email(value):
+            raise TogglValidationException('Email \'{}\' is not valid email address!'.format(value))
+
+
+class ChoiceField(TogglField):
+    choices = {}
+
+    def __init__(self, choices, *args, **kwargs):
+        super(ChoiceField, self).__init__(*args, **kwargs)
+
+        self.choices = choices
+
+    def __set__(self, instance, value):
+        # User entered the choice's label and not the key, let's remap it
+        if value not in self.choices:
+            for key, choice_value in self.choices.items():
+                if value == choice_value:
+                    value = key
+                    break
+
+        super(ChoiceField, self).__set__(instance, value)
+
+    def validate(self, value):
+        super(ChoiceField, self).validate(value)
+
+        if value not in self.choices and value not in self.choices.values():
+            raise TogglValidationException('Value \'{}\' is not valid choice!'.format(value))
+
+    def get_label(self, value):
+        return self.choices[value]
 
 
 class MappingCardinality(Enum):
@@ -246,7 +289,8 @@ class MappingField(TogglField):
 def _make_signature(fields):
     non_default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD) for field in fields
                               if field.name != 'id' and field.required]
-    default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD, default=field.default) for field in fields
+    default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD, default=field.default) for field in
+                          fields
                           if field.name != 'id' and not field.required]
 
     return Signature(non_default_parameters + default_parameters)
@@ -316,7 +360,7 @@ class TogglEntity(metaclass=TogglEntityBase):
             if field.name not in kwargs:
                 if field.default is None and field.required:
                     raise TypeError('We need "{}" attribute!'.format(field.name))
-            else: # Set the attribute only when there is some value to set, so default values could work properly
+            else:  # Set the attribute only when there is some value to set, so default values could work properly
                 setattr(self, field.name, kwargs[field.name])
 
     def save(self):

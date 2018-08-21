@@ -58,6 +58,30 @@ class Project(WorkspaceEntity):
             raise TogglValidationException("Client specified by ID does not exists!")
 
 
+class User(WorkspaceEntity):
+    _can_create = False
+    _can_update = False
+    _can_delete = False
+
+    default_workspace = base.MappingField(Workspace, 'default_wid')
+    email = base.EmailField()
+    fullname = base.StringField()
+    store_start_and_stop_time = base.BooleanField()
+    beginning_of_week = base.ChoiceField({
+        0: 'Sunday',
+        1: 'Monday',
+        2: 'Tuesday',
+        3: 'Wednesday',
+        4: 'Thursday',
+        5: 'Friday',
+        6: 'Saturday'
+    })
+    language = base.StringField()
+    image_url = base.StringField()
+    timezone = base.StringField()
+
+
+# TODO: Is_admin check?
 class WorkspaceUser(base.TogglEntity):
     _can_get_detail = False
 
