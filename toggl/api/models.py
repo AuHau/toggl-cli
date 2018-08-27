@@ -84,19 +84,12 @@ class User(WorkspaceEntity):
 # TODO: Is_admin check?
 class WorkspaceUser(base.TogglEntity):
     _can_get_detail = False
+    _can_create = False
 
-    required_fields = {'email', }
-    bool_fields = {'active', 'admin'}
-    int_fields = {'uid', }
-
-    def __init__(self, email, name=None, wid=None, uid=None, active=True, admin=False, config=None, **kwargs):
-        self.email = email
-        self.name = name
-        self.uid = uid
-        self.active = active
-        self.admin = admin
-
-        super(WorkspaceUser, self).__init__(wid=wid, config=config)
+    email = base.EmailField(is_read_only=True)
+    active = base.BooleanField(is_read_only=True)
+    admin = base.BooleanField()
+    user = base.MappingField(User, 'uid', is_read_only=True)
 
     @classmethod
     def invite(cls, *emails, wid=None, config=None):

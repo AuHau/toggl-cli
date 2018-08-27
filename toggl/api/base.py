@@ -225,7 +225,7 @@ class MappingCardinality(Enum):
 
 class MappingField(TogglField):
 
-    def __init__(self, mapped_cls, mapped_field, cardinality=MappingCardinality.ONE, read_only=False, *args, **kwargs):
+    def __init__(self, mapped_cls, mapped_field, cardinality=MappingCardinality.ONE, *args, **kwargs):
         super(MappingField, self).__init__(*args, **kwargs)
 
         if not issubclass(mapped_cls, TogglEntity):
@@ -234,7 +234,6 @@ class MappingField(TogglField):
         self.mapped_cls = mapped_cls
         self.mapped_field = mapped_field
         self.cardinality = cardinality
-        self.read_only = read_only
 
     def __get__(self, instance, owner):
         if self.cardinality == MappingCardinality.ONE:
@@ -267,9 +266,6 @@ class MappingField(TogglField):
             raise TogglException('{}: Unknown cardinality \'{}\''.format(self.name, self.cardinality))
 
     def __set__(self, instance, value):
-        if self.read_only:
-            raise AttributeError('Field is read only!')
-
         if self.cardinality == MappingCardinality.ONE:
             try:
                 if not isinstance(value, self.mapped_cls):
@@ -361,7 +357,11 @@ class TogglEntity(metaclass=TogglEntityBase):
                 if field.default is None and field.required:
                     raise TypeError('We need "{}" attribute!'.format(field.name))
             else:  # Set the attribute only when there is some value to set, so default values could work properly
-                setattr(self, field.name, kwargs[field.name])
+
+                if field.is_read_only:  # Bypass field's __set__ method
+                    self.__dict__[field.name] = kwargs[field.name]
+                else:
+                    setattr(self, field.name, kwargs[field.name])
 
     def save(self):
         if not self._can_update and self.id is not None:

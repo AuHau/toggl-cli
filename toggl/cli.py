@@ -458,13 +458,42 @@ def users_get(ctx, spec):
     entity_detail(api.User, spec, ('id', 'email', 'fullname'), 'email')
 
 
-@users.command('invite', short_help='invite new user into workspace')
-@click.argument('email')
+# ----------------------------------------------------------------------------
+# Workspace users
+# ----------------------------------------------------------------------------
+@cli.group('workspace_users', short_help='workspace\'s users management')
 @click.pass_context
-def users_invite(ctx, email):
+def workspace_users(ctx):
+    pass
+
+
+@workspace_users.command('ls', short_help='list workspace\'s users')
+@click.pass_context
+def workspace_users_ls(ctx):
+    entity_listing(api.WorkspaceUser, ('id', 'email', 'active', 'admin'))
+
+
+@workspace_users.command('get', short_help='retrieve details of a user')
+@click.argument('spec')
+@click.pass_context
+def workspace_users_get(ctx, spec):
+    entity_detail(api.WorkspaceUser, spec, ('id', 'email'), 'email')
+
+
+@workspace_users.command('invite', short_help='invite new user into workspace')
+@click.option('--email', '-e', prompt='Email of a user to invite to the workspace')
+@click.pass_context
+def workspace_users_invite(ctx, email):
     api.WorkspaceUser.invite(email)
 
     click.echo("User '{}' was successfully invited! He needs to accept the invitation now.".format(email))
+
+
+@workspace_users.command('rm', short_help='delete a specific workspace\'s user')
+@click.argument('spec')
+@click.pass_context
+def projects_rm(ctx, spec):
+    entity_remove(api.WorkspaceUser, spec)
 
 
 # ----------------------------------------------------------------------------
