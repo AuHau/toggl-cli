@@ -445,7 +445,7 @@ def users(ctx):
     pass
 
 
-@users.command('ls', short_help='list users')
+@users.command('ls', short_help='list users for given workspace')
 @click.pass_context
 def users_ls(ctx):
     entity_listing(api.User, ('id', 'email', 'fullname'))
@@ -458,10 +458,24 @@ def users_get(ctx, spec):
     entity_detail(api.User, spec, ('id', 'email', 'fullname'), 'email')
 
 
+@users.command('signup', short_help='sign up a new user')
+@click.option('--email', '-e', help='Email address which represents the new user\'s account',
+              prompt='Email of the user to sign up')
+@click.option('--password', '-p', help='Password for the new user\'s account', hide_input=True,
+              confirmation_prompt=True, prompt='Password of a user to sign up')
+@click.option('--timezone', '-t', help='Timezone which will be used for all date/time operations')
+@click.option('--created-with', '-c', help='Information about which application created the user\' account')
+@click.pass_context
+def users_signup(ctx, email, password, timezone=None, created_with=None):
+    user = api.User.signup(email, password, timezone, created_with)
+
+    click.echo("User '{}' was successfully created with ID #{}.".format(email, user.id))
+
+
 # ----------------------------------------------------------------------------
 # Workspace users
 # ----------------------------------------------------------------------------
-@cli.group('workspace_users', short_help='workspace\'s users management')
+@cli.group('workspace_users', short_help='workspace\'s users management (eq. access management for the workspace)')
 @click.pass_context
 def workspace_users(ctx):
     pass
@@ -481,7 +495,8 @@ def workspace_users_get(ctx, spec):
 
 
 @workspace_users.command('invite', short_help='invite new user into workspace')
-@click.option('--email', '-e', prompt='Email of a user to invite to the workspace')
+@click.option('--email', '-e', help='Email address where will be the invite to the worspace send',
+              prompt='Email of a user to invite to the workspace')
 @click.pass_context
 def workspace_users_invite(ctx, email):
     api.WorkspaceUser.invite(email)

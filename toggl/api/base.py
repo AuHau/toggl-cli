@@ -35,6 +35,18 @@ def evaluate_conditions(conditions, entity):
     return True
 
 
+def convert_entity(entity_cls, raw_entity):
+    entity_id = raw_entity.pop('id')
+    try:
+        raw_entity.pop('at')
+    except KeyError:
+        pass
+    entity_object = entity_cls(**raw_entity)
+    entity_object.id = entity_id
+
+    return entity_object
+
+
 class OldUser(object):
     """
     utils.Singleton toggl user data.
@@ -75,20 +87,13 @@ class TogglSet(object):
     def build_detail_url(self, id):
         return '/{}/{}'.format(self.url, id)
 
-    def _convert_entity(self, raw_entity):
-        entity_id = raw_entity.pop('id')
-        raw_entity.pop('at')
-        entity_object = self.entity_cls(**raw_entity)
-        entity_object.id = entity_id
-
-        return entity_object
 
     def get(self, id=None, config=None, **conditions):
         if id is not None:
             if self.can_get_detail:
                 try:
                     fetched_entity = utils.toggl(self.build_detail_url(id), 'get', config=config)
-                    return self._convert_entity(fetched_entity['data'])
+                    return convert_entity(self.entity_cls, fetched_entity['data'])
                 except HTTPError:
                     return None
             else:
@@ -119,7 +124,7 @@ class TogglSet(object):
         if fetched_entities is None:
             return []
 
-        return [self._convert_entity(entity) for entity in fetched_entities]
+        return [convert_entity(self.entity_cls, entity) for entity in fetched_entities]
 
 
 class TogglField:

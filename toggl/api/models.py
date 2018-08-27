@@ -1,4 +1,5 @@
 import json
+from pprint import pprint
 
 from . import base
 from .. import utils
@@ -79,6 +80,23 @@ class User(WorkspaceEntity):
     language = base.StringField()
     image_url = base.StringField()
     timezone = base.StringField()
+
+    @classmethod
+    def signup(cls, email, password, timezone=None, created_with='TogglCLI', config=None):
+        if config is None:
+            config = utils.Config.factory()
+
+        if timezone is None:
+            timezone = config.get('options', 'timezone')
+
+        user_json = json.dumps({'user': {
+            'email': email,
+            'password': password,
+            'timezone': timezone,
+            'created_with': created_with
+        }})
+        data = utils.toggl("/signups", "post", user_json, config=config)
+        return base.convert_entity(cls, data['data'])
 
 
 # TODO: Is_admin check?
