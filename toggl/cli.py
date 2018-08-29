@@ -237,8 +237,6 @@ def cli(ctx, quiet, verbose, debug, config=None):
 
     if not config.is_loaded:
         config.cli_bootstrap()
-        input('Waiting')
-
         config.persist()
 
     main_logger = logging.getLogger('toggl')

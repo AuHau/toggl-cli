@@ -30,7 +30,7 @@ Workspace.objects = WorkspaceSet('/workspaces', Workspace)
 
 
 class WorkspaceEntity(base.TogglEntity):
-    workspace = base.MappingField(Workspace, 'wid', default=lambda config: base.OldUser(config).get('default_wid'))
+    workspace = base.MappingField(Workspace, 'wid', default=lambda config: config.default_workspace)
 
 
 # ----------------------------------------------------------------------------
@@ -59,11 +59,21 @@ class Project(WorkspaceEntity):
             raise TogglValidationException("Client specified by ID does not exists!")
 
 
+class UserSet(base.TogglSet):
+
+    def current_user(self, config=None):
+        fetched_entity = utils.toggl('/me', 'get', config=config)
+        return base.convert_entity(self.entity_cls, fetched_entity['data'], config)
+
+
 class User(WorkspaceEntity):
     _can_create = False
     _can_update = False
     _can_delete = False
 
+    api_token = base.StringField()
+    send_timer_notifications = base.BooleanField()
+    openid_enabled = base.BooleanField()
     default_workspace = base.MappingField(Workspace, 'default_wid')
     email = base.EmailField()
     fullname = base.StringField()
@@ -96,7 +106,10 @@ class User(WorkspaceEntity):
             'created_with': created_with
         }})
         data = utils.toggl("/signups", "post", user_json, config=config)
-        return base.convert_entity(cls, data['data'])
+        return base.convert_entity(cls, data['data'], config)
+
+
+User.objects = UserSet('/users', User)
 
 
 # TODO: Is_admin check?
@@ -111,8 +124,8 @@ class WorkspaceUser(base.TogglEntity):
 
     @classmethod
     def invite(cls, *emails, wid=None, config=None):
-        if wid is None:
-            wid = base.OldUser().get('default_wid')
+        config = config or utils.Config.factory()
+        wid = wid or config.default_workspace
 
         emails_json = json.dumps({'emails': emails})
         data = utils.toggl("/workspaces/{}/invite".format(wid), "post", emails_json, config=config)

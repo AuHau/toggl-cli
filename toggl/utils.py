@@ -157,7 +157,7 @@ class ConfigBootstrap:
         if answers['default workspace'] != self.KEEP_TOGGLS_DEFAULT_WORKSPACE:
             from toggl.api import Workspace
             config = self._build_tmp_config(answers)
-            output['default_workspace'] = Workspace.objects.get(name=answers['default workspace'], config=config).id
+            output['default_wid'] = Workspace.objects.get(name=answers['default workspace'], config=config).id
 
         if answers['type_auth'] == "API token":
             output['api_token'] = answers['API token']
@@ -353,11 +353,13 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
         'continue_creates': IniEntry('options', bool),
         'year_first': IniEntry('options', bool),
         'day_first': IniEntry('options', bool),
-        'default_workspace': IniEntry('options', int),
+        'default_wid': IniEntry('options', int),
     }
 
     def __init__(self, config_path=sentinel, read_env=True, **kwargs):
         super().__init__(config_path=config_path, read_env=read_env, **kwargs)
+
+        self._user = None
 
         for key, value in kwargs.items():
             if key.isupper() or key[0] == '_':
@@ -397,6 +399,24 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
         values_dict = ConfigBootstrap().start()
         for key, value in values_dict.items():
             setattr(self, key, value)
+
+    @property
+    def user(self):
+        # Cache the User defined by the instance's config
+        if self._user is None:
+            from .api import User
+            self._user = User.objects.current_user(config=self)
+
+        return self._user
+
+    @property
+    def default_workspace(self):
+        try:
+            return self.default_wid
+        except AttributeError:
+            pass
+
+        return self.user.default_workspace.id
 
     def persist(self, items=None):
         # TODO: Decide if default values should be also persisted for backwards compatibility

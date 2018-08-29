@@ -35,43 +35,16 @@ def evaluate_conditions(conditions, entity):
     return True
 
 
-def convert_entity(entity_cls, raw_entity):
+def convert_entity(entity_cls, raw_entity, config):
     entity_id = raw_entity.pop('id')
     try:
         raw_entity.pop('at')
     except KeyError:
         pass
-    entity_object = entity_cls(**raw_entity)
+    entity_object = entity_cls(config=config, **raw_entity)
     entity_object.id = entity_id
 
     return entity_object
-
-
-class OldUser(object):
-    """
-    utils.Singleton toggl user data.
-    """
-
-    __metaclass__ = utils.Singleton
-
-    def __init__(self, config=None):
-        """
-        Fetches user data from toggl.
-        """
-        result_dict = utils.toggl("/me", 'get', config=config)
-
-        # Results come back in two parts. 'since' is how long the user has
-        # had their toggl account. 'data' is a dictionary of all the other
-        # user data.
-        self.data = result_dict['data']
-        self.data['since'] = result_dict['since']
-
-    def get(self, prop):
-        """
-        Return the given toggl user property. User properties are
-        documented at https://github.com/toggl/toggl_api_docs/blob/master/chapters/users.md
-        """
-        return self.data[prop]
 
 
 class TogglSet(object):
@@ -87,13 +60,12 @@ class TogglSet(object):
     def build_detail_url(self, id):
         return '/{}/{}'.format(self.url, id)
 
-
     def get(self, id=None, config=None, **conditions):
         if id is not None:
             if self.can_get_detail:
                 try:
                     fetched_entity = utils.toggl(self.build_detail_url(id), 'get', config=config)
-                    return convert_entity(self.entity_cls, fetched_entity['data'])
+                    return convert_entity(self.entity_cls, fetched_entity['data'], config)
                 except HTTPError:
                     return None
             else:
@@ -118,13 +90,14 @@ class TogglSet(object):
         return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity)]
 
     def all(self, wid=None, config=None):
-        wid = wid or OldUser(config).get('default_wid')
+        config = config or utils.Config.factory()
+        wid = wid or config.default_workspace
         fetched_entities = utils.toggl(self.build_list_url(wid), 'get', config=config)
 
         if fetched_entities is None:
             return []
 
-        return [convert_entity(self.entity_cls, entity) for entity in fetched_entities]
+        return [convert_entity(self.entity_cls, entity, config) for entity in fetched_entities]
 
 
 class TogglField:
@@ -368,7 +341,7 @@ class TogglEntity(metaclass=TogglEntityBase):
                 else:
                     setattr(self, field.name, kwargs[field.name])
 
-    def save(self):
+    def save(self, config=None):
         if not self._can_update and self.id is not None:
             raise TogglException("Updating this entity is not allowed!")
 
@@ -378,16 +351,16 @@ class TogglEntity(metaclass=TogglEntityBase):
         self.validate()
 
         if self.id is not None:  # Update
-            utils.toggl("/{}/{}".format(self.get_url(), self.id), "put", self.json(), config=self._config)
+            utils.toggl("/{}/{}".format(self.get_url(), self.id), "put", self.json(), config=config or self._config)
         else:  # Create
-            data = utils.toggl("/{}".format(self.get_url()), "post", self.json(), config=self._config)
+            data = utils.toggl("/{}".format(self.get_url()), "post", self.json(), config=config or self._config)
             self.id = data['data']['id']  # Store the returned ID
 
-    def delete(self):
+    def delete(self, config=None):
         if not self._can_delete:
             raise TogglException("Deleting this entity is not allowed!")
 
-        utils.toggl("/{}/{}".format(self.get_url(), self.id), "delete")
+        utils.toggl("/{}/{}".format(self.get_url(), self.id), "delete", config=config or self._config)
         self.id = None  # Invalidate the object, so when save() is called after delete a new object is created
 
     def __cmp__(self, other):
