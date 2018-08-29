@@ -87,7 +87,7 @@ class User(WorkspaceEntity):
             config = utils.Config.factory()
 
         if timezone is None:
-            timezone = config.get('options', 'timezone')
+            timezone = config.timezone
 
         user_json = json.dumps({'user': {
             'email': email,

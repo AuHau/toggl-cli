@@ -2,11 +2,11 @@ import datetime
 import json
 import logging
 import os
-from abc import ABCMeta
-from collections import defaultdict
-
-import time
+from collections import namedtuple
 from pprint import pformat
+
+import configparser
+from traceback import format_stack
 
 import click
 import dateutil.parser
@@ -14,9 +14,6 @@ import inquirer
 import iso8601
 import pytz
 import requests
-from six.moves import configparser
-from builtins import input
-from six import with_metaclass
 from tzlocal import get_localzone
 
 logger = logging.getLogger('toggl.utils')
@@ -89,14 +86,26 @@ class CachedFactoryMeta(type):
         return super().__new__(mcs, name, bases, namespace)
 
 
-class ABCCachedFactoryMeta(CachedFactoryMeta, ABCMeta):
+class ClassAttributeModificationWarning(type):
+    def __setattr__(cls, attr, value):
+        logger.warning('You are modifying class attribute of \'{}\' class. You better know what you are doing!'
+                       .format(cls.__name__))
+
+        logger.debug(pformat(format_stack()))
+
+        super(ClassAttributeModificationWarning, cls).__setattr__(attr, value)
+
+
+class CachedFactoryWithWarningsMeta(CachedFactoryMeta, ClassAttributeModificationWarning):
     pass
 
 
-class ConfigBootstrap(object):
+class ConfigBootstrap:
     """
     Create config based on the input from the User
     """
+
+    KEEP_TOGGLS_DEFAULT_WORKSPACE = '-- Keep Toggl\'s default --'
 
     def __init__(self):
         self.workspaces = None
@@ -114,13 +123,12 @@ class ConfigBootstrap(object):
 
     def _build_tmp_config(self, answers, credential=None):
         config = Config.factory(None)
-        config.add_section("auth")
 
         if answers['type_auth'] == "API token":
-            config.set('auth', 'api_token', credential or answers['API token'])
+            config.api_token = credential or answers['API token']
         else:
-            config.set('auth', 'username', answers['username'])
-            config.set('auth', 'password', credential or answers['password'])
+            config.username = answers['username']
+            config.password = credential or answers['password']
 
         return config
 
@@ -129,40 +137,35 @@ class ConfigBootstrap(object):
         config = self._build_tmp_config(answers)
 
         if self.workspaces is None:
-            self.workspaces = []
+            self.workspaces = [self.KEEP_TOGGLS_DEFAULT_WORKSPACE]
             for workspace in Workspace.objects.all(config=config):
                 self.workspaces.append(workspace.name)
 
         return self.workspaces
 
     def _map_answers(self, answers):
-        from toggl.api import Workspace
+        output = {
+            'file_logging': answers['file_logging'],
 
-        config = self._build_tmp_config(answers)
-        default_workspace_id = Workspace.objects.get(name=answers['default workspace'], config=config).id
+            'timezone': answers['timezone'],
+            'continue_creates': answers['continue_creates'],
+        }
+
+        if output['file_logging']:
+            output['file_logging_path'] = os.path.expanduser(answers.get('file_logging_path'))
+
+        if answers['default workspace'] != self.KEEP_TOGGLS_DEFAULT_WORKSPACE:
+            from toggl.api import Workspace
+            config = self._build_tmp_config(answers)
+            output['default_workspace'] = Workspace.objects.get(name=answers['default workspace'], config=config).id
 
         if answers['type_auth'] == "API token":
-            auth = {
-                'api_token': answers['API token']
-            }
+            output['api_token'] = answers['API token']
         else:
-            auth = {
-                'username': answers['username'],
-                'password': answers['password']
-            }
+            output['username'] = answers['username']
+            output['password'] = answers['password']
 
-        return {
-            'auth': auth,
-            'logging': {
-                'file_logging': answers['file_logging'],
-                'file_logging_path': answers.get('file_logging_path')
-            },
-            'options': {
-                'default_workspace': default_workspace_id,
-                'timezone': answers['timezone'],
-                'continue_creates': answers['continue_creates'],
-            }
-        }
+        return output
 
     def start(self, validate_credentials=True):
         click.secho(""" _____                 _   _____  _     _____ 
@@ -194,9 +197,10 @@ class ConfigBootstrap(object):
 
             inquirer.Password('password', message="Your Password", ignore=lambda x: x['type_auth'] != 'Credentials',
                               validate=lambda answers, current: not validate_credentials
-                                        or self._are_credentials_valid(answers)),
+                                                                or self._are_credentials_valid(answers)),
 
-            inquirer.List('default workspace', message="Default workspace which will be used when no workspace is provided",
+            inquirer.List('default workspace', message="Should TogglCli use different default workspace from Toggl's "
+                                                       "setting?",
                           choices=lambda answers: self._get_workspaces(answers)),
 
             inquirer.Text('timezone', 'Used timezone', default=local_timezone, show_default=True,
@@ -225,91 +229,203 @@ class ConfigBootstrap(object):
 # ----------------------------------------------------------------------------
 sentinel = object()
 
+IniEntry = namedtuple('IniEntry', ['section', 'type'])
 
-class Config(with_metaclass(ABCCachedFactoryMeta, configparser.RawConfigParser)):
-    """
-    Singleton. toggl configuration data, read from ~/.togglrc.
-    Properties:
-        auth - (username, password) tuple.
-    """
 
-    DEFAULT_VALUES = {
-        'continue_creates': 'True',
-        'time_format': '%I:%M%p',
-        'day_first': 'False',
-        'year_first': 'False',
-        'file_logging': 'False',
-        'file_logging_path': 'None',
-    }
-
+class IniConfigMixin:
+    INI_MAPPING = {}
     DEFAULT_CONFIG_PATH = os.path.expanduser('~/.togglrc')
 
-    ENV_NAME_API_TOKEN = 'TOGGL_API_TOKEN'
-    ENV_NAME_USERNAME = 'TOGGL_USERNAME'
-    ENV_NAME_PASSWORD = 'TOGGL_PASSWORD'
+    def __init__(self, config_path=sentinel, **kwargs):
+        self._config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path
+        self._store = configparser.ConfigParser()
+        self._loaded = False
 
-    def __init__(self, config_path=sentinel):
+        if self._config_path is not None:
+            self._loaded = self._store.read(self._config_path)
+
+        super().__init__(**kwargs)
+
+    def _resolve_type(self, entry, item):
+        if entry.type == bool:
+            return self._store.getboolean(entry.section, item, fallback=None)
+        elif entry.type == int:
+            return self._store.getint(entry.section, item, fallback=None)
+        elif entry.type == float:
+            return self._store.getfloat(entry.section, item, fallback=None)
+        else:
+            return self._store.get(entry.section, item, fallback=None)
+
+    def __getattribute__(self, item):
+        mapping_dict = object.__getattribute__(self, 'INI_MAPPING')
+        if item in mapping_dict:
+            value = self._resolve_type(mapping_dict[item], item)
+            if value is not None:
+                return value
+
+        return super(IniConfigMixin, self).__getattribute__(item)
+
+    @property
+    def is_loaded(self):
+        return bool(self._loaded)
+
+    def persist(self, items=None):
+        if self._config_path is None:
+            return
+
+        for item in items:
+            if item in self.INI_MAPPING:
+                value = getattr(self, item)
+                section = self.INI_MAPPING[item].section
+
+                if not self._store.has_section(section):
+                    self._store.add_section(section)
+
+                self._store.set(section, item, value)
+
+        with open(self._config_path, 'w') as config_file:
+            self._store.write(config_file)
+
+
+EnvEntry = namedtuple('EnvEntry', ['variable', 'type'])
+
+
+class EnvConfigMixin:
+    ENV_MAPPING = {}
+
+    def __init__(self, read_env=True, **kwargs):
+        self._read_env = read_env
+        super(EnvConfigMixin, self).__init__(**kwargs)
+
+    def _resolve_variable(self, entry):
+        value = os.environ.get(entry.variable)
+
+        if value is None:
+            return None
+
+        return entry.type(value)
+
+    def __getattribute__(self, item):
+        mapping_dict = object.__getattribute__(self, 'ENV_MAPPING')
+        if item in mapping_dict:
+            value = self._resolve_variable(mapping_dict[item])
+            if value is not None:
+                return value
+
+        return super().__getattribute__(item)
+
+
+class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarningsMeta):
+    """
+    Configuration class which implements hierarchy lookup to enable overloading configurations
+    based on several aspects.
+
+    Supported hierarchy in order of priority:
+         1) config instance's dict if present
+         2) if associated env variable is present, then the env variable is used
+         3) if config file specified, appropriate value is used
+         4) class's dict for default fallback
+    """
+
+    # Default values
+    continue_creates = True
+    time_format = '%I:%M%p'
+    day_first = False
+    year_first = False
+    file_logging = False
+    file_logging_path = None
+
+    ENV_MAPPING = {
+        'api_token': EnvEntry('TOGGL_API_TOKEN', str),
+        'user_name': EnvEntry('TOGGL_USERNAME', str),
+        'password': EnvEntry('TOGGL_PASSWORD', str),
+    }
+
+    INI_MAPPING = {
+        'api_token': IniEntry('auth', str),
+        'user_name': IniEntry('auth', str),
+        'password': IniEntry('auth', str),
+
+        'file_logging': IniEntry('logging', bool),
+        'file_logging_path': IniEntry('logging', str),
+
+        'timezone': IniEntry('options', str),
+        'continue_creates': IniEntry('options', bool),
+        'year_first': IniEntry('options', bool),
+        'day_first': IniEntry('options', bool),
+        'default_workspace': IniEntry('options', int),
+    }
+
+    def __init__(self, config_path=sentinel, read_env=True, **kwargs):
+        super().__init__(config_path=config_path, read_env=read_env, **kwargs)
+
+        for key, value in kwargs.items():
+            if key.isupper() or key[0] == '_':
+                raise AttributeError('You can not overload constants (eq. uppercase attributes) and private attributes'
+                                     '(eq. variables starting with \'_\')!')
+
+            setattr(self, key, value)
+
+    def __getattribute__(self, item):
         """
-        Reads configuration data from ~/.togglrc.
+        Implements hierarchy lookup as described in the class docstring.
+
+        :param item:
+        :return:
         """
-        super().__init__(self.DEFAULT_VALUES)
+        value_exists = True
+        retrieved_value = None
+        try:
+            retrieved_value = object.__getattribute__(self, item)
+        except AttributeError:
+            value_exists = False
 
-        self.config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path
+        # We are not interested in special attributes (private attributes or constants, methods)
+        if item.isupper() or item[0] == '_' or (value_exists and callable(retrieved_value)):
+            return retrieved_value
 
-        # There are use-cases when we do not want to load config from config file
-        # and just build the config during runtime
-        if self.config_path is not None and not self.read(self.config_path):
-            self._init_new_config()
+        # Retrieved value differs from the class attribute ==> it is instance's value, which has highest priority
+        if value_exists and self._get_class_attribute(item) != retrieved_value:
+            return retrieved_value
 
-    def _init_new_config(self):
+        return super().__getattribute__(item)
+
+    def _get_class_attribute(self, attr):
+        return self.__class__.__dict__.get(attr)
+
+    def cli_bootstrap(self):
         values_dict = ConfigBootstrap().start()
-        self.read_dict(values_dict)
+        for key, value in values_dict.items():
+            setattr(self, key, value)
 
-        with open(self.config_path, 'w') as cfgfile:
-            self.write(cfgfile)
-        os.chmod(self.config_path, 0o600)
+    def persist(self, items=None):
+        # TODO: Decide if default values should be also persisted for backwards compatibility
+        if items is None:
+            items = []
+            for item, value in vars(self).items():
+                if item.isupper() or item[0] == '_' or self._get_class_attribute(item) == value:
+                    continue
+
+                items.append(item)
+
+        super().persist(items)
 
     def get_auth(self):
         """
         Returns HTTPBasicAuth object to be used with request.
 
-        Supports overriding of the configuration using environment variables:
-        TOGGL_API_TOKEN, TOGGL_USERNAME and TOGGL_PASSWORD.
-
         :raises configparser.Error: When no credentials are available.
         :return: requests.auth.HTTPBasicAuth
         """
-        env_api_token = os.getenv(self.ENV_NAME_API_TOKEN)
-        env_username = os.getenv(self.ENV_NAME_USERNAME)
-        env_password = os.getenv(self.ENV_NAME_PASSWORD)
+        try:
+            return requests.auth.HTTPBasicAuth(self.api_token, 'api_token')
+        except AttributeError:
+            pass
 
-        if env_api_token:
-            return requests.auth.HTTPBasicAuth(env_api_token, 'api_token')
-
-        if env_username and env_password:
-            return requests.auth.HTTPBasicAuth(env_username, env_password)
-
-        use_token = self.get("options", "prefer_token", fallback=None)
-
-        if use_token is None:
-            api_token = self.get('auth', 'api_token', fallback=None)
-
-            if api_token is not None:
-                return requests.auth.HTTPBasicAuth(api_token, 'api_token')
-
-            username = env_username or self.get('auth', 'username', fallback=None)
-            password = env_password or self.get('auth', 'password', fallback=None)
-
-            if username is None and password is None:
-                raise configparser.Error("There is no authentication configuration!")
-
-            return requests.auth.HTTPBasicAuth(username, password)
-
-        # Fallback to old style configuration with 'prefer_token'
-        if use_token.lower() == 'true':
-            return requests.auth.HTTPBasicAuth(self.get('auth', 'api_token'), 'api_token')
-        else:
-            return requests.auth.HTTPBasicAuth(self.get('auth', 'username'), self.get('auth', 'password'))
+        try:
+            return requests.auth.HTTPBasicAuth(self.username, self.password)
+        except AttributeError:
+            raise configparser.Error("There is no authentication configuration!")
 
 
 # ----------------------------------------------------------------------------
@@ -489,7 +605,7 @@ def toggl(url, method, data=None, headers=None, config=None):
         config = Config.factory()
 
     url = "{}{}".format(TOGGL_URL, url)
-    logger.info('Sending to {} \'{}\' data: {}'.format(method.upper(), url, json.dumps(data)))
+    logger.info('Sending {} to \'{}\' data: {}'.format(method.upper(), url, json.dumps(data)))
     if method == 'delete':
         r = requests.delete(url, auth=config.get_auth(), data=data, headers=headers)
     elif method == 'get':
@@ -506,4 +622,3 @@ def toggl(url, method, data=None, headers=None, config=None):
     response = json.loads(r.text)
     logger.debug('Response data:\n' + pformat(response))
     return response
-

@@ -216,7 +216,7 @@ def entity_remove(cls, spec):
               help="sets specific Config file to be used (ENV: TOGGL_CONFIG)")
 @click.version_option(__version__)
 @click.pass_context
-def cli(ctx, quiet, verbose, debug, config):
+def cli(ctx, quiet, verbose, debug, config=None):
     """
     CLI interface to interact with Toggl tracking application.
 
@@ -228,8 +228,18 @@ def cli(ctx, quiet, verbose, debug, config):
     The authentication credentials can be also overridden with Environmental variables. Use
     TOGGL_API_TOKEN or TOGGL_USERNAME, TOGGL_PASSWORD.
     """
-    config = utils.Config.factory()
+    if config is not None:
+        config = utils.Config.factory(config)
+    else:
+        config = utils.Config.factory()
+
     ctx.obj['config'] = config
+
+    if not config.is_loaded:
+        config.cli_bootstrap()
+        input('Waiting')
+
+        config.persist()
 
     main_logger = logging.getLogger('toggl')
     main_logger.setLevel(logging.DEBUG)
@@ -251,8 +261,8 @@ def cli(ctx, quiet, verbose, debug, config):
     else:
         main_logger.addHandler(default)
 
-    if config.getboolean('logging', 'file_logging'):
-        log_path = config.get('logging', 'file_logging_path')
+    if config.file_logging:
+        log_path = config.file_logging_path
         fh = logging.FileHandler(log_path)
         fh_formater = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         fh.setFormatter(fh_formater)
