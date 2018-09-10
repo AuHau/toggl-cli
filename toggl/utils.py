@@ -315,6 +315,7 @@ class EnvConfigMixin:
         return super().__getattribute__(item)
 
 
+# TODO: Migration of old version INI config
 class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarningsMeta):
     """
     Configuration class which implements hierarchy lookup to enable overloading configurations
@@ -360,6 +361,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
         super().__init__(config_path=config_path, read_env=read_env, **kwargs)
 
         self._user = None
+        self._default_workspace = None
 
         for key, value in kwargs.items():
             if key.isupper() or key[0] == '_':
@@ -411,12 +413,17 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
 
     @property
     def default_workspace(self):
+        if self._default_workspace is not None:
+            return self._default_workspace
+
         try:
-            return self.default_wid
+            from .api import Workspace
+            self._default_workspace = Workspace.objects.get(self.default_wid)
+            return self._default_workspace
         except AttributeError:
             pass
 
-        return self.user.default_workspace.id
+        return self.user.default_workspace
 
     def persist(self, items=None):
         # TODO: Decide if default values should be also persisted for backwards compatibility

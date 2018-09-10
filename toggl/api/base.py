@@ -47,6 +47,7 @@ def convert_entity(entity_cls, raw_entity, config):
     return entity_object
 
 
+# TODO: Caching
 class TogglSet(object):
     def __init__(self, url, entity_cls, can_get_detail=True, can_get_list=True):
         self.url = url
@@ -91,7 +92,7 @@ class TogglSet(object):
 
     def all(self, wid=None, config=None):
         config = config or utils.Config.factory()
-        wid = wid or config.default_workspace
+        wid = wid or config.default_workspace.id
         fetched_entities = utils.toggl(self.build_list_url(wid), 'get', config=config)
 
         if fetched_entities is None:
@@ -103,12 +104,12 @@ class TogglSet(object):
 class TogglField:
     field_type = object
 
-    def __init__(self, verbose_name=None, required=False, default=None, is_premium=False, is_read_only=False):
+    def __init__(self, verbose_name=None, required=False, default=None, admin=False, is_read_only=False):
         self.name = None
         self.verbose_name = verbose_name
         self.required = required
         self.default = default
-        self.is_premium = is_premium
+        self.admin = admin
         self.is_read_only = is_read_only
 
     def validate(self, value):

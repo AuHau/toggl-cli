@@ -1,5 +1,4 @@
 import json
-from pprint import pprint
 
 from . import base
 from .. import utils
@@ -30,7 +29,7 @@ Workspace.objects = WorkspaceSet('/workspaces', Workspace)
 
 
 class WorkspaceEntity(base.TogglEntity):
-    workspace = base.MappingField(Workspace, 'wid', default=lambda config: config.default_workspace)
+    workspace = base.MappingField(Workspace, 'wid', default=lambda config: config.default_workspace.id)
 
 
 # ----------------------------------------------------------------------------
@@ -125,7 +124,7 @@ class WorkspaceUser(base.TogglEntity):
     @classmethod
     def invite(cls, *emails, wid=None, config=None):
         config = config or utils.Config.factory()
-        wid = wid or config.default_workspace
+        wid = wid or config.default_workspace.id
 
         emails_json = json.dumps({'emails': emails})
         data = utils.toggl("/workspaces/{}/invite".format(wid), "post", emails_json, config=config)
