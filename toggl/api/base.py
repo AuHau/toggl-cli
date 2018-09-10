@@ -116,6 +116,30 @@ class TogglField:
         if self.required and self.default is None and not value:
             raise TogglValidationException('The field \'{}\' is required!'.format(self.name))
 
+    def init(self, instance, value):
+        if self.name in instance.__dict__:
+            raise TogglException('Field \'{}.{}\' is already initiated!'.format(instance.__class__.__name__), self.name)
+
+        if not isinstance(value, self.field_type):
+            # Before raising TypeError lets try to cast the value into correct type
+            try:
+                value = self.field_type(value)
+            except ValueError:
+                raise TypeError(
+                    'Expected for field \'{}\' type {} got {}'.format(self.name, self.field_type, type(value)))
+
+        instance.__dict__[self.name] = value
+
+    def _set_value(self, instance, value):
+        try:
+            if instance.__dict__[self.name] == value:
+                return
+        except KeyError:
+            pass
+
+        instance.__change_dict__[self.name] = value
+        instance.__dict__[self.name] = value
+
     def __get__(self, instance, owner):
         try:
             return instance.__dict__[self.name]
@@ -132,11 +156,11 @@ class TogglField:
             if (isinstance(instance, WorkspaceEntity) and not instance.workspace.admin) \
                     or (isinstance(instance, Workspace) and not instance.admin):
                 raise TogglAuthorizationException('You are trying edit field \'{}.{}\' which is admin only field, '
-                                                  'but you are not an admin!'.format(self.__class__.__name__, self.name)
-                                                  )
+                                                  'but you are not an admin!'
+                                                  .format(instance.__class__.__name__, self.name))
 
         if value is None and not self.required:
-            instance.__dict__[self.name] = value
+            self._set_value(instance, value)
             return
 
         if not isinstance(value, self.field_type):
@@ -147,7 +171,7 @@ class TogglField:
                 raise TypeError(
                     'Expected for field \'{}\' type {} got {}'.format(self.name, self.field_type, type(value)))
 
-        instance.__dict__[self.name] = value
+        self._set_value(instance, value)
 
     def __str__(self):
         return '{} - {}'.format(self.__class__.__name__, self.name)
@@ -223,6 +247,32 @@ class MappingField(TogglField):
         self.mapped_field = mapped_field
         self.cardinality = cardinality
 
+    def init(self, instance, value):
+        if self.cardinality == MappingCardinality.ONE:
+            try:
+                if not isinstance(value, self.mapped_cls):
+                    logger.warning('Assigning class {} to MappedField with class {}.'.format(type(value),
+                                                                                             self.mapped_cls))
+
+                instance.__dict__[self.mapped_field] = value.id
+            except AttributeError:
+                if not isinstance(value, int):
+                    logger.warning('Assigning as ID to mapped field value which is not integer!')
+
+                instance.__dict__[self.mapped_field] = value
+        else:
+            raise NotImplementedError('Field with MANY cardinality is not supported for attribute assignment')
+
+    def _set_value(self, instance, value):
+        try:
+            if instance.__dict__[self.mapped_field] == value:
+                return
+        except KeyError:
+            pass
+
+        instance.__change_dict__[self.mapped_field] = value
+        instance.__dict__[self.mapped_field] = value
+
     def __get__(self, instance, owner):
         if self.cardinality == MappingCardinality.ONE:
             try:
@@ -257,15 +307,15 @@ class MappingField(TogglField):
         if self.cardinality == MappingCardinality.ONE:
             try:
                 if not isinstance(value, self.mapped_cls):
-                    logger.warning('Assigning class \'{}\' to MappedField with class \'{}\'.'.format(type(value),
-                                                                                                     self.mapped_cls))
+                    logger.warning('Assigning class {} to MappedField with class {}.'.format(type(value),
+                                                                                             self.mapped_cls))
 
-                instance.__dict__[self.mapped_field] = value.id
+                self._set_value(instance, value.id)
             except AttributeError:
                 if not isinstance(value, int):
                     logger.warning('Assigning as ID to mapped field value which is not integer!')
 
-                instance.__dict__[self.mapped_field] = value.id
+                self._set_value(instance, value)
         else:
             raise NotImplementedError('Field with MANY cardinality is not supported for attribute assignment')
 
@@ -310,6 +360,7 @@ class TogglEntityBase(ABCMeta):
 class TogglEntity(metaclass=TogglEntityBase):
     __signature__ = _make_signature({})
     __fields__ = []
+    __change_dict__ = {}
 
     _validate_workspace = True
     _can_create = True
@@ -329,12 +380,12 @@ class TogglEntity(metaclass=TogglEntityBase):
             if isinstance(field, MappingField):
                 # User supplied most probably the whole mapped object
                 if field.name in kwargs:
-                    setattr(self, field.name, kwargs.get(field.name))
+                    field.init(self, kwargs.get(field.name))
                     continue
 
                 # Most probably converting API call with direct ID of the object
                 if field.mapped_field in kwargs:
-                    setattr(self, field.mapped_field, kwargs.get(field.mapped_field))
+                    field.init(self, kwargs.get(field.mapped_field))
                     continue
 
                 if field.default is None and field.required:
@@ -345,11 +396,7 @@ class TogglEntity(metaclass=TogglEntityBase):
                 if field.default is None and field.required:
                     raise TypeError('We need "{}" attribute!'.format(field.name))
             else:  # Set the attribute only when there is some value to set, so default values could work properly
-
-                if field.is_read_only:  # Bypass field's __set__ method
-                    self.__dict__[field.name] = kwargs[field.name]
-                else:
-                    setattr(self, field.name, kwargs[field.name])
+                field.init(self, kwargs[field.name])
 
     def save(self, config=None):
         if not self._can_update and self.id is not None:
@@ -361,7 +408,9 @@ class TogglEntity(metaclass=TogglEntityBase):
         self.validate()
 
         if self.id is not None:  # Update
-            utils.toggl("/{}/{}".format(self.get_url(), self.id), "put", self.json(), config=config or self._config)
+            utils.toggl("/{}/{}".format(self.get_url(), self.id), "put", self.json(update=True),
+                        config=config or self._config)
+            self.__change_dict__ = {}  # Reset tracking changes
         else:  # Create
             data = utils.toggl("/{}".format(self.get_url()), "post", self.json(), config=config or self._config)
             self.id = data['data']['id']  # Store the returned ID
@@ -379,7 +428,13 @@ class TogglEntity(metaclass=TogglEntityBase):
 
         return self.id == other.id
 
-    def json(self):
+    def json(self, update=False):
+        if update:
+            change_dict = self.__change_dict__
+            del change_dict['id']
+
+            return json.dumps({self.get_name(): change_dict})
+
         return json.dumps({self.get_name(): self.to_dict()})
 
     @classmethod

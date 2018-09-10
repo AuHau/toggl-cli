@@ -10,8 +10,6 @@ Parser = None  # OptionParser initialized by main()
 VISIT_WWW_COMMAND = "open http://www.toggl.com/app/timer"
 
 
-# TODO: Edits
-
 def run(cmd):
     """Special function for running CLI like commands inside REPL
 

@@ -205,6 +205,28 @@ def entity_remove(cls, spec):
     click.echo("{} successfully deleted!".format(cls.get_name(verbose=True)))
 
 
+def entity_update(cls, spec, **kwargs):
+    entity = cls.objects.get(spec) or cls.objects.get(name=spec)
+
+    if entity is None:
+        click.echo("{} not found!".format(cls.get_name(verbose=True)), color='red')
+        exit(1)
+
+    updated = False
+    for key, value in kwargs.items():
+        if value is not None:
+            updated = True
+            setattr(entity, key, value)
+
+    if not updated:
+        click.echo("Nothing to update for {}!".format(cls.get_name(verbose=True)))
+        exit(0)
+
+    entity.save()
+
+    click.echo("{} successfully updated!".format(cls.get_name(verbose=True)))
+
+
 # ----------------------------------------------------------------------------
 # NEW CLI
 # ----------------------------------------------------------------------------
@@ -323,7 +345,7 @@ def clients(ctx):
 @clients.command('add', short_help='create new client')
 @click.option('--name', '-n', prompt='Name of the client',
               help='Specifies the name of the client', )
-@click.option('--note', help='Specifies a note linked to the client', )
+@click.option('--notes', help='Specifies a note linked to the client', )
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.Workspace),
               help='Specifies a workspace where the client will be created. Can be ID or name of the workspace '
                    '(ENV: TOGGL_WORKSPACE)')
@@ -337,6 +359,15 @@ def clients_add(ctx, name, note, workspace):
 
     client.save()
     click.echo("Client '{}' with #{} created.".format(client.name, client.id))
+
+
+@clients.command('update', short_help='update a client')
+@click.argument('spec')
+@click.option('--name', '-n', help='Specifies the name of the client', )
+@click.option('--notes', help='Specifies a note linked to the client', )
+@click.pass_context
+def clients_update(ctx, spec, **kwargs):
+    entity_update(api.Client, spec, **kwargs)
 
 
 @clients.command('ls', short_help='list clients')

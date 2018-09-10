@@ -418,7 +418,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
 
         try:
             from .api import Workspace
-            self._default_workspace = Workspace.objects.get(self.default_wid)
+            self._default_workspace = Workspace.objects.get(self.default_wid, config=self)
             return self._default_workspace
         except AttributeError:
             pass
@@ -640,7 +640,7 @@ def toggl(url, method, data=None, headers=None, config=None):
     elif method == 'post':
         r = requests.post(url, auth=config.get_auth(), data=data, headers=headers)
     elif method == 'put':
-        r = requests.post(url, auth=config.get_auth(), data=data, headers=headers)
+        r = requests.put(url, auth=config.get_auth(), data=data, headers=headers)
     else:
         raise NotImplementedError('HTTP method "{}" not implemented.'.format(method))
 
