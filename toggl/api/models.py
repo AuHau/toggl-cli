@@ -107,18 +107,23 @@ class User(WorkspaceEntity):
         data = utils.toggl("/signups", "post", user_json, config=config)
         return base.convert_entity(cls, data['data'], config)
 
+    def is_admin(self, workspace):
+        wid = workspace.id if isinstance(workspace, Workspace) else workspace
+
+        workspace_user = WorkspaceUser.objects.get(wid=wid, uid=self.id)
+        return workspace_user.admin
+
 
 User.objects = UserSet('/users', User)
 
 
-# TODO: Is_admin check?
-class WorkspaceUser(base.TogglEntity):
+class WorkspaceUser(WorkspaceEntity):
     _can_get_detail = False
     _can_create = False
 
     email = base.EmailField(is_read_only=True)
     active = base.BooleanField(is_read_only=True)
-    admin = base.BooleanField()
+    admin = base.BooleanField(admin_only=True)
     user = base.MappingField(User, 'uid', is_read_only=True)
 
     @classmethod

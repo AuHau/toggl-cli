@@ -10,7 +10,7 @@ from requests import HTTPError
 from validate_email import validate_email
 
 from .. import utils
-from ..exceptions import TogglValidationException, TogglException, TogglMultipleResults
+from ..exceptions import TogglValidationException, TogglException, TogglMultipleResults, TogglAuthorizationException
 
 logger = logging.getLogger('toggl.models.base')
 
@@ -104,12 +104,12 @@ class TogglSet(object):
 class TogglField:
     field_type = object
 
-    def __init__(self, verbose_name=None, required=False, default=None, admin=False, is_read_only=False):
+    def __init__(self, verbose_name=None, required=False, default=None, admin_only=False, is_read_only=False):
         self.name = None
         self.verbose_name = verbose_name
         self.required = required
         self.default = default
-        self.admin = admin
+        self.admin_only = admin_only
         self.is_read_only = is_read_only
 
     def validate(self, value):
@@ -125,6 +125,15 @@ class TogglField:
     def __set__(self, instance, value):
         if self.is_read_only:
             raise TogglException('Attribute \'{}\' is read only!'.format(self.name))
+
+        if self.admin_only:
+            from .models import Workspace, WorkspaceEntity
+
+            if (isinstance(instance, WorkspaceEntity) and not instance.workspace.admin) \
+                    or (isinstance(instance, Workspace) and not instance.admin):
+                raise TogglAuthorizationException('You are trying edit field \'{}.{}\' which is admin only field, '
+                                                  'but you are not an admin!'.format(self.__class__.__name__, self.name)
+                                                  )
 
         if value is None and not self.required:
             instance.__dict__[self.name] = value

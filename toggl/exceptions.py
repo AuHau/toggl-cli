@@ -9,6 +9,14 @@ class TogglValidationException(TogglException):
     pass
 
 
+class TogglAuthorizationException(TogglException):
+    pass
+
+
+class TogglAuthenticationException(TogglException):
+    pass
+
+
 class TogglMultipleResults(TogglException):
     pass
 
