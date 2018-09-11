@@ -3,14 +3,14 @@ import logging
 import re
 from abc import ABCMeta
 from builtins import int
+from collections import OrderedDict
 from enum import Enum
 from inspect import Signature, Parameter
 
-from requests import HTTPError
 from validate_email import validate_email
 
 from .. import utils
-from ..exceptions import TogglValidationException, TogglException, TogglMultipleResults, TogglAuthorizationException
+from .. import exceptions
 
 logger = logging.getLogger('toggl.models.base')
 
@@ -67,7 +67,7 @@ class TogglSet(object):
                 try:
                     fetched_entity = utils.toggl(self.build_detail_url(id), 'get', config=config)
                     return convert_entity(self.entity_cls, fetched_entity['data'], config)
-                except HTTPError:
+                except exceptions.TogglNotFoundException:
                     return None
             else:
                 conditions['id'] = id
@@ -75,7 +75,7 @@ class TogglSet(object):
         entries = self.filter(config=config, **conditions)
 
         if len(entries) > 1:
-            raise TogglMultipleResults()
+            raise exceptions.TogglMultipleResults()
 
         if not entries:
             return None
@@ -102,7 +102,7 @@ class TogglSet(object):
 
 
 class TogglField:
-    field_type = object
+    _field_type = object
 
     def __init__(self, verbose_name=None, required=False, default=None, admin_only=False, is_read_only=False):
         self.name = None
@@ -114,19 +114,23 @@ class TogglField:
 
     def validate(self, value):
         if self.required and self.default is None and not value:
-            raise TogglValidationException('The field \'{}\' is required!'.format(self.name))
+            raise exceptions.TogglValidationException('The field \'{}\' is required!'.format(self.name))
+
+    def cast_value(self, value):
+        return self._field_type(value)
 
     def init(self, instance, value):
         if self.name in instance.__dict__:
-            raise TogglException('Field \'{}.{}\' is already initiated!'.format(instance.__class__.__name__), self.name)
+            raise exceptions.TogglException('Field \'{}.{}\' is already initiated!'
+                                            .format(instance.__class__.__name__, self.name))
 
-        if not isinstance(value, self.field_type):
+        if not isinstance(value, self._field_type):
             # Before raising TypeError lets try to cast the value into correct type
             try:
-                value = self.field_type(value)
+                value = self.cast_value(value)
             except ValueError:
                 raise TypeError(
-                    'Expected for field \'{}\' type {} got {}'.format(self.name, self.field_type, type(value)))
+                    'Expected for field \'{}\' type {} got {}'.format(self.name, self._field_type, type(value)))
 
         instance.__dict__[self.name] = value
 
@@ -148,28 +152,30 @@ class TogglField:
 
     def __set__(self, instance, value):
         if self.is_read_only:
-            raise TogglException('Attribute \'{}\' is read only!'.format(self.name))
+            raise exceptions.TogglException('Attribute \'{}\' is read only!'.format(self.name))
 
         if self.admin_only:
             from .models import Workspace, WorkspaceEntity
 
             if (isinstance(instance, WorkspaceEntity) and not instance.workspace.admin) \
                     or (isinstance(instance, Workspace) and not instance.admin):
-                raise TogglAuthorizationException('You are trying edit field \'{}.{}\' which is admin only field, '
-                                                  'but you are not an admin!'
-                                                  .format(instance.__class__.__name__, self.name))
+                raise exceptions.TogglAuthorizationException(
+                    None, None,
+                    'You are trying edit field \'{}.{}\' which is admin only field, but you are not an admin!'
+                        .format(instance.__class__.__name__, self.name)
+                )
 
         if value is None and not self.required:
             self._set_value(instance, value)
             return
 
-        if not isinstance(value, self.field_type):
+        if not isinstance(value, self._field_type):
             # Before raising TypeError lets try to cast the value into correct type
             try:
-                value = self.field_type(value)
+                value = self.cast_value(value)
             except ValueError:
                 raise TypeError(
-                    'Expected for field \'{}\' type {} got {}'.format(self.name, self.field_type, type(value)))
+                    'Expected for field \'{}\' type {} got {}'.format(self.name, self._field_type, type(value)))
 
         self._set_value(instance, value)
 
@@ -178,19 +184,19 @@ class TogglField:
 
 
 class StringField(TogglField):
-    field_type = str
+    _field_type = str
 
 
 class IntegerField(TogglField):
-    field_type = int
+    _field_type = int
 
 
 class FloatField(TogglField):
-    field_type = float
+    _field_type = float
 
 
 class BooleanField(TogglField):
-    field_type = bool
+    _field_type = bool
 
 
 class EmailField(StringField):
@@ -199,7 +205,7 @@ class EmailField(StringField):
         super(EmailField, self).validate(value)
 
         if not validate_email(value):
-            raise TogglValidationException('Email \'{}\' is not valid email address!'.format(value))
+            raise exceptions.TogglValidationException('Email \'{}\' is not valid email address!'.format(value))
 
 
 class ChoiceField(TogglField):
@@ -224,7 +230,7 @@ class ChoiceField(TogglField):
         super(ChoiceField, self).validate(value)
 
         if value not in self.choices and value not in self.choices.values():
-            raise TogglValidationException('Value \'{}\' is not valid choice!'.format(value))
+            raise exceptions.TogglValidationException('Value \'{}\' is not valid choice!'.format(value))
 
     def get_label(self, value):
         return self.choices[value]
@@ -301,7 +307,7 @@ class MappingField(TogglField):
         elif self.cardinality == MappingCardinality.MANY:
             raise NotImplementedError("Not implemented yet")
         else:
-            raise TogglException('{}: Unknown cardinality \'{}\''.format(self.name, self.cardinality))
+            raise exceptions.TogglException('{}: Unknown cardinality \'{}\''.format(self.name, self.cardinality))
 
     def __set__(self, instance, value):
         if self.cardinality == MappingCardinality.ONE:
@@ -321,24 +327,24 @@ class MappingField(TogglField):
 
 
 def _make_signature(fields):
-    non_default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD) for field in fields
+    non_default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD) for field in fields.values()
                               if field.name != 'id' and field.required]
     default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD, default=field.default) for field in
-                          fields
+                          fields.values()
                           if field.name != 'id' and not field.required]
 
     return Signature(non_default_parameters + default_parameters)
 
 
 def _make_fields(attrs, parents):
-    fields = []
+    fields = OrderedDict()
     for parent in parents:
-        fields += parent.__fields__
+        fields.update(parent.__fields__)
 
     for key, field in attrs.items():
         if isinstance(field, TogglField):
             field.name = key
-            fields.append(field)
+            fields[key] = field
 
     return fields
 
@@ -359,7 +365,7 @@ class TogglEntityBase(ABCMeta):
 # TODO: Premium fields and check for current Workspace to be Premium
 class TogglEntity(metaclass=TogglEntityBase):
     __signature__ = _make_signature({})
-    __fields__ = []
+    __fields__ = OrderedDict()
     __change_dict__ = {}
 
     _validate_workspace = True
@@ -373,7 +379,7 @@ class TogglEntity(metaclass=TogglEntityBase):
     def __init__(self, config=None, **kwargs):
         self._config = config
 
-        for field in self.__fields__:
+        for field in self.__fields__.values():
             if field.name in {'id'}:
                 continue
 
@@ -400,10 +406,10 @@ class TogglEntity(metaclass=TogglEntityBase):
 
     def save(self, config=None):
         if not self._can_update and self.id is not None:
-            raise TogglException("Updating this entity is not allowed!")
+            raise exceptions.TogglException("Updating this entity is not allowed!")
 
         if not self._can_create and self.id is None:
-            raise TogglException("Creating this entity is not allowed!")
+            raise exceptions.TogglException("Creating this entity is not allowed!")
 
         self.validate()
 
@@ -417,14 +423,14 @@ class TogglEntity(metaclass=TogglEntityBase):
 
     def delete(self, config=None):
         if not self._can_delete:
-            raise TogglException("Deleting this entity is not allowed!")
+            raise exceptions.TogglException("Deleting this entity is not allowed!")
 
         utils.toggl("/{}/{}".format(self.get_url(), self.id), "delete", config=config or self._config)
         self.id = None  # Invalidate the object, so when save() is called after delete a new object is created
 
     def __cmp__(self, other):
         if not isinstance(other, self.__class__):
-            raise TogglException("You are trying to compare instances of different classes!")
+            raise exceptions.TogglException("You are trying to compare instances of different classes!")
 
         return self.id == other.id
 
@@ -453,12 +459,12 @@ class TogglEntity(metaclass=TogglEntityBase):
         return cls.get_name() + 's'
 
     def validate(self):
-        for field in self.__fields__:
+        for field in self.__fields__.values():
             field.validate(getattr(self, field.name, None))
 
     def to_dict(self):
         entity_dict = {}
-        for field in self.__fields__:
+        for field in self.__fields__.values():
             try:
                 entity_dict[field.mapped_field] = getattr(self, field.name).id
             except AttributeError:

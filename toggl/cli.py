@@ -150,9 +150,14 @@ def entity_listing(cls, fields=('id', 'name',)):
     click.echo(table)
 
 
-def get_entity(cls, spec, field_lookup):
+def get_entity(cls, org_spec, field_lookup):
     entity = None
     for field in field_lookup:
+        try:
+            spec = cls.__fields__[field].cast_value(org_spec)
+        except ValueError:
+            continue
+
         entity = cls.objects.get(**{field: spec})
 
         if entity is not None:
@@ -169,7 +174,7 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name')
         exit(1)
 
     entity_dict = {}
-    for field in entity.__fields__:
+    for field in entity.__fields__.values():
         try:
             # In case it is ChoiceField translate the key to label
             entity_dict[field.name] = field.get_label(getattr(entity, field.name))
@@ -437,10 +442,13 @@ def projects_add(ctx, name, client, workspace, public, billable, auto_estimates,
 @click.option('--name', '-n', help='Specifies the name of the project', )
 @click.option('--customer', '-c', type=ResourceType(api.Client),
               help='Specifies a client to which the project will be assigned to. Can be ID or name of the client')
-@click.option('--public', '-p', is_flag=True, help='Specifies whether project is accessible for all workspace users ('
-                                             '=public) or just only project\'s users.')
-@click.option('--billable/--no-billable', help='Specifies whether project is billable or not. (Premium only)')
-@click.option('--auto-estimates/--no-auto-estimates', help='Specifies whether the estimated hours are automatically calculated based on task estimations or manually fixed based on the value of \'estimated_hours\' ')
+@click.option('--public/--no-public', default=None, help='Specifies whether project is accessible for all workspace'
+                                                         ' users (=public) or just only project\'s users.')
+@click.option('--billable/--no-billable', default=None, help='Specifies whether project is billable or not.'
+                                                             ' (Premium only)')
+@click.option('--auto-estimates/--no-auto-estimates', default=None,
+              help='Specifies whether the estimated hours are automatically calculated based on task estimations or'
+                   ' manually fixed based on the value of \'estimated_hours\'')
 @click.option('--rate', '-r', type=click.FLOAT, help='Hourly rate of the project (Premium only)')
 @click.option('--color', type=click.INT, help='ID of color used for the project')
 @click.pass_context
@@ -569,7 +577,7 @@ def workspace_users_rm(ctx, spec):
 
 @workspace_users.command('update', short_help='update a specific workspace\'s user')
 @click.argument('spec')
-@click.option('--admin/--no-admin', help='Specifies if the workspace\'s user is admin for the workspace',)
+@click.option('--admin/--no-admin', default=None, help='Specifies if the workspace\'s user is admin for the workspace',)
 @click.pass_context
 def workspace_users_update(ctx, spec, **kwargs):
     entity_update(api.WorkspaceUser, spec, ('id', 'email'), **kwargs)
