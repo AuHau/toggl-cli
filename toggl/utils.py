@@ -16,6 +16,8 @@ import pytz
 import requests
 from tzlocal import get_localzone
 
+from . import exceptions
+
 logger = logging.getLogger('toggl.utils')
 
 
@@ -113,11 +115,10 @@ class ConfigBootstrap:
     def _are_credentials_valid(self, answers, credential):
         config = self._build_tmp_config(answers, credential)
 
-        # TODO: Narrow down the Exception when proper Exception raising is created for toggl() function.
         try:
             toggl("/me", "get", config=config)
             return True
-        except Exception as e:
+        except exceptions.TogglAuthenticationException as e:
             Logger.debug(e)
             return False
 
@@ -619,6 +620,41 @@ class Logger(object):
 # ----------------------------------------------------------------------------
 # toggl
 # ----------------------------------------------------------------------------
+def handle_error(response):
+    if response.status_code == 402:
+        raise exceptions.TogglPremiumException(
+            response.status_code, response.text,
+            "Request tried to utilized Premium functionality on workspace which is not Premium!"
+        )
+
+    if response.status_code == 403:
+        raise exceptions.TogglAuthenticationException(
+            response.status_code, response.text,
+            "Authentication credentials are not correct."
+        )
+
+    if response.status_code == 429:
+        raise exceptions.TogglThrottlingException(
+            response.status_code, response.text,
+            "Toggl's API refused your request for throttling reasons."
+        )
+
+    if response.status_code == 404:
+        raise exceptions.TogglNotFoundException(
+            response.status_code, response.text,
+            "Requested resource not found."
+        )
+
+    if 500 <= response.status_code < 600:
+        raise exceptions.TogglServerException()
+
+    raise exceptions.TogglApiException(
+        response.status_code, response.text,
+        "Toggl's API server returned {} code with message: {}"
+        .format(response.status_code, response.text)
+    )
+
+
 def toggl(url, method, data=None, headers=None, config=None):
     """
     Makes an HTTP request to toggl.com. Returns the parsed JSON as dict.
@@ -634,18 +670,21 @@ def toggl(url, method, data=None, headers=None, config=None):
     url = "{}{}".format(TOGGL_URL, url)
     logger.info('Sending {} to \'{}\' data: {}'.format(method.upper(), url, json.dumps(data)))
     if method == 'delete':
-        r = requests.delete(url, auth=config.get_auth(), data=data, headers=headers)
+        response = requests.delete(url, auth=config.get_auth(), data=data, headers=headers)
     elif method == 'get':
-        r = requests.get(url, auth=config.get_auth(), data=data, headers=headers)
+        response = requests.get(url, auth=config.get_auth(), data=data, headers=headers)
     elif method == 'post':
-        r = requests.post(url, auth=config.get_auth(), data=data, headers=headers)
+        response = requests.post(url, auth=config.get_auth(), data=data, headers=headers)
     elif method == 'put':
-        r = requests.put(url, auth=config.get_auth(), data=data, headers=headers)
+        response = requests.put(url, auth=config.get_auth(), data=data, headers=headers)
     else:
         raise NotImplementedError('HTTP method "{}" not implemented.'.format(method))
 
-    # TODO: Better error handling (eq. Toggl's custom Exceptions)
-    r.raise_for_status()  # raise exception on error
-    response = json.loads(r.text)
-    logger.debug('Response data:\n' + pformat(response))
-    return response
+    if response.status_code >= 300:
+        handle_error(response)
+
+        response.raise_for_status()
+
+    response_json = response.json()
+    logger.debug('Response data:\n' + pformat(response_json))
+    return response_json

@@ -75,7 +75,7 @@ class TogglSet(object):
         entries = self.filter(config=config, **conditions)
 
         if len(entries) > 1:
-            raise exceptions.TogglMultipleResults()
+            raise exceptions.TogglMultipleResultsException()
 
         if not entries:
             return None

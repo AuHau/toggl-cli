@@ -122,7 +122,7 @@ class WorkspaceUser(WorkspaceEntity):
     _can_create = False
 
     email = base.EmailField(is_read_only=True)
-    active = base.BooleanField(is_read_only=True)
+    active = base.BooleanField()
     admin = base.BooleanField(admin_only=True)
     user = base.MappingField(User, 'uid', is_read_only=True)
 
