@@ -99,9 +99,8 @@ class DurationType(DateTimeType):
 
 class ResourceType(click.ParamType):
     """
-    Takes an Resource class and based on the type of value it calls either
-    find_by_id() for integer value or find_by_name() for string value and return
-    the appropriate entry.
+    Takes an Entity class and based on the type of entered specification searches either
+    for ID or Name of the entity
     """
     name = 'resource-type'
 
@@ -110,17 +109,12 @@ class ResourceType(click.ParamType):
 
     def convert(self, value, param, ctx):
         try:
-            try:
-                resource_id = int(value)
-                return self._convert_id(resource_id, param, ctx)
-            except ValueError:
-                pass
+            resource_id = int(value)
+            return self._convert_id(resource_id, param, ctx)
+        except ValueError:
+            pass
 
-            return self._convert_name(value, param, ctx)
-
-        except AttributeError:
-            raise TogglCliException("The passed resource class {} does not have expected interface! "
-                                    "(find_by_id and find_by_name)".format(self._resource_cls))
+        return self._convert_name(value, param, ctx)
 
     def _convert_id(self, resource_id, param, ctx):
         resource = self._resource_cls.objects.get(resource_id)
@@ -156,13 +150,19 @@ def entity_listing(cls, fields=('id', 'name',)):
     click.echo(table)
 
 
-def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name'):
+def get_entity(cls, spec, field_lookup):
     entity = None
     for field in field_lookup:
         entity = cls.objects.get(**{field: spec})
 
         if entity is not None:
             break
+
+    return entity
+
+
+def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name'):
+    entity = get_entity(cls, spec, field_lookup)
 
     if entity is None:
         click.echo("{} not found!".format(cls.get_name(verbose=True)), color='red')
@@ -194,8 +194,8 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name')
         entity_string[1:]))
 
 
-def entity_remove(cls, spec):
-    entity = cls.objects.get(spec) or cls.objects.get(name=spec)
+def entity_remove(cls, spec, field_lookup=('id', 'name',)):
+    entity = get_entity(cls, spec, field_lookup)
 
     if entity is None:
         click.echo("{} not found!".format(cls.get_name(verbose=True)), color='red')
@@ -205,8 +205,8 @@ def entity_remove(cls, spec):
     click.echo("{} successfully deleted!".format(cls.get_name(verbose=True)))
 
 
-def entity_update(cls, spec, **kwargs):
-    entity = cls.objects.get(spec) or cls.objects.get(name=spec)
+def entity_update(cls, spec, field_lookup=('id', 'name',), **kwargs):
+    entity = get_entity(cls, spec, field_lookup)
 
     if entity is None:
         click.echo("{} not found!".format(cls.get_name(verbose=True)), color='red')
@@ -402,7 +402,7 @@ def projects(ctx):
 @projects.command('add', short_help='create new project')
 @click.option('--name', '-n', prompt='Name of the project',
               help='Specifies the name of the project', )
-@click.option('--client', '-c', envvar="TOGGL_CLIENT", type=ResourceType(api.Client),
+@click.option('--customer', '-c', envvar="TOGGL_CLIENT", type=ResourceType(api.Client),
               help='Specifies a client to which the project will be assigned to. Can be ID or name of the client ('
                    'ENV: TOGGL_CLIENT)')
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.Workspace),
@@ -432,6 +432,22 @@ def projects_add(ctx, name, client, workspace, public, billable, auto_estimates,
     click.echo("Project '{}' with #{} created.".format(project.name, project.id))
 
 
+@projects.command('update', short_help='update a project')
+@click.argument('spec')
+@click.option('--name', '-n', help='Specifies the name of the project', )
+@click.option('--customer', '-c', type=ResourceType(api.Client),
+              help='Specifies a client to which the project will be assigned to. Can be ID or name of the client')
+@click.option('--public', '-p', is_flag=True, help='Specifies whether project is accessible for all workspace users ('
+                                             '=public) or just only project\'s users.')
+@click.option('--billable/--no-billable', help='Specifies whether project is billable or not. (Premium only)')
+@click.option('--auto-estimates/--no-auto-estimates', help='Specifies whether the estimated hours are automatically calculated based on task estimations or manually fixed based on the value of \'estimated_hours\' ')
+@click.option('--rate', '-r', type=click.FLOAT, help='Hourly rate of the project (Premium only)')
+@click.option('--color', type=click.INT, help='ID of color used for the project')
+@click.pass_context
+def projects_update(ctx, spec, **kwargs):
+    entity_update(api.Project, spec, **kwargs)
+
+
 @projects.command('ls', short_help='list projects')
 @click.pass_context
 def projects_ls(ctx):
@@ -455,6 +471,8 @@ def projects_rm(ctx, spec):
 # ----------------------------------------------------------------------------
 # Workspaces
 # ----------------------------------------------------------------------------
+# TODO: Leave workspace
+# TODO: Create workspace
 
 @cli.group('workspaces', short_help='workspaces management')
 @click.pass_context
@@ -473,7 +491,6 @@ def workspaces_ls(ctx):
 @click.pass_context
 def workspaces_get(ctx, spec):
     entity_detail(api.Workspace, spec)
-
 
 # ----------------------------------------------------------------------------
 # Users
@@ -546,8 +563,16 @@ def workspace_users_invite(ctx, email):
 @workspace_users.command('rm', short_help='delete a specific workspace\'s user')
 @click.argument('spec')
 @click.pass_context
-def projects_rm(ctx, spec):
-    entity_remove(api.WorkspaceUser, spec)
+def workspace_users_rm(ctx, spec):
+    entity_remove(api.WorkspaceUser, spec, ('id', 'email'))
+
+
+@workspace_users.command('update', short_help='update a specific workspace\'s user')
+@click.argument('spec')
+@click.option('--admin/--no-admin', help='Specifies if the workspace\'s user is admin for the workspace',)
+@click.pass_context
+def workspace_users_update(ctx, spec, **kwargs):
+    entity_update(api.WorkspaceUser, spec, ('id', 'email'), **kwargs)
 
 
 # ----------------------------------------------------------------------------
