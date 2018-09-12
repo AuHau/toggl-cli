@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import click
+import dateutil
 from prettytable import PrettyTable
 
 from toggl.exceptions import TogglCliException
@@ -32,20 +33,21 @@ class DateTimeType(click.ParamType):
         if value == self.NOW_STRING and self._allow_now:
             return utils.DateAndTime().now()
 
+        config = ctx.obj.get('config') or utils.Config.factory()
         try:
-            config = ctx.obj.get('config')
-            day_first = config.getboolean('options', 'day_first')
-            year_first = config.getboolean('options', 'year_first')
-
             try:
-                return utils.DateAndTime().parse_local_datetime_str(value, day_first, year_first)
+                date = dateutil.parser.parse(value, dayfirst=config.day_first, yearfirst=config.year_first)
+                return config.timezone.localize(date)
             except ValueError:
-                self.fail("Unknown datetime format!", param, ctx)
+                pass
         except AttributeError:
             try:
-                return utils.DateAndTime().parse_local_datetime_str(value)
+                date = dateutil.parser.parse(value)
+                return config.timezone.localize(date)
             except ValueError:
-                self.fail("Unknown datetime format!", param, ctx)
+                pass
+
+        self.fail("Unknown datetime format!", param, ctx)
 
 
 class DurationType(DateTimeType):
@@ -154,7 +156,7 @@ def get_entity(cls, org_spec, field_lookup):
     entity = None
     for field in field_lookup:
         try:
-            spec = cls.__fields__[field].cast_value(org_spec)
+            spec = cls.__fields__[field].parse(org_spec)
         except ValueError:
             continue
 

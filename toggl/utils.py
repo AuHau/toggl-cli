@@ -254,6 +254,13 @@ class IniConfigMixin:
             return self._store.getint(entry.section, item, fallback=None)
         elif entry.type == float:
             return self._store.getfloat(entry.section, item, fallback=None)
+        elif entry.type == 'tz':
+            value = self._store.get(entry.section, item, fallback=None)
+
+            if value is None:
+                return
+
+            return pytz.timezone(value)
         else:
             return self._store.get(entry.section, item, fallback=None)
 
@@ -336,6 +343,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
     year_first = False
     file_logging = False
     file_logging_path = None
+    timezone = pytz.utc
 
     ENV_MAPPING = {
         'api_token': EnvEntry('TOGGL_API_TOKEN', str),
@@ -351,7 +359,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
         'file_logging': IniEntry('logging', bool),
         'file_logging_path': IniEntry('logging', str),
 
-        'timezone': IniEntry('options', str),
+        'timezone': IniEntry('options', 'tz'),
         'continue_creates': IniEntry('options', bool),
         'year_first': IniEntry('options', bool),
         'day_first': IniEntry('options', bool),

@@ -4,9 +4,12 @@ import re
 from abc import ABCMeta
 from builtins import int
 from collections import OrderedDict
+from datetime import datetime
 from enum import Enum
 from inspect import Signature, Parameter
 
+import dateutil
+import pytz
 from validate_email import validate_email
 
 from .. import utils
@@ -116,7 +119,10 @@ class TogglField:
         if self.required and self.default is None and not value:
             raise exceptions.TogglValidationException('The field \'{}\' is required!'.format(self.name))
 
-    def cast_value(self, value):
+    def serialize(self, value):
+        return value
+
+    def parse(self, value, config=None):
         return self._field_type(value)
 
     def init(self, instance, value):
@@ -124,13 +130,11 @@ class TogglField:
             raise exceptions.TogglException('Field \'{}.{}\' is already initiated!'
                                             .format(instance.__class__.__name__, self.name))
 
-        if not isinstance(value, self._field_type):
-            # Before raising TypeError lets try to cast the value into correct type
-            try:
-                value = self.cast_value(value)
-            except ValueError:
-                raise TypeError(
-                    'Expected for field \'{}\' type {} got {}'.format(self.name, self._field_type, type(value)))
+        try:
+            value = self.parse(value, instance._config)
+        except ValueError:
+            raise TypeError(
+                'Expected for field \'{}\' type {} got {}'.format(self.name, self._field_type, type(value)))
 
         instance.__dict__[self.name] = value
 
@@ -169,13 +173,11 @@ class TogglField:
             self._set_value(instance, value)
             return
 
-        if not isinstance(value, self._field_type):
-            # Before raising TypeError lets try to cast the value into correct type
-            try:
-                value = self.cast_value(value)
-            except ValueError:
-                raise TypeError(
-                    'Expected for field \'{}\' type {} got {}'.format(self.name, self._field_type, type(value)))
+        try:
+            value = self.parse(value, instance._config)
+        except ValueError:
+            raise TypeError(
+                'Expected for field \'{}\' type {} got {}'.format(self.name, self._field_type, type(value)))
 
         self._set_value(instance, value)
 
@@ -197,6 +199,38 @@ class FloatField(TogglField):
 
 class BooleanField(TogglField):
     _field_type = bool
+
+
+class DateTimeField(StringField):
+
+    @staticmethod
+    def _is_naive(value):
+        return value.utcoffset() is None
+
+    def parse(self, value, config=None):
+        config = config or utils.Config.factory()
+
+        if isinstance(value, datetime):
+            if self._is_naive(value):
+                return value.astimezone(config.timezone)
+
+            return value
+
+        try:
+            date = dateutil.parser.parse(value, dayfirst=config.day_first, yearfirst=config.year_first)
+            return config.timezone.localize(date)
+        except AttributeError:
+            date = dateutil.parser.parse(value)
+            return config.timezone.localize(date)
+
+    def serialize(self, value):
+        if not isinstance(value, datetime):
+            raise ValueError('DateTimeField needs for serialization datetime object!')
+
+        if self._is_naive(value):
+            return value.isoformat()
+
+        return value.astimezone(pytz.utc).replace(tzinfo=None).isoformat()
 
 
 class EmailField(StringField):
@@ -411,14 +445,15 @@ class TogglEntity(metaclass=TogglEntityBase):
         if not self._can_create and self.id is None:
             raise exceptions.TogglException("Creating this entity is not allowed!")
 
+        config = config or self._config
+
         self.validate()
 
         if self.id is not None:  # Update
-            utils.toggl("/{}/{}".format(self.get_url(), self.id), "put", self.json(update=True),
-                        config=config or self._config)
+            utils.toggl("/{}/{}".format(self.get_url(), self.id), "put", self.json(update=True), config=config)
             self.__change_dict__ = {}  # Reset tracking changes
         else:  # Create
-            data = utils.toggl("/{}".format(self.get_url()), "post", self.json(), config=config or self._config)
+            data = utils.toggl("/{}".format(self.get_url()), "post", self.json(), config=config)
             self.id = data['data']['id']  # Store the returned ID
 
     def delete(self, config=None):
@@ -462,13 +497,14 @@ class TogglEntity(metaclass=TogglEntityBase):
         for field in self.__fields__.values():
             field.validate(getattr(self, field.name, None))
 
-    def to_dict(self):
+    def to_dict(self, serialized=False):
         entity_dict = {}
         for field in self.__fields__.values():
             try:
                 entity_dict[field.mapped_field] = getattr(self, field.name).id
             except AttributeError:
-                entity_dict[field.name] = getattr(self, field.name, None)
+                value = getattr(self, field.name, None)
+                entity_dict[field.name] = field.serialize(value) if serialized else value
 
         return entity_dict
 
