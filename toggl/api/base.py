@@ -242,6 +242,64 @@ class EmailField(StringField):
             raise exceptions.TogglValidationException('Email \'{}\' is not valid email address!'.format(value))
 
 
+class PropertyField(TogglField):
+
+    def __init__(self, getter, setter=None, verbose_name=None, admin_only=False):
+        self.getter = getter
+        self.setter = setter or self.default_setter
+
+        super().__init__(verbose_name=verbose_name, admin_only=admin_only, is_read_only=setter is None)
+
+    @staticmethod
+    def default_setter(name, instance, value, init=False):
+        """
+        Default setter which behaves like normal ToggleField, that stores the value inside of the instance's dict under
+        the field's name.
+
+        :param name: Field's name
+        :param instance: Instance of the entity
+        :param value: Value to be set
+        :param init: Boolean that describe if the value is being set during creation of the entity's instance
+        :return: None
+        """
+        instance.__dict__[name] = value
+
+    @staticmethod
+    def default_getter(name, instance, serializing=False):
+        """
+        Default getter which retrieves the value from instance's dict.
+
+        :param name: Field's name
+        :param instance: Instance of the entity
+        :param serializing: Whether the function is called during serialization of the instance into JSON
+        :return: Value of the field
+        """
+        return instance.__dict__[name]
+
+    def init(self, instance, value):
+        self.setter(self.name, instance, value, init=True)
+
+    def __get__(self, instance, owner):
+        return self.getter(self.name, instance, serializing=False)
+
+    def __set__(self, instance, value):
+        if self.is_read_only:
+            raise exceptions.TogglException('Attribute \'{}\' is read only!'.format(self.name))
+
+        if self.admin_only:
+            from .models import Workspace, WorkspaceEntity
+
+            if (isinstance(instance, WorkspaceEntity) and not instance.workspace.admin) \
+                    or (isinstance(instance, Workspace) and not instance.admin):
+                raise exceptions.TogglAuthorizationException(
+                    None, None,
+                    'You are trying edit field \'{}.{}\' which is admin only field, but you are not an admin!'
+                        .format(instance.__class__.__name__, self.name)
+                )
+
+        return self.setter(self.name, instance, value, init=False)
+
+
 class ChoiceField(TogglField):
     choices = {}
 
