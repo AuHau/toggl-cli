@@ -232,6 +232,15 @@ class DateTimeField(StringField):
     def _is_naive(value):
         return value.utcoffset() is None
 
+    def __set__(self, instance, value):
+        if not isinstance(value, datetime):
+            raise TypeError('Value which is being set to DateTimeField have to be a datetime object!')
+
+        if self._is_naive(value):
+            value = value.replace(tzinfo=instance._config.timezone)
+
+        super().__set__(instance, value)
+
     def parse(self, value, config=None):
         config = config or utils.Config.factory()
 
@@ -505,7 +514,7 @@ class TogglEntity(metaclass=TogglEntityMeta):
     id = IntegerField(required=False)
 
     def __init__(self, config=None, **kwargs):
-        self._config = config
+        self._config = config or utils.Config.factory()
 
         for field in self.__fields__.values():
             if field.name in {'id'}:
@@ -624,7 +633,6 @@ class TogglEntity(metaclass=TogglEntityMeta):
                 except KeyError:
                     continue
 
-            value = field.parse(value, config=config)
             field.init(instance, value)
 
         return instance

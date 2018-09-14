@@ -1,3 +1,5 @@
+import datetime
+
 from toggl.api import base
 from toggl import exceptions
 import pytest
@@ -73,3 +75,25 @@ class TestPropertyField:
         assert instance.__fields__['field'].is_read_only == True
         with pytest.raises(exceptions.TogglException):
             instance.field = 'some value'
+
+
+#########################################################################################
+# DateTimeField
+
+class DateTimeEntity(base.TogglEntity):
+    field = base.DateTimeField()
+
+
+class TestDateTimeField:
+
+    def test_type_check(self):
+        instance = DateTimeEntity()
+
+        with pytest.raises(TypeError):
+            instance.field = 'some value not datetime'
+
+        try:
+            instance.field = datetime.datetime.now()
+        except TypeError:
+            pytest.fail('DateTimeField does not accept valid datetime object!')
+
