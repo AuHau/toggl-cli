@@ -409,7 +409,7 @@ class MappingField(TogglField):
             raise NotImplementedError('Field with MANY cardinality is not supported for attribute assignment')
 
 
-class TogglEntityBase(ABCMeta):
+class TogglEntityMeta(ABCMeta):
 
     def _make_signature(fields):
         non_default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD) for field in fields.values()
@@ -442,13 +442,16 @@ class TogglEntityBase(ABCMeta):
         setattr(new_class, '__fields__', fields)
         setattr(new_class, '__mapped_fields__', mcs._make_mapped_fields(fields))
         setattr(new_class, '__signature__', mcs._make_signature(fields))
-        setattr(new_class, 'objects', TogglSet(new_class.get_url(), new_class, new_class._can_get_detail))
+
+        # Add objects only if they are not defined to allow custom ToggleSet implementations
+        if not hasattr(new_class, 'objects'):
+            setattr(new_class, 'objects', TogglSet(new_class.get_url(), new_class, new_class._can_get_detail))
 
         return new_class
 
 
 # TODO: Premium fields and check for current Workspace to be Premium
-class TogglEntity(metaclass=TogglEntityBase):
+class TogglEntity(metaclass=TogglEntityMeta):
     __signature__ = Signature()
     __fields__ = OrderedDict()
     __change_dict__ = {}
