@@ -40,17 +40,41 @@ def evaluate_conditions(conditions, entity):
 
 # TODO: Caching
 class TogglSet(object):
-    def __init__(self, url, entity_cls=None, can_get_detail=True, can_get_list=True):
-        self.url = url
+    def __init__(self, entity_cls=None, url=None, can_get_detail=None, can_get_list=None):
         self.entity_cls = entity_cls
-        self.can_get_detail = can_get_detail
-        self.can_get_list = can_get_list
+        self._url = url
+        self._can_get_detail = can_get_detail
+        self._can_get_list = can_get_list
 
     def bind_to_class(self, cls):
         if self.entity_cls is not None:
             raise exceptions.TogglException('The instance is already binded to a class {}!'.format(self.entity_cls))
 
         self.entity_cls = cls
+
+    @property
+    def url(self):
+        return self._url or self.entity_cls.get_url()
+
+    @property
+    def can_get_detail(self):
+        if self._can_get_detail is not None:
+            return self._can_get_detail
+
+        if self.entity_cls._can_get_detail is not None:
+            return self._can_get_detail
+
+        return True
+
+    @property
+    def can_get_list(self):
+        if self._can_get_list is not None:
+            return self._can_get_list
+
+        if self.entity_cls._can_get_list is not None:
+            return self._can_get_list
+
+        return True
 
     def build_list_url(self, wid):
         return '/workspaces/{}/{}'.format(wid, self.url)
@@ -88,6 +112,10 @@ class TogglSet(object):
         return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity)]
 
     def all(self, wid=None, config=None):
+        if not self.can_get_list:
+            raise exceptions.TogglException('Entity {} is not allowed to fetch list from the API!'
+                                            .format(self.entity_cls))
+
         config = config or utils.Config.factory()
         wid = wid or config.default_workspace.id
         fetched_entities = utils.toggl(self.build_list_url(wid), 'get', config=config)
@@ -451,7 +479,7 @@ class TogglEntityMeta(ABCMeta):
 
         # Add objects only if they are not defined to allow custom ToggleSet implementations
         if not hasattr(new_class, 'objects'):
-            setattr(new_class, 'objects', TogglSet(new_class.get_url(), new_class, new_class._can_get_detail))
+            setattr(new_class, 'objects', TogglSet(new_class))
         else:
             try:
                 new_class.objects.bind_to_class(new_class)
@@ -472,6 +500,7 @@ class TogglEntity(metaclass=TogglEntityMeta):
     _can_update = True
     _can_delete = True
     _can_get_detail = True
+    _can_get_list = True
 
     id = IntegerField(required=False)
 
