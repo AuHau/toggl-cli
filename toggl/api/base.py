@@ -564,7 +564,6 @@ class TogglEntity(metaclass=TogglEntityBase):
 
     @classmethod
     def deserialize(cls, config=None, **kwargs):
-
         try:
             kwargs.pop('at')
         except KeyError:
@@ -575,11 +574,14 @@ class TogglEntity(metaclass=TogglEntityBase):
 
         for key, value in kwargs.items():
             try:
-                instance.__dict__[key] = instance.__fields__[key].parse(value, config=config)
+                field = instance.__fields__[key]
             except KeyError:
                 try:
-                    instance.__dict__[key] = instance.__mapped_fields__[key].parse(value, config=config)
+                    field = instance.__mapped_fields__[key]
                 except KeyError:
-                    pass
+                    continue
+
+            value = field.parse(value, config=config)
+            field.init(instance, value)
 
         return instance

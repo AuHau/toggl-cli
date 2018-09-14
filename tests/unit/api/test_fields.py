@@ -47,6 +47,19 @@ class TestPropertyField:
         assert PropertyFieldStore.value == 'some value'
         assert instance.field == 'some value'
 
+    def test_deserialization(self):
+        PropertyFieldStore.value = None
+        instance = PropertyEntity.deserialize()
+
+        assert PropertyFieldStore.value is None
+        assert instance.field is None
+
+        PropertyFieldStore.value = None
+        instance = PropertyEntity.deserialize(field='some value')
+
+        assert PropertyFieldStore.value == 'some value'
+        assert instance.field == 'some value'
+
     def test_read_only(self):
         PropertyFieldStore.value = None
         instance = ReadOnlyPropertyEntity()
