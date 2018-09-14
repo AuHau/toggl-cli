@@ -38,18 +38,6 @@ def evaluate_conditions(conditions, entity):
     return True
 
 
-def convert_entity(entity_cls, raw_entity, config):
-    entity_id = raw_entity.pop('id')
-    try:
-        raw_entity.pop('at')
-    except KeyError:
-        pass
-    entity_object = entity_cls(config=config, **raw_entity)
-    entity_object.id = entity_id
-
-    return entity_object
-
-
 # TODO: Caching
 class TogglSet(object):
     def __init__(self, url, entity_cls, can_get_detail=True, can_get_list=True):
@@ -69,7 +57,7 @@ class TogglSet(object):
             if self.can_get_detail:
                 try:
                     fetched_entity = utils.toggl(self.build_detail_url(id), 'get', config=config)
-                    return convert_entity(self.entity_cls, fetched_entity['data'], config)
+                    return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
                 except exceptions.TogglNotFoundException:
                     return None
             else:
@@ -101,11 +89,11 @@ class TogglSet(object):
         if fetched_entities is None:
             return []
 
-        return [convert_entity(self.entity_cls, entity, config) for entity in fetched_entities]
+        return [self.entity_cls.deserialize(config=config, **entity) for entity in fetched_entities]
 
 
 class TogglField:
-    _field_type = object
+    _field_type = None
 
     def __init__(self, verbose_name=None, required=False, default=None, admin_only=False, is_read_only=False):
         self.name = None
@@ -123,7 +111,10 @@ class TogglField:
         return value
 
     def parse(self, value, config=None):
-        return self._field_type(value)
+        if self._field_type is not None:
+            return self._field_type(value)
+
+        return value
 
     def init(self, instance, value):
         if self.name in instance.__dict__:
@@ -418,37 +409,39 @@ class MappingField(TogglField):
             raise NotImplementedError('Field with MANY cardinality is not supported for attribute assignment')
 
 
-def _make_signature(fields):
-    non_default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD) for field in fields.values()
-                              if field.name != 'id' and field.required]
-    default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD, default=field.default) for field in
-                          fields.values()
-                          if field.name != 'id' and not field.required]
-
-    return Signature(non_default_parameters + default_parameters)
-
-
-def _make_fields(attrs, parents):
-    fields = OrderedDict()
-    for parent in parents:
-        fields.update(parent.__fields__)
-
-    for key, field in attrs.items():
-        if isinstance(field, TogglField):
-            field.name = key
-            fields[key] = field
-
-    return fields
-
-
 class TogglEntityBase(ABCMeta):
+
+    def _make_signature(fields):
+        non_default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD) for field in fields.values()
+                                  if field.name != 'id' and field.required]
+        default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD, default=field.default) for field in
+                              fields.values()
+                              if field.name != 'id' and not field.required]
+
+        return Signature(non_default_parameters + default_parameters)
+
+    def _make_fields(attrs, parents):
+        fields = OrderedDict()
+        for parent in parents:
+            fields.update(parent.__fields__)
+
+        for key, field in attrs.items():
+            if isinstance(field, TogglField):
+                field.name = key
+                fields[key] = field
+
+        return fields
+
+    def _make_mapped_fields(fields):
+        return {field.mapped_field: field for field in fields.values() if isinstance(field, MappingField)}
 
     def __new__(mcs, name, bases, attrs, **kwargs):
         new_class = super().__new__(mcs, name, bases, attrs, **kwargs)
 
-        fields = _make_fields(attrs, bases)
+        fields = mcs._make_fields(attrs, bases)
         setattr(new_class, '__fields__', fields)
-        setattr(new_class, '__signature__', _make_signature(fields))
+        setattr(new_class, '__mapped_fields__', mcs._make_mapped_fields(fields))
+        setattr(new_class, '__signature__', mcs._make_signature(fields))
         setattr(new_class, 'objects', TogglSet(new_class.get_url(), new_class, new_class._can_get_detail))
 
         return new_class
@@ -456,7 +449,7 @@ class TogglEntityBase(ABCMeta):
 
 # TODO: Premium fields and check for current Workspace to be Premium
 class TogglEntity(metaclass=TogglEntityBase):
-    __signature__ = _make_signature({})
+    __signature__ = Signature()
     __fields__ = OrderedDict()
     __change_dict__ = {}
 
@@ -536,21 +529,6 @@ class TogglEntity(metaclass=TogglEntityBase):
 
         return json.dumps({self.get_name(): self.to_dict()})
 
-    @classmethod
-    def get_name(cls, verbose=False):
-        name = cls.__name__
-        name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-        name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
-
-        if verbose:
-            return name.replace('_', ' ').capitalize()
-
-        return name
-
-    @classmethod
-    def get_url(cls):
-        return cls.get_name() + 's'
-
     def validate(self):
         for field in self.__fields__.values():
             field.validate(getattr(self, field.name, None))
@@ -568,3 +546,40 @@ class TogglEntity(metaclass=TogglEntityBase):
 
     def __str__(self):
         return "{} (#{})".format(getattr(self, 'name'), self.id)
+
+    @classmethod
+    def get_name(cls, verbose=False):
+        name = cls.__name__
+        name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+        name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+
+        if verbose:
+            return name.replace('_', ' ').capitalize()
+
+        return name
+
+    @classmethod
+    def get_url(cls):
+        return cls.get_name() + 's'
+
+    @classmethod
+    def deserialize(cls, config=None, **kwargs):
+
+        try:
+            kwargs.pop('at')
+        except KeyError:
+            pass
+
+        instance = cls.__new__(cls)
+        instance._config = config
+
+        for key, value in kwargs.items():
+            try:
+                instance.__dict__[key] = instance.__fields__[key].parse(value, config=config)
+            except KeyError:
+                try:
+                    instance.__dict__[key] = instance.__mapped_fields__[key].parse(value, config=config)
+                except KeyError:
+                    pass
+
+        return instance

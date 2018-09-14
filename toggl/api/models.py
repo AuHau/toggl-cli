@@ -62,7 +62,7 @@ class UserSet(base.TogglSet):
 
     def current_user(self, config=None):
         fetched_entity = utils.toggl('/me', 'get', config=config)
-        return base.convert_entity(self.entity_cls, fetched_entity['data'], config)
+        return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
 
 
 class User(WorkspaceEntity):
@@ -105,7 +105,7 @@ class User(WorkspaceEntity):
             'created_with': created_with
         }})
         data = utils.toggl("/signups", "post", user_json, config=config)
-        return base.convert_entity(cls, data['data'], config)
+        return cls.deserialize(config=config, **data['data'])
 
     def is_admin(self, workspace):
         wid = workspace.id if isinstance(workspace, Workspace) else workspace
