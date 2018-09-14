@@ -6,8 +6,20 @@ class RandomEntity(base.TogglEntity):
     some_field = base.StringField()
 
 
-class EntityWithCustomObjects(base.TogglEntity):
+class EntityWithDummySet(base.TogglEntity):
     objects = 'something'
+
+
+class CustomSet(base.TogglSet):
+    pass
+
+
+class EntityWithCustomNotBindedSet(base.TogglEntity):
+    objects = CustomSet('some_url')
+
+
+class EntityWithCustomBindedSet(base.TogglEntity):
+    objects = CustomSet('some_url', RandomEntity)
 
 
 class TestMetaBase:
@@ -17,4 +29,8 @@ class TestMetaBase:
         assert isinstance(RandomEntity.objects, base.TogglSet)
 
     def test_not_overriding_objects(self):
-        assert EntityWithCustomObjects.objects == 'something'
+        assert EntityWithDummySet.objects == 'something'
+
+    def test_objects_class_binding(self):
+        assert EntityWithCustomNotBindedSet.objects.entity_cls == EntityWithCustomNotBindedSet
+        assert EntityWithCustomBindedSet.objects.entity_cls == RandomEntity

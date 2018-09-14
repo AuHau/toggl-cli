@@ -40,11 +40,17 @@ def evaluate_conditions(conditions, entity):
 
 # TODO: Caching
 class TogglSet(object):
-    def __init__(self, url, entity_cls, can_get_detail=True, can_get_list=True):
+    def __init__(self, url, entity_cls=None, can_get_detail=True, can_get_list=True):
         self.url = url
         self.entity_cls = entity_cls
         self.can_get_detail = can_get_detail
         self.can_get_list = can_get_list
+
+    def bind_to_class(self, cls):
+        if self.entity_cls is not None:
+            raise exceptions.TogglException('The instance is already binded to a class {}!'.format(self.entity_cls))
+
+        self.entity_cls = cls
 
     def build_list_url(self, wid):
         return '/workspaces/{}/{}'.format(wid, self.url)
@@ -446,6 +452,11 @@ class TogglEntityMeta(ABCMeta):
         # Add objects only if they are not defined to allow custom ToggleSet implementations
         if not hasattr(new_class, 'objects'):
             setattr(new_class, 'objects', TogglSet(new_class.get_url(), new_class, new_class._can_get_detail))
+        else:
+            try:
+                new_class.objects.bind_to_class(new_class)
+            except (exceptions.TogglException, AttributeError):
+                pass
 
         return new_class
 
