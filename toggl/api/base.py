@@ -566,12 +566,6 @@ class TogglEntity(metaclass=TogglEntityMeta):
         utils.toggl("/{}/{}".format(self.get_url(), self.id), "delete", config=config or self._config)
         self.id = None  # Invalidate the object, so when save() is called after delete a new object is created
 
-    def __cmp__(self, other):
-        if not isinstance(other, self.__class__):
-            raise exceptions.TogglException("You are trying to compare instances of different classes!")
-
-        return self.id == other.id
-
     def json(self, update=False):
         if update:
             change_dict = self.__change_dict__
@@ -595,6 +589,19 @@ class TogglEntity(metaclass=TogglEntityMeta):
                 entity_dict[field.name] = field.serialize(value) if serialized else value
 
         return entity_dict
+
+    def __cmp__(self, other):
+        if not isinstance(other, self.__class__):
+            raise RuntimeError("You are trying to compare instances of different classes!")
+
+        return self.id == other.id
+
+    def __copy__(self):
+        cls = self.__class__
+        new_instance = cls.__new__(cls)
+        new_instance.__dict__.update(self.__dict__)
+        new_instance.id = None  # New instance was never saved ==> no ID for it yet
+        return new_instance
 
     def __str__(self):
         return "{} (#{})".format(getattr(self, 'name'), self.id)
