@@ -152,7 +152,7 @@ def entity_listing(cls, fields=('id', 'name',)):
     table.align = 'l'
 
     for entity in entities:
-        table.add_row([str(getattr(entity, field)) for field in fields])
+        table.add_row([str(entity.__fields__[field].format(getattr(entity, field))) for field in fields])
 
     click.echo(table)
 
@@ -182,11 +182,7 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name')
 
     entity_dict = {}
     for field in entity.__fields__.values():
-        try:
-            # In case it is ChoiceField translate the key to label
-            entity_dict[field.name] = field.get_label(getattr(entity, field.name))
-        except AttributeError:
-            entity_dict[field.name] = getattr(entity, field.name)
+        entity_dict[field.name] = field.format(getattr(entity, field.name))
 
     del entity_dict[primary_field]
     del entity_dict['id']
@@ -351,7 +347,7 @@ def entry_ls(ctx, start, stop):
     entities = api.TimeEntry.objects.filter(start=start, stop=stop)
 
     # noinspection PyTypeChecker
-    entity_listing(reversed(entities), fields=('description', 'duration', 'start', 'stop', 'project'))
+    entity_listing(reversed(entities), fields=('description', 'duration', 'start', 'stop', 'project', 'id'))
 
 
 @cli.command('rm', short_help='delete a time entry')

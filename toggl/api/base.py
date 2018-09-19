@@ -23,8 +23,7 @@ def evaluate_conditions(conditions, entity, contain=False):
     Will compare conditions dict and entity.
     Condition's keys and values must match the entities attributes, but not the other way around.
 
-    If contain is True, then string fields won't be tested on equality but on partial match.
-
+    :param contain: If True, then string fields won't be tested on equality but on partial match.
     :param entity: TogglEntity
     :param conditions: dict
     :return:
@@ -158,6 +157,9 @@ class TogglField:
 
         return value
 
+    def format(self, value, config=None):
+        return value
+
     def init(self, instance, value):
         if self.name in instance.__dict__:
             raise exceptions.TogglException('Field \'{}.{}\' is already initiated!'
@@ -273,6 +275,14 @@ class DateTimeField(StringField):
 
         return date
 
+    def format(self, value, config=None):
+        if value is None:
+            return None
+
+        config = config or utils.Config.factory()
+
+        return value.strftime(config.datetime_format)
+
     def serialize(self, value):
         if value is None:
             return None
@@ -294,9 +304,10 @@ class EmailField(StringField):
 
 class PropertyField(TogglField):
 
-    def __init__(self, getter, setter=None, serializer=None, verbose_name=None, admin_only=False):
+    def __init__(self, getter, setter=None, serializer=None, formater=None, verbose_name=None, admin_only=False):
         self.getter = getter
         self.serializer = serializer
+        self.formater = formater
         self.setter = setter or self.default_setter
 
         super().__init__(verbose_name=verbose_name, admin_only=admin_only, is_read_only=setter is None)
@@ -329,6 +340,9 @@ class PropertyField(TogglField):
 
     def init(self, instance, value):
         self.setter(self.name, instance, value, init=True)
+
+    def format(self, value, config=None):
+        return self.formater(value, config) if self.formater else super().format(value, config)
 
     def serialize(self, value):
         return self.serializer(value) if self.serializer else super().serialize(value)
@@ -377,6 +391,9 @@ class ChoiceField(TogglField):
 
         if value not in self.choices and value not in self.choices.values():
             raise exceptions.TogglValidationException('Value \'{}\' is not valid choice!'.format(value))
+
+    def format(self, value, config=None):
+        return self.get_label(value)
 
     def get_label(self, value):
         return self.choices[value]

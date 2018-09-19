@@ -338,7 +338,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
 
     # Default values
     continue_creates = True
-    time_format = '%I:%M%p'
+    datetime_format = '%X %x'
     day_first = False
     year_first = False
     file_logging = False
@@ -363,6 +363,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
         'continue_creates': IniEntry('options', bool),
         'year_first': IniEntry('options', bool),
         'day_first': IniEntry('options', bool),
+        'datetime_format': IniEntry('options', str),
         'default_wid': IniEntry('options', int),
     }
 

@@ -12,7 +12,7 @@ epoch = datetime.datetime.utcfromtimestamp(0)
 
 # Workspace entity
 class WorkspaceSet(base.TogglSet):
-    def build_list_url(self, wid):
+    def build_list_url(self, wid=None):
         return self.url
 
 
@@ -162,6 +162,17 @@ def set_duration(name, instance, value, init=False):
         instance.stop = None
 
 
+def format_duration(value, config=None):
+    if value < 0:
+        value = value + int((datetime.datetime.now() - datetime.datetime.utcfromtimestamp(0)) / datetime.timedelta(seconds=1))
+
+    hours = value // 3600
+    minutes = (value - hours * 3600) // 60
+    seconds = (value - hours * 3600 - minutes * 60) % 60
+
+    return '{}:{:02d}:{:02d}'.format(hours, minutes, seconds)
+
+
 class TimeEntrySet(base.TogglSet):
 
     def build_list_url(self, wid=None):
@@ -205,7 +216,7 @@ class TimeEntry(WorkspaceEntity):
     billable = base.BooleanField(default=False, admin_only=True)
     start = base.DateTimeField(required=True)
     stop = base.DateTimeField()
-    duration = base.PropertyField(get_duration, set_duration)
+    duration = base.PropertyField(get_duration, set_duration, formater=format_duration)
     created_with = base.StringField(required=True, default='TogglCLI')
     # tags = base.ListField() TODO: Tags & ListField
 
