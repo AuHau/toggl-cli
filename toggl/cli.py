@@ -4,11 +4,12 @@ import optparse
 import os
 import re
 import sys
+from collections import Iterable
+
 import click
 import dateutil
 from prettytable import PrettyTable
 
-from toggl.exceptions import TogglCliException
 from . import api, utils, __version__
 
 DEFAULT_CONFIG_PATH = '~/.togglrc'
@@ -30,10 +31,14 @@ class DateTimeType(click.ParamType):
         self._allow_now = allow_now
 
     def convert(self, value, param, ctx):
-        if value == self.NOW_STRING and self._allow_now:
-            return utils.DateAndTime().now()
+        if value is None:
+            return None
 
         config = ctx.obj.get('config') or utils.Config.factory()
+
+        if value == self.NOW_STRING and self._allow_now:
+            return config.timezone.localize(datetime.datetime.now())
+
         try:
             try:
                 date = dateutil.parser.parse(value, dayfirst=config.day_first, yearfirst=config.year_first)
@@ -136,7 +141,7 @@ class ResourceType(click.ParamType):
 
 
 def entity_listing(cls, fields=('id', 'name',)):
-    entities = cls.objects.all()
+    entities = cls if isinstance(cls, Iterable) else cls.objects.all()
     if not entities:
         click.echo('No entries were found!')
         exit(0)
@@ -169,7 +174,7 @@ def get_entity(cls, org_spec, field_lookup):
 
 
 def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name'):
-    entity = get_entity(cls, spec, field_lookup)
+    entity = spec if isinstance(spec, cls) else get_entity(cls, spec, field_lookup)
 
     if entity is None:
         click.echo("{} not found!".format(cls.get_name(verbose=True)), color='red')
@@ -188,7 +193,6 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name')
 
     entity_string = ''
     for key, value in sorted(entity_dict.items()):
-
         entity_string += '\n{}: {}'.format(
             key.replace('_', ' ').capitalize(),
             value
@@ -196,7 +200,7 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name')
 
     click.echo("""{} {}
 {}""".format(
-        click.style(getattr(entity, primary_field), fg="green"),
+        click.style(getattr(entity, primary_field) or '', fg="green"),
         click.style('#' + str(entity.id), fg="green", dim=1),
         entity_string[1:]))
 
@@ -237,7 +241,7 @@ def entity_update(cls, spec, field_lookup=('id', 'name',), **kwargs):
 # ----------------------------------------------------------------------------
 # NEW CLI
 # ----------------------------------------------------------------------------
-@click.group()
+@click.group(cls=utils.SubCommandsGroup)
 @click.option('--quiet', '-q', is_flag=True, help="don't print anything")
 @click.option('--verbose', '-v', is_flag=True, help="print additional info")
 @click.option('--debug', '-d', is_flag=True, help="print debugging output")
@@ -296,6 +300,9 @@ def cli(ctx, quiet, verbose, debug, config=None):
         main_logger.addHandler(fh)
 
 
+# ----------------------------------------------------------------------------
+# Time Entries
+# ----------------------------------------------------------------------------
 @cli.command('add', short_help='adds finished time entry')
 @click.argument('start', type=DateTimeType(allow_now=True))
 @click.argument('end', type=DurationType())
@@ -305,7 +312,7 @@ def cli(ctx, quiet, verbose, debug, config=None):
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.Workspace),
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
-def add_time_entry(ctx, start, end, descr, project, workspace):
+def entry_add(ctx, start, end, descr, project, workspace):
     """
     Adds finished time entry to Toggl with DESCR description and start
     datetime START which can also be a special string 'now' which denotes current
@@ -327,16 +334,110 @@ def add_time_entry(ctx, start, end, descr, project, workspace):
     # Create a time entry.
     entry = api.TimeEntry(
         description=descr,
-        start_time=start,
-        stop_time=end,
-        duration=(end - start).total_seconds(),
-        project_name=project['name'] if project else None,
-        workspace_name=workspace['name'] if workspace else None
+        start=start,
+        stop=end,
+        project=project,
+        workspace=workspace
     )
 
-    utils.Logger.debug(entry.json())
-    entry.add()
-    utils.Logger.info('{} added'.format(descr))
+    entry.save()
+
+
+@cli.command('ls', short_help='list a time entries')
+@click.option('--start', '-s', type=DateTimeType(), help='Defines start of a date range to filter the entries by.')
+@click.option('--stop', '-p', type=DateTimeType(), help='Defines stop of a date range to filter the entries by.')
+@click.pass_context
+def entry_ls(ctx, start, stop):
+    entities = api.TimeEntry.objects.filter(start=start, stop=stop)
+
+    # noinspection PyTypeChecker
+    entity_listing(reversed(entities), fields=('description', 'duration', 'start', 'stop', 'project'))
+
+
+@cli.command('rm', short_help='delete a time entry')
+@click.argument('spec')
+@click.pass_context
+def entry_rm(ctx, spec):
+    entity_remove(api.TimeEntry, spec)
+
+
+@cli.command('start', short_help='starts new time entry')
+@click.argument('descr', required=False)
+@click.option('--start', '-s', type=DateTimeType(allow_now=True), help='Specifies start of the time entry. '
+                                                                       'If left empty \'now\' is assumed.')
+@click.option('--project', '-p', envvar="TOGGL_PROJECT", type=ResourceType(api.Project),
+              help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.Workspace),
+              help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
+@click.pass_context
+def entry_start(ctx, descr, start, project, workspace):
+    api.TimeEntry.start_and_save(
+        start=start,
+        description=descr,
+        project=project,
+        workspace=workspace
+    )
+
+
+@cli.command('now', short_help='manage current time entry')
+@click.option('--description', '-d', help='Sets description')
+@click.option('--start', '-s', type=DateTimeType(allow_now=True), help='Sets starts time.')
+@click.option('--project', '-p', envvar="TOGGL_PROJECT", type=ResourceType(api.Project),
+              help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.Workspace),
+              help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
+@click.pass_context
+def entry_now(ctx, **kwargs):
+    current = api.TimeEntry.objects.current()
+
+    if current is None:
+        click.echo('There is no time entry running!')
+        exit(1)
+
+    updated = False
+    for key, value in kwargs.items():
+        if value is not None:
+            updated = True
+            setattr(current, key, value)
+
+    if updated:
+        current.save()
+
+    entity_detail(api.TimeEntry, current, primary_field='description')
+
+
+@cli.command('stop', short_help='stops current time entry')
+@click.option('--stop', '-p', type=DateTimeType(allow_now=True), help='Sets stop time.')
+@click.pass_context
+def entry_stop(ctx, stop):
+    current = api.TimeEntry.objects.current()
+
+    if current is None:
+        click.echo('There is no time entry running!')
+        exit(1)
+
+    current.stop_and_save(stop)
+
+    click.echo('\'{}\' was stopped'.format(current.description))
+
+
+@cli.command('continue', short_help='continue a time entry')
+@click.argument('descr', required=False, type=ResourceType(api.TimeEntry))
+@click.option('--start', '-s', type=DateTimeType(), help='Sets a start time.')
+@click.pass_context
+def entry_continue(ctx, descr, start):
+    try:
+        if descr is None:
+            entry = api.TimeEntry.objects.all()[0]
+        else:
+            entry = api.TimeEntry.objects.filter(contain=True, description=descr)[0]
+    except IndexError:
+        click.echo('You don\'t have any time entries in past 9 days!')
+        exit(1)
+
+    entry.continue_and_save(start=start)
+
+    click.echo('Time entry \'{}\' continue!'.format(entry.description))
 
 
 # ----------------------------------------------------------------------------
@@ -416,10 +517,11 @@ def projects(ctx):
               help='Specifies a workspace where the project will be created. Can be ID or name of the workspace (ENV: '
                    'TOGGL_WORKSPACE)')
 @click.option('--public', '-p', is_flag=True, help='Specifies whether project is accessible for all workspace users ('
-                                             '=public) or just only project\'s users.')
+                                                   '=public) or just only project\'s users.')
 @click.option('--billable/--no-billable', default=True, help='Specifies whether project is billable or not. '
                                                              '(Premium only)')
-@click.option('--auto-estimates/--no-auto-estimates', default=False, help='Specifies whether the estimated hours are automatically calculated based on task estimations or manually fixed based on the value of \'estimated_hours\' ')
+@click.option('--auto-estimates/--no-auto-estimates', default=False,
+              help='Specifies whether the estimated hours are automatically calculated based on task estimations or manually fixed based on the value of \'estimated_hours\' ')
 @click.option('--rate', '-r', type=click.FLOAT, help='Hourly rate of the project (Premium only)')
 @click.option('--color', type=click.INT, help='ID of color used for the project')
 @click.pass_context
@@ -502,6 +604,7 @@ def workspaces_ls(ctx):
 def workspaces_get(ctx, spec):
     entity_detail(api.Workspace, spec)
 
+
 # ----------------------------------------------------------------------------
 # Users
 # ----------------------------------------------------------------------------
@@ -579,7 +682,8 @@ def workspace_users_rm(ctx, spec):
 
 @workspace_users.command('update', short_help='update a specific workspace\'s user')
 @click.argument('spec')
-@click.option('--admin/--no-admin', default=None, help='Specifies if the workspace\'s user is admin for the workspace',)
+@click.option('--admin/--no-admin', default=None,
+              help='Specifies if the workspace\'s user is admin for the workspace', )
 @click.pass_context
 def workspace_users_update(ctx, spec, **kwargs):
     entity_update(api.WorkspaceUser, spec, ('id', 'email'), **kwargs)

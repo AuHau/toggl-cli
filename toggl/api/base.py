@@ -18,10 +18,12 @@ from .. import exceptions
 logger = logging.getLogger('toggl.models.base')
 
 
-def evaluate_conditions(conditions, entity):
+def evaluate_conditions(conditions, entity, contain=False):
     """
     Will compare conditions dict and entity.
     Condition's keys and values must match the entities attributes, but not the other way around.
+
+    If contain is True, then string fields won't be tested on equality but on partial match.
 
     :param entity: TogglEntity
     :param conditions: dict
@@ -31,6 +33,12 @@ def evaluate_conditions(conditions, entity):
     for key in conditions:
         if not getattr(entity, key, False):
             return False
+
+        if isinstance(entity.__fields__[key], StringField) and contain:
+            if str(conditions[key]) not in str(getattr(entity, key)):
+                return False
+
+            continue
 
         if str(getattr(entity, key)) != str(conditions[key]):
             return False
@@ -48,7 +56,7 @@ class TogglSet(object):
 
     def bind_to_class(self, cls):
         if self.entity_cls is not None:
-            raise exceptions.TogglException('The instance is already binded to a class {}!'.format(self.entity_cls))
+            raise exceptions.TogglException('The instance is already bound to a class {}!'.format(self.entity_cls))
 
         self.entity_cls = cls
 
@@ -62,7 +70,7 @@ class TogglSet(object):
             return self._can_get_detail
 
         if self.entity_cls._can_get_detail is not None:
-            return self._can_get_detail
+            return self.entity_cls._can_get_detail
 
         return True
 
@@ -72,11 +80,11 @@ class TogglSet(object):
             return self._can_get_list
 
         if self.entity_cls._can_get_list is not None:
-            return self._can_get_list
+            return self.entity_cls._can_get_list
 
         return True
 
-    def build_list_url(self, wid):
+    def build_list_url(self, wid=None):
         return '/workspaces/{}/{}'.format(wid, self.url)
 
     def build_detail_url(self, id):
@@ -103,13 +111,13 @@ class TogglSet(object):
 
         return entries[0]
 
-    def filter(self, wid=None, config=None, **conditions):
+    def filter(self, wid=None, config=None, contain=False, **conditions):
         fetched_entities = self.all(wid, config)
 
         if fetched_entities is None:
             return []
 
-        return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity)]
+        return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity, contain)]
 
     def all(self, wid=None, config=None):
         if not self.can_get_list:
@@ -157,7 +165,7 @@ class TogglField:
 
         try:
             value = self.parse(value, instance._config)
-        except ValueError:
+        except ValueError as e:
             raise TypeError(
                 'Expected for field \'{}\' type {} got {}'.format(self.name, self._field_type, type(value)))
 
@@ -233,11 +241,16 @@ class DateTimeField(StringField):
         return value.utcoffset() is None
 
     def __set__(self, instance, value):
+        if value is None:
+            return super().__set__(instance, value)
+
         if not isinstance(value, datetime):
             raise TypeError('Value which is being set to DateTimeField have to be a datetime object!')
 
+        config = instance._config or utils.Config.factory()
+
         if self._is_naive(value):
-            value = value.replace(tzinfo=instance._config.timezone)
+            value = value.astimezone(tz=config.timezone)
 
         super().__set__(instance, value)
 
@@ -252,19 +265,22 @@ class DateTimeField(StringField):
 
         try:
             date = dateutil.parser.parse(value, dayfirst=config.day_first, yearfirst=config.year_first)
-            return config.timezone.localize(date)
         except AttributeError:
             date = dateutil.parser.parse(value)
+
+        if self._is_naive(date):
             return config.timezone.localize(date)
 
+        return date
+
     def serialize(self, value):
+        if value is None:
+            return None
+
         if not isinstance(value, datetime):
             raise ValueError('DateTimeField needs for serialization datetime object!')
 
-        if self._is_naive(value):
-            return value.isoformat()
-
-        return value.astimezone(pytz.utc).replace(tzinfo=None).isoformat()
+        return value.isoformat()
 
 
 class EmailField(StringField):
@@ -278,8 +294,9 @@ class EmailField(StringField):
 
 class PropertyField(TogglField):
 
-    def __init__(self, getter, setter=None, verbose_name=None, admin_only=False):
+    def __init__(self, getter, setter=None, serializer=None, verbose_name=None, admin_only=False):
         self.getter = getter
+        self.serializer = serializer
         self.setter = setter or self.default_setter
 
         super().__init__(verbose_name=verbose_name, admin_only=admin_only, is_read_only=setter is None)
@@ -313,8 +330,11 @@ class PropertyField(TogglField):
     def init(self, instance, value):
         self.setter(self.name, instance, value, init=True)
 
+    def serialize(self, value):
+        return self.serializer(value) if self.serializer else super().serialize(value)
+
     def __get__(self, instance, owner):
-        return self.getter(self.name, instance, serializing=False)
+        return self.getter(self.name, instance)
 
     def __set__(self, instance, value):
         if self.is_read_only:
@@ -567,21 +587,17 @@ class TogglEntity(metaclass=TogglEntityMeta):
         self.id = None  # Invalidate the object, so when save() is called after delete a new object is created
 
     def json(self, update=False):
-        if update:
-            change_dict = self.__change_dict__
-            del change_dict['id']
-
-            return json.dumps({self.get_name(): change_dict})
-
-        return json.dumps({self.get_name(): self.to_dict()})
+        return json.dumps({self.get_name(): self.to_dict(serialized=True, changes_only=update)})
 
     def validate(self):
         for field in self.__fields__.values():
             field.validate(getattr(self, field.name, None))
 
-    def to_dict(self, serialized=False):
+    def to_dict(self, serialized=False, changes_only=False):
+        source_dict = self.__change_dict__ if changes_only else self.__fields__
         entity_dict = {}
-        for field in self.__fields__.values():
+        for field_name in source_dict:
+            field = self.__fields__[field_name]
             try:
                 entity_dict[field.mapped_field] = getattr(self, field.name).id
             except AttributeError:

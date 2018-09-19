@@ -1,8 +1,13 @@
 import json
+import datetime
+from copy import copy
+from urllib.parse import urlencode
 
 from . import base
 from .. import utils
-from ..exceptions import TogglValidationException, TogglException
+from .. import exceptions
+
+epoch = datetime.datetime.utcfromtimestamp(0)
 
 
 # Workspace entity
@@ -24,8 +29,7 @@ class Workspace(base.TogglEntity):
     rounding_minutes = base.IntegerField()
     default_hourly_rate = base.FloatField()
 
-
-Workspace.objects = WorkspaceSet('/workspaces', Workspace)
+    objects = WorkspaceSet()
 
 
 class WorkspaceEntity(base.TogglEntity):
@@ -55,7 +59,7 @@ class Project(WorkspaceEntity):
         super(Project, self).validate()
 
         if self.customer is not None and not Client.objects.get(self.cid):
-            raise TogglValidationException("Client specified by ID does not exists!")
+            raise exceptions.TogglValidationException("Client specified by ID does not exists!")
 
 
 class UserSet(base.TogglSet):
@@ -90,6 +94,8 @@ class User(WorkspaceEntity):
     image_url = base.StringField()
     timezone = base.StringField()
 
+    objects = UserSet()
+
     @classmethod
     def signup(cls, email, password, timezone=None, created_with='TogglCLI', config=None):
         if config is None:
@@ -114,9 +120,6 @@ class User(WorkspaceEntity):
         return workspace_user.admin
 
 
-User.objects = UserSet('/users', User)
-
-
 class WorkspaceUser(WorkspaceEntity):
     _can_get_detail = False
     _can_create = False
@@ -135,7 +138,146 @@ class WorkspaceUser(WorkspaceEntity):
         data = utils.toggl("/workspaces/{}/invite".format(wid), "post", emails_json, config=config)
 
         if 'notifications' in data and data['notifications']:
-            raise TogglException(data['notifications'])
+            raise exceptions.TogglException(data['notifications'])
+
+
+def get_duration(name, instance, serializing=False):
+    config = instance._config or utils.Config.factory()
+
+    if instance.is_running:
+        return int((config.timezone.localize(epoch) - instance.start).total_seconds())
+
+    return int((instance.stop - instance.start).total_seconds())
+
+
+def set_duration(name, instance, value, init=False):
+    if value is None:
+        return
+
+    if value > 0:
+        instance.is_running = False
+        instance.stop = instance.start + datetime.timedelta(seconds=value)
+    else:
+        instance.is_running = True
+        instance.stop = None
+
+
+class TimeEntrySet(base.TogglSet):
+
+    def build_list_url(self, wid=None):
+        return '/{}'.format(self.url)
+
+    def current(self, config=None):
+        config = config or utils.Config.factory()
+        fetched_entity = utils.toggl('/time_entries/current', 'get', config=config)
+
+        if fetched_entity.get('data') is None:
+            return None
+
+        return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
+
+    def filter(self, start=None, stop=None, config=None, contain=False, **conditions):
+        if start is None and stop is None:
+            return super().filter(config=config, contain=contain, **conditions)
+
+        config = config or utils.Config.factory()
+        url = self.build_list_url() + '?'
+
+        if start is not None:
+            url += 'start_date={}&'.format(urlencode(start.isoformat()))
+
+        if stop is not None:
+            url += 'stop_date={}&'.format(urlencode(stop.isoformat()))
+
+        fetched_entities = utils.toggl(url, 'get', config=config)
+
+        if fetched_entities is None:
+            return []
+
+        entities = [self.entity_cls.deserialize(config=config, **entity) for entity in fetched_entities]
+        return [entity for entity in entities if base.evaluate_conditions(conditions, entity, contain)]
+
+
+class TimeEntry(WorkspaceEntity):
+    description = base.StringField()
+    project = base.MappingField(Project, 'pid')
+    # task = base.MappingField(Task, 'tid') TODO: Tasks
+    billable = base.BooleanField(default=False, admin_only=True)
+    start = base.DateTimeField(required=True)
+    stop = base.DateTimeField()
+    duration = base.PropertyField(get_duration, set_duration)
+    created_with = base.StringField(required=True, default='TogglCLI')
+    # tags = base.ListField() TODO: Tags & ListField
+
+    objects = TimeEntrySet()
+
+    def __init__(self, start, stop=None, duration=None, **kwargs):
+        if stop is None and duration is None:
+            raise ValueError(
+                'You can create only finished time entries through this way! '
+                'You must supply either \'stop\' or \'duration\' parameter!'
+            )
+
+        self.is_running = False
+
+        super().__init__(start=start, stop=stop, duration=duration, **kwargs)
+
+    @classmethod
+    def get_url(cls):
+        return 'time_entries'
+
+    def to_dict(self, serialized=False, changes_only=False):
+        # Enforcing serialize duration when start or stop changes
+        if changes_only and (self.__change_dict__.get('start') or self.__change_dict__.get('stop')):
+            self.__change_dict__['duration'] = None
+
+        return super().to_dict(serialized=serialized, changes_only=changes_only)
+
+    @classmethod
+    def start_and_save(cls, start=None, config=None, **kwargs):
+        if start is None:
+            start = datetime.datetime.now()
+
+        if 'stop' in kwargs or 'duration' in kwargs:
+            raise RuntimeError('With start() method you can not create finished entries!')
+
+        instance = cls.__new__(cls)
+        instance.is_running = True
+        instance._config = config
+        instance.start = start
+
+        for key, value in kwargs.items():
+            setattr(instance, key, value)
+
+        instance.save()
+
+        return instance
+
+    def stop_and_save(self, stop=None, config=None):
+        if not self.is_running:
+            raise exceptions.TogglValidationException('You can\'t stop not running entry!')
+
+        if stop is None:
+            stop = datetime.datetime.now()
+
+        self.stop = stop
+        self.is_running = False
+        self.save(config=config)
+
+        return self
+
+    def continue_and_save(self, start=None, config=None):
+        if start is None:
+            start = datetime.datetime.now()
+
+        new_entry = copy(self)
+        new_entry.start = start
+        new_entry.stop = None
+        new_entry.is_running = True
+
+        new_entry.save(config=config)
+
+        return new_entry
 
 
 # ----------------------------------------------------------------------------
