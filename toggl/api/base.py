@@ -534,7 +534,7 @@ class TogglEntityMeta(ABCMeta):
         setattr(new_class, '__signature__', mcs._make_signature(fields))
 
         # Add objects only if they are not defined to allow custom ToggleSet implementations
-        if not hasattr(new_class, 'objects'):
+        if 'objects' not in new_class.__dict__:
             setattr(new_class, 'objects', TogglSet(new_class))
         else:
             try:
