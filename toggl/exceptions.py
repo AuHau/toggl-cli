@@ -13,6 +13,10 @@ class TogglMultipleResultsException(TogglException):
     pass
 
 
+class TogglConfigException(TogglException):
+    pass
+
+
 class TogglCliException(TogglException, click.ClickException):
     pass
 

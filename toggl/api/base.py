@@ -83,8 +83,8 @@ class TogglSet(object):
 
         return True
 
-    def build_list_url(self, wid=None):
-        return '/workspaces/{}/{}'.format(wid, self.url)
+    def build_list_url(self):
+        return '/{}'.format(self.url)
 
     def build_detail_url(self, id):
         return '/{}/{}'.format(self.url, id)
@@ -109,6 +109,43 @@ class TogglSet(object):
             return None
 
         return entries[0]
+
+    def filter(self, order='asc', config=None, contain=False, **conditions):
+        fetched_entities = self.all(order, config)
+
+        if fetched_entities is None:
+            return []
+
+        return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity, contain)]
+
+    def all(self, order='asc', config=None):
+        if not self.can_get_list:
+            raise exceptions.TogglException('Entity {} is not allowed to fetch list from the API!'
+                                            .format(self.entity_cls))
+
+        config = config or utils.Config.factory()
+        fetched_entities = utils.toggl(self.build_list_url(), 'get', config=config)
+
+        if fetched_entities is None:
+            return []
+
+        output = []
+        i = 0 if order == 'asc' else len(fetched_entities) - 1
+        while 0 <= i < len(fetched_entities):
+            output.append(self.entity_cls.deserialize(config=config, **fetched_entities[i]))
+
+            if order == 'asc':
+                i += 1
+            else:
+                i -= 1
+
+        return output
+
+
+class WorkspaceToggleSet(TogglSet):
+
+    def build_list_url(self, wid=None):
+        return '/workspaces/{}/{}'.format(wid, self.url)
 
     def filter(self, order='asc', wid=None, config=None, contain=False, **conditions):
         fetched_entities = self.all(order, wid, config)
@@ -535,7 +572,7 @@ class TogglEntityMeta(ABCMeta):
 
         # Add objects only if they are not defined to allow custom ToggleSet implementations
         if 'objects' not in new_class.__dict__:
-            setattr(new_class, 'objects', TogglSet(new_class))
+            setattr(new_class, 'objects', WorkspaceToggleSet(new_class))
         else:
             try:
                 new_class.objects.bind_to_class(new_class)

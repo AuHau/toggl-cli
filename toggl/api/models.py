@@ -11,11 +11,6 @@ epoch = datetime.datetime.utcfromtimestamp(0)
 
 
 # Workspace entity
-class WorkspaceSet(base.TogglSet):
-    def build_list_url(self, wid=None):
-        return '/' + self.url
-
-
 class Workspace(base.TogglEntity):
     _can_create = False
     _can_delete = False
@@ -29,7 +24,7 @@ class Workspace(base.TogglEntity):
     rounding_minutes = base.IntegerField()
     default_hourly_rate = base.FloatField()
 
-    objects = WorkspaceSet()
+    objects = base.TogglSet()
 
 
 class WorkspaceEntity(base.TogglEntity):
@@ -221,7 +216,7 @@ class TimeEntrySet(base.TogglSet):
         return output
 
     def all(self, order='desc', wid=None, config=None):
-        return super().all(order=order, wid=wid, config=config)
+        return super().all(order=order, config=config)
 
 
 class TimeEntry(WorkspaceEntity):

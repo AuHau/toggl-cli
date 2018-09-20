@@ -1,20 +1,18 @@
-import datetime
 import json
 import logging
 import os
 from collections import namedtuple
 from pprint import pformat
+from typing import Union
 
 import configparser
 from traceback import format_stack
 
 import click
-import dateutil.parser
 import inquirer
 import iso8601
-import pytz
 import requests
-from tzlocal import get_localzone
+import pendulum
 
 from . import exceptions
 
@@ -108,34 +106,36 @@ class ConfigBootstrap:
     """
 
     KEEP_TOGGLS_DEFAULT_WORKSPACE = '-- Keep Toggl\'s default --'
+    API_TOKEN_OPTION = 'API token'
+    CREDENTIALS_OPTION = 'Credentials'
 
     def __init__(self):
         self.workspaces = None
 
-    def _are_credentials_valid(self, answers, credential):
-        config = self._build_tmp_config(answers, credential)
+    def _are_credentials_valid(self, **kwargs):
+        config = self._build_tmp_config(**kwargs)
 
         try:
             toggl("/me", "get", config=config)
             return True
         except exceptions.TogglAuthenticationException as e:
-            Logger.debug(e)
+            logger.debug(e)
             return False
 
-    def _build_tmp_config(self, answers, credential=None):
+    def _build_tmp_config(self, api_token=None, username=None, password=None):
         config = Config.factory(None)
 
-        if answers['type_auth'] == "API token":
-            config.api_token = credential or answers['API token']
+        if api_token is not None:
+            config.api_token = api_token
         else:
-            config.username = answers['username']
-            config.password = credential or answers['password']
+            config.username = username
+            config.password = password
 
         return config
 
-    def _get_workspaces(self, answers):
+    def _get_workspaces(self, api_token):
         from toggl.api import Workspace
-        config = self._build_tmp_config(answers)
+        config = self._build_tmp_config(api_token=api_token)
 
         if self.workspaces is None:
             self.workspaces = [self.KEEP_TOGGLS_DEFAULT_WORKSPACE]
@@ -144,12 +144,13 @@ class ConfigBootstrap:
 
         return self.workspaces
 
-    def _map_answers(self, answers):
+    def _map_answers(self, **answers):
         output = {
+            'api_token': answers['api_token'],
+
             'file_logging': answers['file_logging'],
 
             'timezone': answers['timezone'],
-            'continue_creates': answers['continue_creates'],
         }
 
         if output['file_logging']:
@@ -157,18 +158,53 @@ class ConfigBootstrap:
 
         if answers['default workspace'] != self.KEEP_TOGGLS_DEFAULT_WORKSPACE:
             from toggl.api import Workspace
-            config = self._build_tmp_config(answers)
-            output['default_wid'] = Workspace.objects.get(name=answers['default workspace'], config=config).id
-
-        if answers['type_auth'] == "API token":
-            output['api_token'] = answers['API token']
-        else:
-            output['username'] = answers['username']
-            output['password'] = answers['password']
+            config = self._build_tmp_config(api_token=answers['api_token'])
+            output['default_wid'] = str(Workspace.objects.get(name=answers['default workspace'], config=config).id)
 
         return output
 
-    def start(self, validate_credentials=True):
+    def _convert_credentials_to_api_token(self, username, password):  # type: (str, str) -> str
+        config = self._build_tmp_config(username=username, password=password)
+
+        data = toggl("/me", "get", config=config)
+        return data['data']['api_token']
+
+    def _get_api_token(self):  # type: () -> Union[str, None]
+        type_auth = inquirer.shortcuts.list_input(message="Type of authentication you want to use",
+                                                  choices=[self.API_TOKEN_OPTION, self.CREDENTIALS_OPTION])
+
+        if type_auth is None:
+            return None
+
+        if type_auth == self.API_TOKEN_OPTION:
+            return inquirer.shortcuts.password(message="Your API token",
+                                               validate=lambda answers, current: self._are_credentials_valid(
+                                                   api_token=current))
+
+        questions = [
+            inquirer.Text('username', message="Your Username"),
+
+            inquirer.Password('password', message="Your Password"),
+        ]
+
+        while True:
+            credentials = inquirer.prompt(questions)
+
+            if credentials is None:
+                return None
+
+            try:
+                return self._convert_credentials_to_api_token(username=credentials['username'],
+                                                              password=credentials['password'])
+            except exceptions.TogglAuthenticationException:
+                click.echo('The provided credentials are not valid! Please try again.')
+
+    def _exit(self):
+        click.secho("We were not able to setup the needed configuration and we are unfortunately not able to "
+                    "proceed without it.", bg="white", fg="red")
+        exit(-1)
+
+    def start(self):
         click.secho(""" _____                 _   _____  _     _____ 
 |_   _|               | | /  __ \| |   |_   _|
   | | ___   __ _  __ _| | | /  \/| |     | |  
@@ -185,29 +221,21 @@ class ConfigBootstrap:
             click.style("Warning!", fg="yellow", bold=True)
         ))
 
-        local_timezone = str(get_localzone())
+        local_timezone = pendulum.local_timezone().name
+
+        api_token = self._get_api_token()
+
+        if api_token is None:
+            self._exit()
+
         questions = [
-            inquirer.List('type_auth', message="Type of authentication you want to use",
-                          choices=["API token", "Credentials"]),
-
-            inquirer.Password('API token', message="Your API token", ignore=lambda x: x['type_auth'] != 'API token',
-                              validate=lambda answers, current: not validate_credentials
-                                                                or self._are_credentials_valid(answers, current)),
-
-            inquirer.Text('username', message="Your Username", ignore=lambda x: x['type_auth'] != 'Credentials'),
-
-            inquirer.Password('password', message="Your Password", ignore=lambda x: x['type_auth'] != 'Credentials',
-                              validate=lambda answers, current: not validate_credentials
-                                                                or self._are_credentials_valid(answers)),
-
             inquirer.List('default workspace', message="Should TogglCli use different default workspace from Toggl's "
                                                        "setting?",
-                          choices=lambda answers: self._get_workspaces(answers)),
+                          choices=lambda answers: self._get_workspaces(api_token)),
 
             inquirer.Text('timezone', 'Used timezone', default=local_timezone, show_default=True,
-                          validate=lambda answers, current: current in pytz.all_timezones_set),
+                          validate=lambda answers, current: current in pendulum.timezones),
 
-            inquirer.Confirm('continue_creates', message="Continue command will create new entry", default=True),
             inquirer.Confirm('file_logging', message="Enable logging of togglCli actions into file?", default=False),
             inquirer.Path('file_logging_path', message="Path to the log file", ignore=lambda x: not x['file_logging'],
                           default='~/.toggl_log'),
@@ -216,13 +244,11 @@ class ConfigBootstrap:
         answers = inquirer.prompt(questions)
 
         if answers is None:
-            click.secho("We were not able to setup the needed configuration and we are unfortunately not able to "
-                        "proceed without it.", bg="white", fg="red")
-            exit(-1)
+            self._exit()
 
         click.echo("\nConfiguration successfully finished!\nNow continuing with your command:\n\n")
 
-        return self._map_answers(answers)
+        return self._map_answers(api_token=api_token, **answers)
 
 
 # ----------------------------------------------------------------------------
@@ -254,13 +280,6 @@ class IniConfigMixin:
             return self._store.getint(entry.section, item, fallback=None)
         elif entry.type == float:
             return self._store.getfloat(entry.section, item, fallback=None)
-        elif entry.type == 'tz':
-            value = self._store.get(entry.section, item, fallback=None)
-
-            if value is None:
-                return
-
-            return pytz.timezone(value)
         else:
             return self._store.get(entry.section, item, fallback=None)
 
@@ -343,7 +362,8 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
     year_first = False
     file_logging = False
     file_logging_path = None
-    timezone = pytz.utc
+    timezone = None
+    use_native_datetime = False
 
     ENV_MAPPING = {
         'api_token': EnvEntry('TOGGL_API_TOKEN', str),
@@ -451,7 +471,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
         """
         Returns HTTPBasicAuth object to be used with request.
 
-        :raises configparser.Error: When no credentials are available.
+        :raises exceptions.TogglConfigsException: When no credentials are available.
         :return: requests.auth.HTTPBasicAuth
         """
         try:
@@ -462,134 +482,134 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
         try:
             return requests.auth.HTTPBasicAuth(self.username, self.password)
         except AttributeError:
-            raise configparser.Error("There is no authentication configuration!")
+            raise exceptions.TogglConfigException("There is no authentication configuration!")
 
 
 # ----------------------------------------------------------------------------
 # DateAndTime
 # ----------------------------------------------------------------------------
-class DateAndTime(object):
-    """
-    Singleton date and time functions. Mostly utility functions. All
-    the timezone and datetime functionality is localized here.
-    """
-
-    __metaclass__ = Singleton
-
-    def __init__(self):
-        self.tz = pytz.timezone(Config().get('options', 'timezone'))
-
-    def duration_since_epoch(self, dt):
-        """
-        Converts the given localized datetime object to the number of
-        seconds since the epoch.
-        """
-        return (dt.astimezone(pytz.UTC) - datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)).total_seconds()
-
-    def duration_str_to_seconds(self, duration_str):
-        """
-        Parses a string of the form [[Hours:]Minutes:]Seconds and returns
-        the total time in seconds.
-        """
-        elements = duration_str.split(':')
-        duration = 0
-        if len(elements) == 3:
-            duration += int(elements[0]) * 3600
-            elements = elements[1:]
-        if len(elements) == 2:
-            duration += int(elements[0]) * 60
-            elements = elements[1:]
-        duration += int(elements[0])
-
-        return duration
-
-    def elapsed_time(self, seconds, suffixes=None, add_s=False, separator=''):
-        """
-        Takes an amount of seconds and turns it into a human-readable amount
-        of time.
-        From http://snipplr.com/view.php?codeview&id=5713
-        """
-        if suffixes is None:
-            suffixes = ['y', 'w', 'd', 'h', 'm', 's']
-
-        # the formatted time string to be returned
-        time = []
-
-        # the pieces of time to iterate over (days, hours, minutes, etc)
-        # - the first piece in each tuple is the suffix (d, h, w)
-        # - the second piece is the length in seconds (a day is 60s * 60m * 24h)
-        parts = [(suffixes[0], 60 * 60 * 24 * 7 * 52),
-                 (suffixes[1], 60 * 60 * 24 * 7),
-                 (suffixes[2], 60 * 60 * 24),
-                 (suffixes[3], 60 * 60),
-                 (suffixes[4], 60),
-                 (suffixes[5], 1)]
-
-        # for each time piece, grab the value and remaining seconds, and add it to
-        # the time string
-        for suffix, length in parts:
-            value = seconds // length
-            if value > 0:
-                seconds = seconds % length
-                time.append('{}{}'.format(str(value),
-                                          (suffix, (suffix, suffix + 's')[value > 1])[add_s]))
-            if seconds < 1:
-                break
-
-        return separator.join(time)
-
-    def format_time(self, time):
-        """
-        Formats the given datetime object according to the strftime() options
-        from the configuration file.
-        """
-        time_format = Config().get('options', 'time_format')
-        return time.strftime(time_format)
-
-    def last_minute_today(self):
-        """
-        Returns 23:59:59 today as a localized datetime object.
-        """
-        return datetime.datetime.now(self.tz) \
-            .replace(hour=23, minute=59, second=59, microsecond=0)
-
-    def now(self):
-        """
-        Returns "now" as a localized datetime object.
-        """
-        return self.tz.localize(datetime.datetime.now())
-
-    def parse_local_datetime_str(self, datetime_str, day_first=False, year_first=False):
-        """
-        Parses a local datetime string (e.g., "2:00pm") and returns
-        a localized datetime object.
-        """
-        return self.tz.localize(dateutil.parser.parse(datetime_str, dayfirst=day_first, yearfirst=year_first))
-
-    def parse_iso_str(self, iso_str):
-        """
-        Parses an ISO 8601 datetime string and returns a localized datetime
-        object.
-        """
-        return iso8601.parse_date(iso_str).astimezone(self.tz)
-
-    def start_of_today(self):
-        """
-        Returns 00:00:00 today as a localized datetime object.
-        """
-        return self.tz.localize(
-            datetime.datetime.combine(datetime.date.today(), datetime.time.min)
-        )
-
-    def start_of_yesterday(self):
-        """
-        Returns 00:00:00 yesterday as a localized datetime object.
-        """
-        return self.tz.localize(
-            datetime.datetime.combine(datetime.date.today(), datetime.time.min) -
-            datetime.timedelta(days=1)  # subtract one day from today at midnight
-        )
-
+# class DateAndTime(object):
+#     """
+#     Singleton date and time functions. Mostly utility functions. All
+#     the timezone and datetime functionality is localized here.
+#     """
+#
+#     __metaclass__ = Singleton
+#
+#     def __init__(self):
+#         self.tz = pytz.timezone(Config().get('options', 'timezone'))
+#
+#     def duration_since_epoch(self, dt):
+#         """
+#         Converts the given localized datetime object to the number of
+#         seconds since the epoch.
+#         """
+#         return (dt.astimezone(pytz.UTC) - datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)).total_seconds()
+#
+#     def duration_str_to_seconds(self, duration_str):
+#         """
+#         Parses a string of the form [[Hours:]Minutes:]Seconds and returns
+#         the total time in seconds.
+#         """
+#         elements = duration_str.split(':')
+#         duration = 0
+#         if len(elements) == 3:
+#             duration += int(elements[0]) * 3600
+#             elements = elements[1:]
+#         if len(elements) == 2:
+#             duration += int(elements[0]) * 60
+#             elements = elements[1:]
+#         duration += int(elements[0])
+#
+#         return duration
+#
+#     def elapsed_time(self, seconds, suffixes=None, add_s=False, separator=''):
+#         """
+#         Takes an amount of seconds and turns it into a human-readable amount
+#         of time.
+#         From http://snipplr.com/view.php?codeview&id=5713
+#         """
+#         if suffixes is None:
+#             suffixes = ['y', 'w', 'd', 'h', 'm', 's']
+#
+#         # the formatted time string to be returned
+#         time = []
+#
+#         # the pieces of time to iterate over (days, hours, minutes, etc)
+#         # - the first piece in each tuple is the suffix (d, h, w)
+#         # - the second piece is the length in seconds (a day is 60s * 60m * 24h)
+#         parts = [(suffixes[0], 60 * 60 * 24 * 7 * 52),
+#                  (suffixes[1], 60 * 60 * 24 * 7),
+#                  (suffixes[2], 60 * 60 * 24),
+#                  (suffixes[3], 60 * 60),
+#                  (suffixes[4], 60),
+#                  (suffixes[5], 1)]
+#
+#         # for each time piece, grab the value and remaining seconds, and add it to
+#         # the time string
+#         for suffix, length in parts:
+#             value = seconds // length
+#             if value > 0:
+#                 seconds = seconds % length
+#                 time.append('{}{}'.format(str(value),
+#                                           (suffix, (suffix, suffix + 's')[value > 1])[add_s]))
+#             if seconds < 1:
+#                 break
+#
+#         return separator.join(time)
+#
+#     def format_time(self, time):
+#         """
+#         Formats the given datetime object according to the strftime() options
+#         from the configuration file.
+#         """
+#         time_format = Config().get('options', 'time_format')
+#         return time.strftime(time_format)
+#
+#     def last_minute_today(self):
+#         """
+#         Returns 23:59:59 today as a localized datetime object.
+#         """
+#         return datetime.datetime.now(self.tz) \
+#             .replace(hour=23, minute=59, second=59, microsecond=0)
+#
+#     def now(self):
+#         """
+#         Returns "now" as a localized datetime object.
+#         """
+#         return self.tz.localize(datetime.datetime.now())
+#
+#     def parse_local_datetime_str(self, datetime_str, day_first=False, year_first=False):
+#         """
+#         Parses a local datetime string (e.g., "2:00pm") and returns
+#         a localized datetime object.
+#         """
+#         return self.tz.localize(dateutil.parser.parse(datetime_str, dayfirst=day_first, yearfirst=year_first))
+#
+#     def parse_iso_str(self, iso_str):
+#         """
+#         Parses an ISO 8601 datetime string and returns a localized datetime
+#         object.
+#         """
+#         return iso8601.parse_date(iso_str).astimezone(self.tz)
+#
+#     def start_of_today(self):
+#         """
+#         Returns 00:00:00 today as a localized datetime object.
+#         """
+#         return self.tz.localize(
+#             datetime.datetime.combine(datetime.date.today(), datetime.time.min)
+#         )
+#
+#     def start_of_yesterday(self):
+#         """
+#         Returns 00:00:00 yesterday as a localized datetime object.
+#         """
+#         return self.tz.localize(
+#             datetime.datetime.combine(datetime.date.today(), datetime.time.min) -
+#             datetime.timedelta(days=1)  # subtract one day from today at midnight
+#         )
+#
 
 class SubCommandsGroup(click.Group):
     """
@@ -638,6 +658,7 @@ class SubCommandsGroup(click.Group):
         return sorted(
             {k: v for k, v in self.commands.items() if k not in self.subcommands}
         )
+
 
 # ----------------------------------------------------------------------------
 #
@@ -708,7 +729,7 @@ def handle_error(response):
     raise exceptions.TogglApiException(
         response.status_code, response.text,
         "Toggl's API server returned {} code with message: {}"
-        .format(response.status_code, response.text)
+            .format(response.status_code, response.text)
     )
 
 
