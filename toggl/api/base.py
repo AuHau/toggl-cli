@@ -110,15 +110,15 @@ class TogglSet(object):
 
         return entries[0]
 
-    def filter(self, wid=None, config=None, contain=False, **conditions):
-        fetched_entities = self.all(wid, config)
+    def filter(self, order='asc', wid=None, config=None, contain=False, **conditions):
+        fetched_entities = self.all(order, wid, config)
 
         if fetched_entities is None:
             return []
 
         return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity, contain)]
 
-    def all(self, wid=None, config=None):
+    def all(self, order='asc', wid=None, config=None):
         if not self.can_get_list:
             raise exceptions.TogglException('Entity {} is not allowed to fetch list from the API!'
                                             .format(self.entity_cls))
@@ -130,7 +130,17 @@ class TogglSet(object):
         if fetched_entities is None:
             return []
 
-        return [self.entity_cls.deserialize(config=config, **entity) for entity in fetched_entities]
+        output = []
+        i = 0 if order == 'asc' else len(fetched_entities) - 1
+        while 0 <= i < len(fetched_entities):
+            output.append(self.entity_cls.deserialize(config=config, **fetched_entities[i]))
+
+            if order == 'asc':
+                i += 1
+            else:
+                i -= 1
+
+        return output
 
 
 class TogglField:

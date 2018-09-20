@@ -344,10 +344,13 @@ def entry_add(ctx, start, end, descr, project, workspace):
 @click.option('--stop', '-p', type=DateTimeType(), help='Defines stop of a date range to filter the entries by.')
 @click.pass_context
 def entry_ls(ctx, start, stop):
-    entities = api.TimeEntry.objects.filter(start=start, stop=stop)
+    if start is not None or stop is not None:
+        entities = api.TimeEntry.objects.filter(start=start, stop=stop)
+    else:
+        entities = api.TimeEntry.objects.all()
 
     # noinspection PyTypeChecker
-    entity_listing(reversed(entities), fields=('description', 'duration', 'start', 'stop', 'project', 'id'))
+    entity_listing(entities, fields=('description', 'duration', 'start', 'stop', 'project', 'id'))
 
 
 @cli.command('rm', short_help='delete a time entry')

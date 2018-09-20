@@ -13,7 +13,7 @@ epoch = datetime.datetime.utcfromtimestamp(0)
 # Workspace entity
 class WorkspaceSet(base.TogglSet):
     def build_list_url(self, wid=None):
-        return self.url
+        return '/' + self.url
 
 
 class Workspace(base.TogglEntity):
@@ -187,9 +187,9 @@ class TimeEntrySet(base.TogglSet):
 
         return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
 
-    def filter(self, start=None, stop=None, config=None, contain=False, **conditions):
+    def filter(self, order='desc', start=None, stop=None, config=None, contain=False, **conditions):
         if start is None and stop is None:
-            return super().filter(config=config, contain=contain, **conditions)
+            return super().filter(order=order, config=config, contain=contain, **conditions)
 
         config = config or utils.Config.factory()
         url = self.build_list_url() + '?'
@@ -205,8 +205,23 @@ class TimeEntrySet(base.TogglSet):
         if fetched_entities is None:
             return []
 
-        entities = [self.entity_cls.deserialize(config=config, **entity) for entity in fetched_entities]
-        return [entity for entity in entities if base.evaluate_conditions(conditions, entity, contain)]
+        output = []
+        i = 0 if order == 'asc' else len(fetched_entities) - 1
+        while 0 <= i < len(fetched_entities):
+            entity = self.entity_cls.deserialize(config=config, **fetched_entities[i])
+
+            if base.evaluate_conditions(conditions, entity, contain):
+                output.append(entity)
+
+            if order == 'asc':
+                i += 1
+            else:
+                i -= 1
+
+        return output
+
+    def all(self, order='desc', wid=None, config=None):
+        return super().all(order=order, wid=wid, config=config)
 
 
 class TimeEntry(WorkspaceEntity):
