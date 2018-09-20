@@ -280,7 +280,7 @@ def cli(ctx, quiet, verbose, debug, config=None):
     elif debug:
         default.setLevel(logging.DEBUG)
     else:
-        default.setLevel(logging.WARN)
+        default.setLevel(logging.ERROR)
 
     if quiet:
         # Is this good idea?
