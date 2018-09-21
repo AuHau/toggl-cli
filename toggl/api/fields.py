@@ -2,6 +2,7 @@ import datetime
 import logging
 from builtins import int
 from enum import Enum
+from typing import Any, Union
 
 import pendulum
 from validate_email import validate_email
@@ -37,7 +38,10 @@ class TogglField:
 
         return value
 
-    def format(self, value, config=None):
+    def format(self, value, config=None):  # type: (Any, Union[utils.Config, None]) -> str
+        if value is None:
+            return ''
+
         return value
 
     def init(self, instance, value):
@@ -283,6 +287,23 @@ class ChoiceField(TogglField):
 
     def get_label(self, value):
         return self.choices[value]
+
+
+class ListField(TogglField):
+    def format(self, value, config=None):
+        if value is None:
+            return ''
+
+        return ', '.join(value)
+
+    def parse(self, value, config=None):
+        return value
+
+    def __set__(self, instance, value):
+        if not isinstance(value, list):
+            raise TypeError('ListField expects list instance when settings a value to the field.')
+
+        super().__set__(instance, value)
 
 
 class MappingCardinality(Enum):

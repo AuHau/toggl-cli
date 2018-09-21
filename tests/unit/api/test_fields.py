@@ -1,6 +1,8 @@
 import datetime
 
-from toggl.api import base
+import pendulum
+
+from toggl.api import base, fields
 from toggl import exceptions
 import pytest
 
@@ -23,11 +25,11 @@ def setter(name, instance, value, init=False):
 
 
 class PropertyEntity(base.TogglEntity):
-        field = base.PropertyField(getter, setter)
+        field = fields.PropertyField(getter, setter)
 
 
 class ReadOnlyPropertyEntity(base.TogglEntity):
-        field = base.PropertyField(base.PropertyField.default_getter)
+        field = fields.PropertyField(fields.PropertyField.default_getter)
 
 
 class TestPropertyField:
@@ -81,7 +83,7 @@ class TestPropertyField:
 # DateTimeField
 
 class DateTimeEntity(base.TogglEntity):
-    field = base.DateTimeField()
+    field = fields.DateTimeField()
 
 
 class TestDateTimeField:
@@ -95,5 +97,45 @@ class TestDateTimeField:
         try:
             instance.field = datetime.datetime.now()
         except TypeError:
-            pytest.fail('DateTimeField does not accept valid datetime object!')
+            pytest.fail('DateTimeField does not accept valid datetime.datetime object!')
 
+        try:
+            instance.field = pendulum.now()
+        except TypeError:
+            pytest.fail('DateTimeField does not accept valid pendulum.DateTime object!')
+
+
+#########################################################################################
+# ListField
+
+class ListEntity(base.TogglEntity):
+    field = fields.ListField()
+
+
+class TestListField:
+
+    def test_type_check(self):
+        instance = ListEntity()
+
+        with pytest.raises(TypeError):
+            instance.field = 'some value not list'
+
+        try:
+            instance.field = ['some', 'list']
+        except TypeError:
+            pytest.fail('ListField does not accept valid list object!')
+
+    def test_format(self):
+        instance = ListEntity()
+
+        value = ['some', 'list']
+        formatted_value = instance.__fields__['field'].format(value)
+        assert len(value) == len(formatted_value.split(','))
+
+        value = ['some']
+        formatted_value = instance.__fields__['field'].format(value)
+        assert ',' not in formatted_value
+
+        value = None
+        formatted_value = instance.__fields__['field'].format(value)
+        assert formatted_value == ''
