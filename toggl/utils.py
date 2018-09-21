@@ -185,7 +185,6 @@ class ConfigBootstrap:
 
         questions = [
             inquirer.Text('username', message="Your Username"),
-
             inquirer.Password('password', message="Your Password"),
         ]
 

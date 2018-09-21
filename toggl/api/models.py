@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 import pendulum
 
 from . import base
+from . import fields
 from .. import utils
 from .. import exceptions
 
@@ -14,40 +15,40 @@ class Workspace(base.TogglEntity):
     _can_create = False
     _can_delete = False
 
-    name = base.StringField(required=True)
-    premium = base.BooleanField()
-    admin = base.BooleanField()
-    only_admins_may_create_projects = base.BooleanField()
-    only_admins_see_billable_rates = base.BooleanField()
-    rounding = base.IntegerField()
-    rounding_minutes = base.IntegerField()
-    default_hourly_rate = base.FloatField()
+    name = fields.StringField(required=True)
+    premium = fields.BooleanField()
+    admin = fields.BooleanField()
+    only_admins_may_create_projects = fields.BooleanField()
+    only_admins_see_billable_rates = fields.BooleanField()
+    rounding = fields.IntegerField()
+    rounding_minutes = fields.IntegerField()
+    default_hourly_rate = fields.FloatField()
 
     objects = base.TogglSet()
 
 
 class WorkspaceEntity(base.TogglEntity):
-    workspace = base.MappingField(Workspace, 'wid', default=lambda config: config.default_workspace.id)
+    workspace = fields.MappingField(Workspace, 'wid', default=lambda config: config.default_workspace.id)
 
 
 # ----------------------------------------------------------------------------
 # Entities definitions
 # ----------------------------------------------------------------------------
 class Client(WorkspaceEntity):
-    name = base.StringField(required=True)
-    notes = base.StringField()
+    name = fields.StringField(required=True)
+    notes = fields.StringField()
 
 
 class Project(WorkspaceEntity):
-    name = base.StringField(required=True)
-    customer = base.MappingField(Client, 'cid')
-    active = base.BooleanField(default=True)
-    is_private = base.BooleanField(default=True)
-    billable = base.BooleanField(default=True)
-    auto_estimates = base.BooleanField(default=False)
-    estimated_hours = base.IntegerField()
-    color = base.IntegerField()
-    rate = base.FloatField()
+    name = fields.StringField(required=True)
+    customer = fields.MappingField(Client, 'cid')
+    active = fields.BooleanField(default=True)
+    is_private = fields.BooleanField(default=True)
+    billable = fields.BooleanField(default=True)
+    auto_estimates = fields.BooleanField(default=False)
+    estimated_hours = fields.IntegerField()
+    color = fields.IntegerField()
+    rate = fields.FloatField()
 
     def validate(self):
         super(Project, self).validate()
@@ -68,14 +69,14 @@ class User(WorkspaceEntity):
     _can_update = False
     _can_delete = False
 
-    api_token = base.StringField()
-    send_timer_notifications = base.BooleanField()
-    openid_enabled = base.BooleanField()
-    default_workspace = base.MappingField(Workspace, 'default_wid')
-    email = base.EmailField()
-    fullname = base.StringField()
-    store_start_and_stop_time = base.BooleanField()
-    beginning_of_week = base.ChoiceField({
+    api_token = fields.StringField()
+    send_timer_notifications = fields.BooleanField()
+    openid_enabled = fields.BooleanField()
+    default_workspace = fields.MappingField(Workspace, 'default_wid')
+    email = fields.EmailField()
+    fullname = fields.StringField()
+    store_start_and_stop_time = fields.BooleanField()
+    beginning_of_week = fields.ChoiceField({
         0: 'Sunday',
         1: 'Monday',
         2: 'Tuesday',
@@ -84,9 +85,9 @@ class User(WorkspaceEntity):
         5: 'Friday',
         6: 'Saturday'
     })
-    language = base.StringField()
-    image_url = base.StringField()
-    timezone = base.StringField()
+    language = fields.StringField()
+    image_url = fields.StringField()
+    timezone = fields.StringField()
 
     objects = UserSet()
 
@@ -118,10 +119,10 @@ class WorkspaceUser(WorkspaceEntity):
     _can_get_detail = False
     _can_create = False
 
-    email = base.EmailField(is_read_only=True)
-    active = base.BooleanField()
-    admin = base.BooleanField(admin_only=True)
-    user = base.MappingField(User, 'uid', is_read_only=True)
+    email = fields.EmailField(is_read_only=True)
+    active = fields.BooleanField()
+    admin = fields.BooleanField(admin_only=True)
+    user = fields.MappingField(User, 'uid', is_read_only=True)
 
     @classmethod
     def invite(cls, *emails, wid=None, config=None):
@@ -135,7 +136,7 @@ class WorkspaceUser(WorkspaceEntity):
             raise exceptions.TogglException(data['notifications'])
 
 
-class TimeEntryDateTimeField(base.DateTimeField):
+class TimeEntryDateTimeField(fields.DateTimeField):
 
     def format(self, value, config=None, instance=None, display_running=False, only_time_for_same_day=False):
         if not display_running and not only_time_for_same_day:
@@ -237,15 +238,15 @@ class TimeEntrySet(base.TogglSet):
 
 
 class TimeEntry(WorkspaceEntity):
-    description = base.StringField()
-    project = base.MappingField(Project, 'pid')
-    # task = base.MappingField(Task, 'tid') TODO: Tasks
-    billable = base.BooleanField(default=False, admin_only=True)
+    description = fields.StringField()
+    project = fields.MappingField(Project, 'pid')
+    # task = fields.MappingField(Task, 'tid') TODO: Tasks
+    billable = fields.BooleanField(default=False, admin_only=True)
     start = TimeEntryDateTimeField(required=True)
     stop = TimeEntryDateTimeField()
-    duration = base.PropertyField(get_duration, set_duration, formater=format_duration)
-    created_with = base.StringField(required=True, default='TogglCLI')
-    # tags = base.ListField() TODO: Tags & ListField
+    duration = fields.PropertyField(get_duration, set_duration, formater=format_duration)
+    created_with = fields.StringField(required=True, default='TogglCLI')
+    # tags = fields.ListField() TODO: Tags & ListField
 
     objects = TimeEntrySet()
 
