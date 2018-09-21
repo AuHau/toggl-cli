@@ -701,7 +701,6 @@ class Logger(object):
 def handle_error(response):
     if response.status_code == 402:
         raise exceptions.TogglPremiumException(
-            response.status_code, response.text,
             "Request tried to utilized Premium functionality on workspace which is not Premium!"
         )
 

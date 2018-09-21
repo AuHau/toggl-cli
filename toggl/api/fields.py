@@ -33,6 +33,9 @@ class TogglField:
         return value
 
     def parse(self, value, config=None):
+        if value is None:
+            return None
+
         if self._field_type is not None:
             return self._field_type(value)
 

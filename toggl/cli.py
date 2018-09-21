@@ -9,7 +9,7 @@ import pendulum
 import click
 from prettytable import PrettyTable
 
-from . import api, utils, __version__
+from . import api, exceptions, utils, __version__
 
 DEFAULT_CONFIG_PATH = '~/.togglrc'
 
@@ -662,6 +662,77 @@ def workspaces_ls(ctx):
 @click.pass_context
 def workspaces_get(ctx, spec):
     entity_detail(api.Workspace, spec)
+
+
+# ----------------------------------------------------------------------------
+# Tasks
+# ----------------------------------------------------------------------------
+
+@cli.group('tasks', short_help='tasks management')
+@click.pass_context
+def tasks(ctx):
+    pass
+
+
+@tasks.command('add', short_help='create new task')
+@click.option('--name', '-n', prompt='Name of the task',
+              help='Specifies the name of the task', )
+@click.option('--estimated_seconds', '-e', type=click.INT, help='Specifies estimated duration for the task in seconds')
+@click.option('--active/--no-active', default=True, help='Specifies whether the task is active', )
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.Workspace),
+              help='Specifies a workspace where the client will be created. Can be ID or name of the workspace '
+                   '(ENV: TOGGL_WORKSPACE)')
+@click.option('--project', '-p', prompt='Name or ID of project to have the task assigned to', envvar="TOGGL_PROJECT", type=ResourceType(api.Project),
+              help='Specifies a project to which the task will be linked to. Can be ID or name of the project '
+                   '(ENV: TOGGL_PROJECT)')
+@click.option('--user', '-u', envvar="TOGGL_USER", type=ResourceType(api.User),
+              help='Specifies a user to whom the task will be assigned. Can be ID or name of the user '
+                   '(ENV: TOGGL_USER)')
+@click.pass_context
+def tasks_add(ctx, **kwargs):
+    task = api.Task(**kwargs)
+
+    try:
+        task.save()
+    except exceptions.TogglPremiumException:
+        click.echo("Task was not possible to create as the assigned workspace '{}' is not a Premium workspace!."
+                   .format(task.workspace))
+        exit(1)
+
+    click.echo("Task '{}' with #{} created.".format(task.name, task.id))
+
+
+@tasks.command('update', short_help='update a task')
+@click.argument('spec')
+@click.option('--name', '-n', help='Specifies the name of the task', )
+@click.option('--estimated_seconds', '-e', type=click.INT, help='Specifies estimated duration for the task in seconds')
+@click.option('--active/--no-active', default=True, help='Specifies whether the task is active', )
+@click.option('--user', '-u', envvar="TOGGL_USER", type=ResourceType(api.User),
+              help='Specifies a user to whom the task will be assigned. Can be ID or name of the user '
+                   '(ENV: TOGGL_USER)')
+@click.pass_context
+def tasks_update(ctx, spec, **kwargs):
+    entity_update(api.Task, spec, **kwargs)
+
+
+@tasks.command('ls', short_help='list tasks')
+@click.pass_context
+def tasks_ls(ctx):
+    entity_listing(api.Task)
+
+
+@tasks.command('get', short_help='retrieve details of a task')
+@click.argument('spec')
+@click.pass_context
+def tasks_get(ctx, spec):
+    entity_detail(api.Task, spec)
+
+
+@tasks.command('rm', short_help='delete a specific task')
+@click.argument('spec')
+@click.pass_context
+def tasks_rm(ctx, spec):
+    entity_remove(api.Task, spec)
 
 
 # ----------------------------------------------------------------------------

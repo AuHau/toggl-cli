@@ -31,6 +31,18 @@ class WorkspaceEntity(base.TogglEntity):
     workspace = fields.MappingField(Workspace, 'wid', default=lambda config: config.default_workspace.id)
 
 
+# Premium Entity
+class PremiumEntity(WorkspaceEntity):
+    """
+    Abstract entity that enforces that linked Workspace is premium (paid).
+    """
+    def save(self, config=None):
+        if not self.workspace.premium:
+            raise exceptions.TogglPremiumException('The entity {} requires to be associated with Premium workspace!')
+
+        super().save(config)
+
+
 # ----------------------------------------------------------------------------
 # Entities definitions
 # ----------------------------------------------------------------------------
@@ -57,7 +69,7 @@ class Project(WorkspaceEntity):
             raise exceptions.TogglValidationException("Client specified by ID does not exists!")
 
 
-class UserSet(base.TogglSet):
+class UserSet(base.WorkspaceToggleSet):
 
     def current_user(self, config=None):
         fetched_entity = utils.toggl('/me', 'get', config=config)
@@ -134,6 +146,15 @@ class WorkspaceUser(WorkspaceEntity):
 
         if 'notifications' in data and data['notifications']:
             raise exceptions.TogglException(data['notifications'])
+
+
+class Task(PremiumEntity):
+    name = fields.StringField(required=True)
+    project = fields.MappingField(Project, 'pid', required=True)
+    user = fields.MappingField(User, 'uid')
+    estimated_seconds = fields.IntegerField()
+    active = fields.BooleanField(default=True)
+    tracked_seconds = fields.IntegerField(is_read_only=True)
 
 
 class TimeEntryDateTimeField(fields.DateTimeField):
