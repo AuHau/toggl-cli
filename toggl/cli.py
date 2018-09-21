@@ -154,7 +154,6 @@ class FieldsType(click.ParamType):
     #
     #     fields = value.split(',')
 
-
     def convert(self, value, param, ctx):
         # if '-' in value or '+' in value:
         #     return self._diff_mode(value, param)
@@ -334,12 +333,15 @@ def cli(ctx, quiet, verbose, debug, config=None):
 @click.argument('start', type=DateTimeType(allow_now=True))
 @click.argument('end', type=DurationType())
 @click.argument('descr')
+@click.option('--tags', '-a', help='List of tags delimited with \',\'')
 @click.option('--project', '-p', envvar="TOGGL_PROJECT", type=ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
+@click.option('--task', '-t', envvar="TOGGL_TASK", type=ResourceType(api.Task),
+              help='Link the entry with specific task. Can be ID or name of the task (ENV: TOGGL_TASK)', )
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.Workspace),
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
-def entry_add(ctx, start, end, descr, project, workspace):
+def entry_add(ctx, start, end, descr, tags, project, task, workspace):
     """
     Adds finished time entry to Toggl with DESCR description and start
     datetime START which can also be a special string 'now' which denotes current
@@ -355,19 +357,25 @@ def entry_add(ctx, start, end, descr, project, workspace):
 
     Example: 5h 2m 10s - 5 hours 2 minutes 10 seconds from the start time
     """
-    if isinstance(end, pendulum.duration):
+    if isinstance(end, pendulum.Duration):
         end = start + end
+
+    if tags is not None:
+        tags = tags.split(',')
 
     # Create a time entry.
     entry = api.TimeEntry(
         description=descr,
         start=start,
         stop=end,
+        task=task,
+        tags=tags,
         project=project,
         workspace=workspace
     )
 
     entry.save()
+    click.echo("Time entry '{}' with #{} created.".format(entry.description, entry.id))
 
 
 @cli.command('ls', short_help='list a time entries')

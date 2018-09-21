@@ -261,7 +261,7 @@ class TimeEntrySet(base.TogglSet):
 class TimeEntry(WorkspaceEntity):
     description = fields.StringField()
     project = fields.MappingField(Project, 'pid')
-    # task = fields.MappingField(Task, 'tid') TODO: Tasks
+    task = fields.MappingField(Task, 'tid')
     billable = fields.BooleanField(default=False, admin_only=True)
     start = TimeEntryDateTimeField(required=True)
     stop = TimeEntryDateTimeField()
