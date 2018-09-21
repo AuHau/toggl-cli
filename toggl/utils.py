@@ -357,7 +357,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
 
     # Default values
     continue_creates = True
-    datetime_format = '%X %x'
+    datetime_format = 'LTS L'
     day_first = False
     year_first = False
     file_logging = False

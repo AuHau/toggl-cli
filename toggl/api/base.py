@@ -1,15 +1,14 @@
 import json
 import logging
 import re
+import datetime
 from abc import ABCMeta
 from builtins import int
 from collections import OrderedDict
-from datetime import datetime
 from enum import Enum
 from inspect import Signature, Parameter
 
-import dateutil
-import pytz
+import pendulum
 from validate_email import validate_email
 
 from .. import utils
@@ -286,58 +285,64 @@ class BooleanField(TogglField):
 class DateTimeField(StringField):
 
     @staticmethod
-    def _is_naive(value):
+    def _is_naive(value):  # type: (datetime.datetime) -> bool
         return value.utcoffset() is None
 
     def __set__(self, instance, value):
         if value is None:
             return super().__set__(instance, value)
 
-        if not isinstance(value, datetime):
-            raise TypeError('Value which is being set to DateTimeField have to be a datetime object!')
-
         config = instance._config or utils.Config.factory()
 
-        if self._is_naive(value):
-            value = value.astimezone(tz=config.timezone)
+        if isinstance(value, datetime.datetime):
+            if self._is_naive(value):
+                value = pendulum.instance(value, config.timezone)
+            else:
+                value = pendulum.instance(value)
+        elif isinstance(value, pendulum.DateTime):
+            pass
+        else:
+            raise TypeError('Value which is being set to DateTimeField have to be either '
+                            'datetime.datetime or pendulum.DateTime object!')
 
         super().__set__(instance, value)
 
     def parse(self, value, config=None):
         config = config or utils.Config.factory()
 
-        if isinstance(value, datetime):
+        if isinstance(value, datetime.datetime):
             if self._is_naive(value):
-                return value.astimezone(config.timezone)
+                return pendulum.instance(value, config.timezone)
 
+            return pendulum.instance(value)
+        elif isinstance(value, pendulum.DateTime):
             return value
 
         try:
-            date = dateutil.parser.parse(value, dayfirst=config.day_first, yearfirst=config.year_first)
+            return pendulum.parse(value, strict=False, dayfirst=config.day_first,
+                                  yearfirst=config.year_first)
         except AttributeError:
-            date = dateutil.parser.parse(value)
-
-        if self._is_naive(date):
-            return config.timezone.localize(date)
-
-        return date
+            return pendulum.parse(value, strict=False)
 
     def format(self, value, config=None):
         if value is None:
             return None
 
+        if not isinstance(value, pendulum.DateTime):
+            raise TypeError('DateTimeField needs for formatting pendulum.DateTime object')
+
         config = config or utils.Config.factory()
 
-        return value.strftime(config.datetime_format)
+        return value.in_timezone(config.timezone).format(config.datetime_format)
 
     def serialize(self, value):
         if value is None:
             return None
 
-        if not isinstance(value, datetime):
-            raise ValueError('DateTimeField needs for serialization datetime object!')
+        if not isinstance(value, pendulum.DateTime):
+            raise TypeError('DateTimeField needs for serialization pendulum.DateTime object!')
 
-        return value.isoformat()
+        return value.in_timezone('UTC').to_iso8601_string()
 
 
 class EmailField(StringField):

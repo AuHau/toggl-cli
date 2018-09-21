@@ -1,13 +1,12 @@
 import json
-import datetime
 from copy import copy
 from urllib.parse import urlencode
+
+import pendulum
 
 from . import base
 from .. import utils
 from .. import exceptions
-
-epoch = datetime.datetime.utcfromtimestamp(0)
 
 
 # Workspace entity
@@ -136,13 +135,31 @@ class WorkspaceUser(WorkspaceEntity):
             raise exceptions.TogglException(data['notifications'])
 
 
+class TimeEntryDateTimeField(base.DateTimeField):
+
+    def format(self, value, config=None, instance=None, display_running=False, only_time_for_same_day=False):
+        if not display_running and not only_time_for_same_day:
+            return super().format(value, config)
+
+        if value is None and display_running:
+            return 'running'
+
+        if instance is not None \
+            and only_time_for_same_day \
+            and (value - instance.start).in_days() == 0:
+
+            config = config or utils.Config.factory()
+
+            return value.in_timezone(config.timezone).format('LTS')
+
+        return super().format(value, config)
+
+
 def get_duration(name, instance, serializing=False):
-    config = instance._config or utils.Config.factory()
-
     if instance.is_running:
-        return int((config.timezone.localize(epoch) - instance.start).total_seconds())
+        return instance.start.int_timestamp * -1
 
-    return int((instance.stop - instance.start).total_seconds())
+    return int((instance.stop - instance.start).in_seconds())
 
 
 def set_duration(name, instance, value, init=False):
@@ -151,7 +168,7 @@ def set_duration(name, instance, value, init=False):
 
     if value > 0:
         instance.is_running = False
-        instance.stop = instance.start + datetime.timedelta(seconds=value)
+        instance.stop = instance.start + pendulum.duration(seconds=value)
     else:
         instance.is_running = True
         instance.stop = None
@@ -159,7 +176,7 @@ def set_duration(name, instance, value, init=False):
 
 def format_duration(value, config=None):
     if value < 0:
-        value = value + int((datetime.datetime.now() - datetime.datetime.utcfromtimestamp(0)) / datetime.timedelta(seconds=1))
+        value = pendulum.now().int_timestamp + value
 
     hours = value // 3600
     minutes = (value - hours * 3600) // 60
@@ -224,8 +241,8 @@ class TimeEntry(WorkspaceEntity):
     project = base.MappingField(Project, 'pid')
     # task = base.MappingField(Task, 'tid') TODO: Tasks
     billable = base.BooleanField(default=False, admin_only=True)
-    start = base.DateTimeField(required=True)
-    stop = base.DateTimeField()
+    start = TimeEntryDateTimeField(required=True)
+    stop = TimeEntryDateTimeField()
     duration = base.PropertyField(get_duration, set_duration, formater=format_duration)
     created_with = base.StringField(required=True, default='TogglCLI')
     # tags = base.ListField() TODO: Tags & ListField
@@ -256,8 +273,10 @@ class TimeEntry(WorkspaceEntity):
 
     @classmethod
     def start_and_save(cls, start=None, config=None, **kwargs):
+        config = config or utils.Config.factory()
+
         if start is None:
-            start = datetime.datetime.now()
+            start = pendulum.now(config.timezone)
 
         if 'stop' in kwargs or 'duration' in kwargs:
             raise RuntimeError('With start() method you can not create finished entries!')
@@ -274,12 +293,14 @@ class TimeEntry(WorkspaceEntity):
 
         return instance
 
-    def stop_and_save(self, stop=None, config=None):
+    def stop_and_save(self, stop=None):
         if not self.is_running:
             raise exceptions.TogglValidationException('You can\'t stop not running entry!')
 
+        config = self._config or utils.Config.factory()
+
         if stop is None:
-            stop = datetime.datetime.now()
+            stop = pendulum.now(config.timezone)
 
         self.stop = stop
         self.is_running = False
@@ -287,9 +308,11 @@ class TimeEntry(WorkspaceEntity):
 
         return self
 
-    def continue_and_save(self, start=None, config=None):
+    def continue_and_save(self, start=None):
+        config = self._config or utils.Config.factory()
+
         if start is None:
-            start = datetime.datetime.now()
+            start = pendulum.now(config.timezone)
 
         new_entry = copy(self)
         new_entry.start = start
