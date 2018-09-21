@@ -40,7 +40,8 @@ class DateTimeType(click.ParamType):
 
         try:
             try:
-                return pendulum.parse(value, tz=config.timezone, strict=False, dayfirst=config.day_first, yearfirst=config.year_first)
+                return pendulum.parse(value, tz=config.timezone, strict=False, dayfirst=config.day_first,
+                                      yearfirst=config.year_first)
             except ValueError:
                 pass
         except AttributeError:
@@ -132,6 +133,42 @@ class ResourceType(click.ParamType):
             self.fail("Unknown {}'s name!".format(self._resource_cls.get_name(verbose=True)), param, ctx)
 
         return resource
+
+
+class FieldsType(click.ParamType):
+    """
+    Takes an Entity class and based on the type of entered specification searches either
+    for ID or Name of the entity
+    """
+    name = 'fields-type'
+
+    def __init__(self, resource_cls):
+        self._resource_cls = resource_cls
+
+    # TODO: Diff mode with +/-
+    # def _diff_mode(self, value, param):
+    #     if param is None:
+    #         default = ''
+    #     else:
+    #         default = param.default
+    #
+    #     fields = value.split(',')
+
+
+    def convert(self, value, param, ctx):
+        # if '-' in value or '+' in value:
+        #     return self._diff_mode(value, param)
+
+        fields = value.split(',')
+        out = []
+        for field in fields:
+            field = field.strip()
+            if field not in self._resource_cls.__fields__:
+                self.fail("Unknown field '{}'!".format(field), param, ctx)
+
+            out.append(field)
+
+        return out
 
 
 def entity_listing(cls, fields=('id', 'name',)):
@@ -336,14 +373,15 @@ def entry_add(ctx, start, end, descr, project, workspace):
 @cli.command('ls', short_help='list a time entries')
 @click.option('--start', '-s', type=DateTimeType(), help='Defines start of a date range to filter the entries by.')
 @click.option('--stop', '-p', type=DateTimeType(), help='Defines stop of a date range to filter the entries by.')
+@click.option('--fields', '-f', type=FieldsType(api.TimeEntry), default='description,duration,start,stop',
+              help='Defines a set of fields of time entries, which will be displayed. Supported values: billable, description, duration, project, start, stop, tags, created_with')
 @click.pass_context
-def entry_ls(ctx, start, stop):
+def entry_ls(ctx, start, stop, fields):
     if start is not None or stop is not None:
         entities = api.TimeEntry.objects.filter(start=start, stop=stop)
     else:
         entities = api.TimeEntry.objects.all()
 
-    fields = ('description', 'duration', 'start', 'stop', 'project', 'id')
     if not entities:
         click.echo('No entries were found!')
         exit(0)
@@ -708,7 +746,6 @@ def workspace_users_rm(ctx, spec):
 @click.pass_context
 def workspace_users_update(ctx, spec, **kwargs):
     entity_update(api.WorkspaceUser, spec, ('id', 'email'), **kwargs)
-
 
 # ----------------------------------------------------------------------------
 # CLI
