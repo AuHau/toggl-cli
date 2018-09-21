@@ -106,6 +106,7 @@ class ConfigBootstrap:
     """
 
     KEEP_TOGGLS_DEFAULT_WORKSPACE = '-- Keep Toggl\'s default --'
+    SYSTEM_TIMEZONE = '-- Use system\'s timezone --'
     API_TOKEN_OPTION = 'API token'
     CREDENTIALS_OPTION = 'Credentials'
 
@@ -149,9 +150,10 @@ class ConfigBootstrap:
             'api_token': answers['api_token'],
 
             'file_logging': answers['file_logging'],
-
-            'timezone': answers['timezone'],
         }
+
+        if answers['timezone'] == self.SYSTEM_TIMEZONE:
+            output['timezone'] = 'local'
 
         if output['file_logging']:
             output['file_logging_path'] = os.path.expanduser(answers.get('file_logging_path'))
@@ -221,8 +223,6 @@ class ConfigBootstrap:
             click.style("Warning!", fg="yellow", bold=True)
         ))
 
-        local_timezone = pendulum.local_timezone().name
-
         api_token = self._get_api_token()
 
         if api_token is None:
@@ -233,8 +233,9 @@ class ConfigBootstrap:
                                                        "setting?",
                           choices=lambda answers: self._get_workspaces(api_token)),
 
-            inquirer.Text('timezone', 'Used timezone', default=local_timezone, show_default=True,
-                          validate=lambda answers, current: current in pendulum.timezones),
+            inquirer.Text('timezone', 'Used timezone', default=self.SYSTEM_TIMEZONE,
+                          validate=lambda answers, current: current in pendulum.timezones
+                                                            or current == self.SYSTEM_TIMEZONE),
 
             inquirer.Confirm('file_logging', message="Enable logging of togglCli actions into file?", default=False),
             inquirer.Path('file_logging_path', message="Path to the log file", ignore=lambda x: not x['file_logging'],
