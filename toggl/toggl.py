@@ -5,7 +5,7 @@ import sys
 from . import cli
 
 TOGGL_URL = "https://www.toggl.com/api/v8"
-VISIT_WWW_COMMAND = "open http://www.toggl.com/app/timer"
+WEB_CLIENT_ADDRESS = "https://www.toggl.com/app/"
 
 
 def main():

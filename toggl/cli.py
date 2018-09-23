@@ -1,12 +1,10 @@
 import logging
-import optparse
-import os
 import re
-import sys
+import webbrowser
 from collections import Iterable
 
-import pendulum
 import click
+import pendulum
 from prettytable import PrettyTable
 
 from . import api, exceptions, utils, __version__
@@ -325,6 +323,11 @@ def cli(ctx, quiet, verbose, debug, config=None):
         fh.setFormatter(fh_formater)
         main_logger.addHandler(fh)
 
+
+@cli.command('www', short_help='open Toggl\'s web client')
+def visit_www():
+    from .toggl import WEB_CLIENT_ADDRESS
+    webbrowser.open(WEB_CLIENT_ADDRESS)
 
 # ----------------------------------------------------------------------------
 # Time Entries
