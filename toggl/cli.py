@@ -1,7 +1,7 @@
 import logging
 import re
 import webbrowser
-from collections import Iterable
+from collections import Iterable, OrderedDict
 
 import click
 import pendulum
@@ -135,26 +135,48 @@ class ResourceType(click.ParamType):
 
 class FieldsType(click.ParamType):
     """
-    Takes an Entity class and based on the type of entered specification searches either
-    for ID or Name of the entity
+    Type used for defining list of fields for certain TogglEntity (resources_cls).
+    The passed fields are validated according the entity's fields.
+    Moreover the type supports diff mode, where it is possible to add or remove fields from
+    the default list of the fields, using +/- signs.
     """
     name = 'fields-type'
 
     def __init__(self, resource_cls):
         self._resource_cls = resource_cls
 
-    # TODO: Diff mode with +/-
-    # def _diff_mode(self, value, param):
-    #     if param is None:
-    #         default = ''
-    #     else:
-    #         default = param.default
-    #
-    #     fields = value.split(',')
+    def _diff_mode(self, value, param, ctx):
+        if param is None:
+            out = OrderedDict()
+        else:
+            out = OrderedDict([(key, None) for key in param.default.split(',')])
+
+        modifier_values = value.split(',')
+        for modifier_value in modifier_values:
+            modifier = modifier_value[0]
+
+            if modifier != '+' and modifier != '-':
+                self.fail('Field modifiers must start with either \'+\' or \'-\' character!')
+
+            field = modifier_value.replace(modifier, '')
+
+            if field not in self._resource_cls.__fields__:
+                self.fail("Unknown field '{}'!".format(field), param, ctx)
+
+            if modifier == '+':
+                out[field] = None
+
+            if modifier == '-':
+                try:
+                    del out[field]
+                except KeyError:
+                    pass
+
+        return out.keys()
 
     def convert(self, value, param, ctx):
-        # if '-' in value or '+' in value:
-        #     return self._diff_mode(value, param)
+        if '-' in value or '+' in value:
+            return self._diff_mode(value, param, ctx)
 
         fields = value.split(',')
         out = []
@@ -385,7 +407,7 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
 @click.option('--start', '-s', type=DateTimeType(), help='Defines start of a date range to filter the entries by.')
 @click.option('--stop', '-p', type=DateTimeType(), help='Defines stop of a date range to filter the entries by.')
 @click.option('--fields', '-f', type=FieldsType(api.TimeEntry), default='description,duration,start,stop',
-              help='Defines a set of fields of time entries, which will be displayed. Supported values: billable, description, duration, project, start, stop, tags, created_with')
+              help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: billable, description, duration, project, start, stop, tags, created_with')
 @click.pass_context
 def entry_ls(ctx, start, stop, fields):
     if start is not None or stop is not None:
