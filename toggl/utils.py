@@ -1,18 +1,16 @@
+import configparser
 import json
 import logging
 import os
 from collections import namedtuple
 from pprint import pformat
-from typing import Union
-
-import configparser
 from traceback import format_stack
+from typing import Union
 
 import click
 import inquirer
-import iso8601
-import requests
 import pendulum
+import requests
 
 from . import exceptions
 
@@ -20,28 +18,8 @@ logger = logging.getLogger('toggl.utils')
 
 
 # ----------------------------------------------------------------------------
-# Singleton
+# Meta utils
 # ----------------------------------------------------------------------------
-class Singleton(type):
-    """
-    Defines a way to implement the singleton pattern in Python.
-    From:
-    http://stackoverflow.com/questions/31875/is-there-a-simple-elegant-way-to-define-singletons-in-python/33201#33201
-
-    To use, simply put the following line in your class definition:
-        __metaclass__ = Singleton
-    """
-
-    def __init__(cls, name, bases, dictionary):
-        super(Singleton, cls).__init__(name, bases, dictionary)
-        cls.instance = None
-
-    def __call__(cls, *args, **kw):
-        if cls.instance is None:
-            cls.instance = super(Singleton, cls).__call__(*args, **kw)
-        return cls.instance
-
-
 class CachedFactoryMeta(type):
     """
     Similar to Singleton patter, except there are more instances cached based on a input parameter.
@@ -485,132 +463,6 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
             raise exceptions.TogglConfigException("There is no authentication configuration!")
 
 
-# ----------------------------------------------------------------------------
-# DateAndTime
-# ----------------------------------------------------------------------------
-# class DateAndTime(object):
-#     """
-#     Singleton date and time functions. Mostly utility functions. All
-#     the timezone and datetime functionality is localized here.
-#     """
-#
-#     __metaclass__ = Singleton
-#
-#     def __init__(self):
-#         self.tz = pytz.timezone(Config().get('options', 'timezone'))
-#
-#     def duration_since_epoch(self, dt):
-#         """
-#         Converts the given localized datetime object to the number of
-#         seconds since the epoch.
-#         """
-#         return (dt.astimezone(pytz.UTC) - datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)).total_seconds()
-#
-#     def duration_str_to_seconds(self, duration_str):
-#         """
-#         Parses a string of the form [[Hours:]Minutes:]Seconds and returns
-#         the total time in seconds.
-#         """
-#         elements = duration_str.split(':')
-#         duration = 0
-#         if len(elements) == 3:
-#             duration += int(elements[0]) * 3600
-#             elements = elements[1:]
-#         if len(elements) == 2:
-#             duration += int(elements[0]) * 60
-#             elements = elements[1:]
-#         duration += int(elements[0])
-#
-#         return duration
-#
-#     def elapsed_time(self, seconds, suffixes=None, add_s=False, separator=''):
-#         """
-#         Takes an amount of seconds and turns it into a human-readable amount
-#         of time.
-#         From http://snipplr.com/view.php?codeview&id=5713
-#         """
-#         if suffixes is None:
-#             suffixes = ['y', 'w', 'd', 'h', 'm', 's']
-#
-#         # the formatted time string to be returned
-#         time = []
-#
-#         # the pieces of time to iterate over (days, hours, minutes, etc)
-#         # - the first piece in each tuple is the suffix (d, h, w)
-#         # - the second piece is the length in seconds (a day is 60s * 60m * 24h)
-#         parts = [(suffixes[0], 60 * 60 * 24 * 7 * 52),
-#                  (suffixes[1], 60 * 60 * 24 * 7),
-#                  (suffixes[2], 60 * 60 * 24),
-#                  (suffixes[3], 60 * 60),
-#                  (suffixes[4], 60),
-#                  (suffixes[5], 1)]
-#
-#         # for each time piece, grab the value and remaining seconds, and add it to
-#         # the time string
-#         for suffix, length in parts:
-#             value = seconds // length
-#             if value > 0:
-#                 seconds = seconds % length
-#                 time.append('{}{}'.format(str(value),
-#                                           (suffix, (suffix, suffix + 's')[value > 1])[add_s]))
-#             if seconds < 1:
-#                 break
-#
-#         return separator.join(time)
-#
-#     def format_time(self, time):
-#         """
-#         Formats the given datetime object according to the strftime() options
-#         from the configuration file.
-#         """
-#         time_format = Config().get('options', 'time_format')
-#         return time.strftime(time_format)
-#
-#     def last_minute_today(self):
-#         """
-#         Returns 23:59:59 today as a localized datetime object.
-#         """
-#         return datetime.datetime.now(self.tz) \
-#             .replace(hour=23, minute=59, second=59, microsecond=0)
-#
-#     def now(self):
-#         """
-#         Returns "now" as a localized datetime object.
-#         """
-#         return self.tz.localize(datetime.datetime.now())
-#
-#     def parse_local_datetime_str(self, datetime_str, day_first=False, year_first=False):
-#         """
-#         Parses a local datetime string (e.g., "2:00pm") and returns
-#         a localized datetime object.
-#         """
-#         return self.tz.localize(dateutil.parser.parse(datetime_str, dayfirst=day_first, yearfirst=year_first))
-#
-#     def parse_iso_str(self, iso_str):
-#         """
-#         Parses an ISO 8601 datetime string and returns a localized datetime
-#         object.
-#         """
-#         return iso8601.parse_date(iso_str).astimezone(self.tz)
-#
-#     def start_of_today(self):
-#         """
-#         Returns 00:00:00 today as a localized datetime object.
-#         """
-#         return self.tz.localize(
-#             datetime.datetime.combine(datetime.date.today(), datetime.time.min)
-#         )
-#
-#     def start_of_yesterday(self):
-#         """
-#         Returns 00:00:00 yesterday as a localized datetime object.
-#         """
-#         return self.tz.localize(
-#             datetime.datetime.combine(datetime.date.today(), datetime.time.min) -
-#             datetime.timedelta(days=1)  # subtract one day from today at midnight
-#         )
-#
-
 class SubCommandsGroup(click.Group):
     """
     Group extension which distinguish between direct commands and groups. Groups
@@ -658,41 +510,6 @@ class SubCommandsGroup(click.Group):
         return sorted(
             {k: v for k, v in self.commands.items() if k not in self.subcommands}
         )
-
-
-# ----------------------------------------------------------------------------
-#
-# ----------------------------------------------------------------------------
-class Logger(object):
-    """
-    Custom logger class. Created because I got tired of seeing logging message
-    from all the modules imported here. There's no easy way to limit logging
-    to this file only.
-    """
-
-    # Logging levels.
-    NONE = 0
-    INFO = 1
-    DEBUG = 2
-
-    # Current level.
-    level = NONE
-
-    @staticmethod
-    def debug(msg, end="\n"):
-        """
-        Prints msg if the current logging level >= DEBUG.
-        """
-        if Logger.level >= Logger.DEBUG:
-            print("{}{}".format(msg, end)),
-
-    @staticmethod
-    def info(msg, end="\n"):
-        """
-        Prints msg if the current logging level >= INFO.
-        """
-        if Logger.level >= Logger.INFO:
-            print("{}{}".format(msg, end)),
 
 
 # ----------------------------------------------------------------------------

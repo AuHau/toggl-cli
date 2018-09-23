@@ -1,5 +1,3 @@
-import re
-
 import sys
 
 from . import cli
