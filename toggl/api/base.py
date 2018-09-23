@@ -220,7 +220,6 @@ class TogglEntityMeta(ABCMeta):
         return new_class
 
 
-# TODO: Premium fields and check for current Workspace to be Premium
 class TogglEntity(metaclass=TogglEntityMeta):
     __signature__ = Signature()
     __fields__ = OrderedDict()

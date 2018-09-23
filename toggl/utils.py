@@ -320,7 +320,6 @@ class EnvConfigMixin:
         return super().__getattribute__(item)
 
 
-# TODO: Migration of old version INI config
 class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarningsMeta):
     """
     Configuration class which implements hierarchy lookup to enable overloading configurations
