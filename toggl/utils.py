@@ -2,17 +2,17 @@ import configparser
 import json
 import logging
 import os
+import typing
 from collections import namedtuple
 from pprint import pformat
 from traceback import format_stack
-from typing import Union
 
 import click
 import inquirer
 import pendulum
 import requests
 
-from . import exceptions
+from . import exceptions, get_version
 
 logger = logging.getLogger('toggl.utils')
 
@@ -74,8 +74,26 @@ class ClassAttributeModificationWarning(type):
         super(ClassAttributeModificationWarning, cls).__setattr__(attr, value)
 
 
-class CachedFactoryWithWarningsMeta(CachedFactoryMeta, ClassAttributeModificationWarning):
-    pass
+MERGE_ATTRS = ('INI_MAPPING', 'ENV_MAPPING')
+
+
+class ConfigMeta(CachedFactoryMeta, ClassAttributeModificationWarning):
+
+    def __new__(mcs, name, bases, attrs, **kwargs):
+        attrs = mcs._merge_attrs(attrs, bases)
+        return super().__new__(mcs, name, bases, attrs)
+
+    @staticmethod
+    def _merge_attrs(attrs, bases):
+        for merging_attr_index in MERGE_ATTRS:
+            new_attrs = attrs[merging_attr_index] if merging_attr_index in attrs else {}
+            for base in bases:
+                if hasattr(base, merging_attr_index):
+                    new_attrs.update(getattr(base, merging_attr_index))
+
+            attrs[merging_attr_index] = new_attrs
+
+        return attrs
 
 
 class ConfigBootstrap:
@@ -149,7 +167,7 @@ class ConfigBootstrap:
         data = toggl("/me", "get", config=config)
         return data['data']['api_token']
 
-    def _get_api_token(self):  # type: () -> Union[str, None]
+    def _get_api_token(self):  # type: () -> typing.Union[str, None]
         type_auth = inquirer.shortcuts.list_input(message="Type of authentication you want to use",
                                                   choices=[self.API_TOKEN_OPTION, self.CREDENTIALS_OPTION])
 
@@ -237,21 +255,116 @@ sentinel = object()
 IniEntry = namedtuple('IniEntry', ['section', 'type'])
 
 
+class Migration200:
+    @classmethod
+    def migrate(cls, parser):
+        pass
+
+
+class IniConfigMigrator:
+    migrations = {
+        (2, 0, 0): Migration200
+    }
+
+    def __init__(self, store, config_path):  # type: (configparser.ConfigParser, typing.Union[str, typing.TextIO]) -> None
+        self.store = store
+        self.config_file = config_path
+
+    @staticmethod
+    def _should_be_migration_executed(current_version, from_version):
+        if current_version[0] > from_version[0]:
+            return True
+
+        if current_version[0] >= from_version[0] and current_version[1] > from_version[1]:
+            return True
+
+        if current_version[0] >= from_version[0] \
+                and current_version[1] >= from_version[1] \
+                and current_version[2] > from_version[2]:
+            return True
+
+        return False
+
+    def _set_version(self, version):  # type: (tuple) -> None
+        if not self.store.has_section('version'):
+            self.store.add_section('version')
+
+        verbose_version = self._format_version(version)
+
+        self.store.set('version', 'version', verbose_version)
+
+    def _format_version(self, version, delimiter='.'):  # type: (typing.Tuple[int, int, int], str) -> str
+        return delimiter.join(str(e) for e in version)
+
+    def migrate(self, from_version):  # type: (tuple) -> None
+        if len(from_version) != 3:
+            raise exceptions.TogglConfigException('Unknown format of from_version: \'{}\'! '
+                                                  'Tuple with three elements is expected!'.format(from_version))
+
+        something_migrated = False
+        for migration_version, migration in self.migrations.items():
+            if self._should_be_migration_executed(migration_version, from_version):
+                migration.migrate(self.store)
+                something_migrated = True
+
+        new_version = get_version(raw=True)
+        self._set_version(new_version)
+
+        if isinstance(self.config_file, str):
+            with open(self.config_file, 'w') as config_file:
+                self.store.write(config_file)
+        else:
+            self.store.write(self.config_file)
+
+        if something_migrated:
+            click.echo('Configuration file was migrated from version {} to {}'.format(
+                self._format_version(from_version),
+                self._format_version(new_version)
+            ))
+
+
 class IniConfigMixin:
-    INI_MAPPING = {}
+    INI_MAPPING = {
+        'version': IniEntry('version', str),
+    }
+
     DEFAULT_CONFIG_PATH = os.path.expanduser('~/.togglrc')
 
     def __init__(self, config_path=sentinel, **kwargs):
         self._config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path
-        self._store = configparser.ConfigParser()
+        self._store = configparser.ConfigParser(interpolation=None)
         self._loaded = False
 
         if self._config_path is not None:
             self._loaded = self._store.read(self._config_path)
+            if self._need_migrate():
+                migrator = IniConfigMigrator(self._store, self._config_path)
+                migrator.migrate(self._get_version(raw=True))
 
         super().__init__(**kwargs)
 
+    def _need_migrate(self):
+        return self._get_version() != get_version()
+
+    def _get_version(self, raw=False):
+        version = self._get('version')
+
+        # Version 1.0 of TogglCLI
+        if version is None:
+            if raw:
+                return 1, 0, 0
+
+            return '1.0.0'
+
+        if raw:
+            return version.split('.')
+
+        return version
+
     def _resolve_type(self, entry, item):
+        if entry is None:
+            return None
+
         if entry.type == bool:
             return self._store.getboolean(entry.section, item, fallback=None)
         elif entry.type == int:
@@ -260,6 +373,10 @@ class IniConfigMixin:
             return self._store.getfloat(entry.section, item, fallback=None)
         else:
             return self._store.get(entry.section, item, fallback=None)
+
+    def _get(self, item):
+        mapping_dict = object.__getattribute__(self, 'INI_MAPPING')
+        return self._resolve_type(mapping_dict.get(item), item)
 
     def __getattribute__(self, item):
         mapping_dict = object.__getattribute__(self, 'INI_MAPPING')
@@ -275,7 +392,7 @@ class IniConfigMixin:
         return bool(self._loaded)
 
     def persist(self, items=None):
-        if self._config_path is None:
+        if self._config_path is None or items is None:
             return
 
         for item in items:
@@ -320,7 +437,7 @@ class EnvConfigMixin:
         return super().__getattribute__(item)
 
 
-class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarningsMeta):
+class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     """
     Configuration class which implements hierarchy lookup to enable overloading configurations
     based on several aspects.
@@ -340,7 +457,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=CachedFactoryWithWarnings
     file_logging = False
     file_logging_path = None
     timezone = None
-    use_native_datetime = False
+    # TODO: use_native_datetime = False
 
     ENV_MAPPING = {
         'api_token': EnvEntry('TOGGL_API_TOKEN', str),

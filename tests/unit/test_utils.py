@@ -1,28 +1,48 @@
-import datetime
-import unittest
+import configparser
+import io
 
-import pytz
+import pytest
 
 from toggl import utils
 
 
-# ----------------------------------------------------------------------------
-# TestDateAndTime
-# ----------------------------------------------------------------------------
-class TestDateAndTime(unittest.TestCase):
+class ConfigFakeFile(io.StringIO):
 
-    def setUp(self):
-        self.dat = utils.DateAndTime()
+    def get_configparser(self):
+        self.seek(0)  # Read the file from beginning
+        parser = configparser.ConfigParser(interpolation=None)
+        parser.read_file(self)
+        return parser
 
-    def test_duration_since_epoch(self):
-        # one hour into the epoch
-        dt = datetime.datetime(1970, 1, 1, 1, 0, 0, 0, tzinfo=pytz.UTC)
-        self.assertEquals(self.dat.duration_since_epoch(dt), 3600)
 
-    def test_duration_str_to_seconds(self):
-        # one element
-        self.assertEquals(self.dat.duration_str_to_seconds("1"), 1)
-        # two elements
-        self.assertEquals(self.dat.duration_str_to_seconds("1:1"), 61)
-        # three elements
-        self.assertEquals(self.dat.duration_str_to_seconds("1:1:1"), 3661)
+@pytest.fixture()
+def file():
+    return ConfigFakeFile()
+
+
+class TestIniConfigMigrator:
+    VERSION_1_0_0 = {'auth': {'username': 'user@example.com',
+                              'password': 'toggl_password',
+                              'api_token': 'your_api_token'},
+                     'options': {'timezone': 'UTC',
+                                 'time_format': '%I:%M%p',
+                                 'prefer_token': 'true',
+                                 'continue_creates': 'true'}}
+
+    def _config_parser_factory(self, version):
+        parser = configparser.ConfigParser(interpolation=None)
+
+        if version == '1.0.0':
+            parser.read_dict(self.VERSION_1_0_0)
+        else:
+            raise Exception('Unknown version!')
+
+        return parser
+
+    def test_basic_usage(self, file):  # type: (ConfigFakeFile) -> None
+        parser = self._config_parser_factory('1.0.0')
+        migrator = utils.IniConfigMigrator(parser, file)
+        migrator.migrate((1, 0, 0))
+
+        validation_parser = file.get_configparser()
+        assert validation_parser.get('version', 'version') == '2.0.0'

@@ -1,7 +1,10 @@
-VERSION = (1, 0, 0)
+VERSION = (2, 0, 0)
 
 
-def get_version():
+def get_version(raw=False):
+    if raw:
+        return VERSION
+
     return '.'.join(map(str, VERSION))
 
 
