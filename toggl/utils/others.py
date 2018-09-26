@@ -63,6 +63,32 @@ class SubCommandsGroup(click.Group):
 # ----------------------------------------------------------------------------
 # toggl
 # ----------------------------------------------------------------------------
+def are_credentials_valid(api_token=None, username=None, password=None):
+    config = Config.factory(None)
+
+    if api_token is not None:
+        config.api_token = api_token
+    else:
+        config.username = username
+        config.password = password
+
+    try:
+        toggl("/me", "get", config=config)
+        return True
+    except exceptions.TogglAuthenticationException as e:
+        logger.debug(e)
+        return False
+
+
+def convert_credentials_to_api_token(username, password):
+    config = Config.factory(None)
+    config.username = username
+    config.password = password
+
+    data = toggl("/me", "get", config=config)
+    return data['data']['api_token']
+
+
 def handle_error(response):
     if response.status_code == 402:
         raise exceptions.TogglPremiumException(

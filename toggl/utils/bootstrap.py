@@ -24,17 +24,6 @@ class ConfigBootstrap:
     def __init__(self):
         self.workspaces = None
 
-    def _are_credentials_valid(self, **kwargs):
-        config = self._build_tmp_config(**kwargs)
-
-        try:
-            from .others import toggl
-            toggl("/me", "get", config=config)
-            return True
-        except exceptions.TogglAuthenticationException as e:
-            logger.debug(e)
-            return False
-
     def _build_tmp_config(self, api_token=None, username=None, password=None):
         from .config import Config
         config = Config.factory(None)
@@ -78,14 +67,9 @@ class ConfigBootstrap:
 
         return output
 
-    def _convert_credentials_to_api_token(self, username, password):  # type: (str, str) -> str
-        from .others import toggl
-        config = self._build_tmp_config(username=username, password=password)
-
-        data = toggl("/me", "get", config=config)
-        return data['data']['api_token']
-
     def _get_api_token(self):  # type: () -> typing.Union[str, None]
+        from .others import are_credentials_valid
+
         type_auth = inquirer.shortcuts.list_input(message="Type of authentication you want to use",
                                                   choices=[self.API_TOKEN_OPTION, self.CREDENTIALS_OPTION])
 
@@ -94,8 +78,7 @@ class ConfigBootstrap:
 
         if type_auth == self.API_TOKEN_OPTION:
             return inquirer.shortcuts.password(message="Your API token",
-                                               validate=lambda answers, current: self._are_credentials_valid(
-                                                   api_token=current))
+                                               validate=lambda answers, current: are_credentials_valid(api_token=current))
 
         questions = [
             inquirer.Text('username', message="Your Username"),
@@ -109,8 +92,9 @@ class ConfigBootstrap:
                 return None
 
             try:
-                return self._convert_credentials_to_api_token(username=credentials['username'],
-                                                              password=credentials['password'])
+                from .others import convert_credentials_to_api_token
+                return convert_credentials_to_api_token(username=credentials['username'],
+                                                        password=credentials['password'])
             except exceptions.TogglAuthenticationException:
                 click.echo('The provided credentials are not valid! Please try again.')
 

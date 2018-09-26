@@ -1,8 +1,11 @@
 import configparser
 import logging
+import pendulum
 import typing
+import webbrowser
 
 import click
+import inquirer
 
 from .. import exceptions, get_version
 
@@ -10,9 +13,83 @@ logger = logging.getLogger('toggl.utils.config')
 
 
 class Migration200:
+
+    @staticmethod
+    def migrate_authentication(parser):  # type: (configparser.ConfigParser) -> None
+        from .others import convert_credentials_to_api_token, are_credentials_valid
+
+        if parser.get('auth', 'prefer_token', fallback='').lower() == 'true':
+            parser.has_option('auth', 'username') and parser.remove_option('auth', 'username')
+            parser.has_option('auth', 'password') and parser.remove_option('auth', 'password')
+        elif parser.get('auth', 'prefer_token', fallback='').lower() == 'false':
+            api_token = convert_credentials_to_api_token(
+                parser.get('auth', 'username'),
+                parser.get('auth', 'password')
+            )
+            parser.set('auth', 'api_token', api_token)
+            parser.remove_option('auth', 'username')
+            parser.remove_option('auth', 'password')
+        else:
+            if not are_credentials_valid(api_token=parser.get('auth', 'api_token')):
+                try:
+                    api_token = convert_credentials_to_api_token(
+                        parser.get('auth', 'username'),
+                        parser.get('auth', 'password')
+                    )
+                    parser.set('auth', 'api_token', api_token)
+                except exceptions.TogglAuthenticationException:
+                    raise exceptions.TogglConfigMigrationException('Migration 2.0.0: No valid authentication!')
+
+            parser.has_option('auth', 'username') and parser.remove_option('auth', 'username')
+            parser.has_option('auth', 'password') and parser.remove_option('auth', 'password')
+
+        parser.has_option('auth', 'prefer_token') and parser.remove_option('auth', 'prefer_token')
+
+    @staticmethod
+    def validate_datetime_format(value):
+        try:
+            pendulum.now().format(value)
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def migrate_datetime(parser):  # type: (configparser.ConfigParser) -> None
+        if parser.get('options', 'time_format') == '%I:%M%p':
+            parser.set('options', 'datetime_format', 'LTS L')
+            return
+
+        while True:
+            value = inquirer.shortcuts.text('What datetime format we should use? Type \'doc\' to display format help. Default is based on system\'s locale.',
+                                            default='LTS L', validate=lambda _, i: Migration200.validate_datetime_format(i))
+
+            if value == 'doc':
+                webbrowser.open('https://pendulum.eustace.io/docs/#tokens')
+            else:
+                parser.set('options', 'datetime_format', value)
+                break
+
+        parser.remove_option('options', 'time_format')
+
+    @staticmethod
+    def migrate_timezone(parser):  # type: (configparser.ConfigParser) -> None
+        tz = parser.get('options', 'timezone')
+        if tz not in pendulum.timezones:
+            click.echo('We have not recognized your timezone!')
+            new_tz = inquirer.shortcuts.text(
+                'Please enter valid timezone. Default is your system\'s timezone.',
+                default='local', validate=lambda _, i: i in pendulum.timezones or i == 'local')
+            parser.set('options', 'timezone', new_tz)
+
     @classmethod
-    def migrate(cls, parser):
-        pass
+    def migrate(cls, parser):  # type: (configparser.ConfigParser) -> configparser.ConfigParser
+        cls.migrate_authentication(parser)
+        cls.migrate_datetime(parser)
+        cls.migrate_timezone(parser)
+
+        parser.remove_option('options', 'continue_creates')
+
+        return parser
 
 
 class IniConfigMigrator:

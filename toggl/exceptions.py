@@ -17,6 +17,10 @@ class TogglConfigException(TogglException):
     pass
 
 
+class TogglConfigMigrationException(TogglException):
+    pass
+
+
 class TogglCliException(TogglException, click.ClickException):
     pass
 

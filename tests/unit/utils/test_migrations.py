@@ -2,8 +2,10 @@ import configparser
 import io
 
 import pytest
+import pytest_mock
 
-from toggl import utils
+from toggl.utils import migrations
+from toggl.utils import others
 
 
 class ConfigFakeFile(io.StringIO):
@@ -13,6 +15,10 @@ class ConfigFakeFile(io.StringIO):
         parser = configparser.ConfigParser(interpolation=None)
         parser.read_file(self)
         return parser
+
+
+def get_dict(parser):  # type: (configparser.ConfigParser) -> dict
+    return {s: dict(parser.items(s)) for s in parser.sections()}
 
 
 @pytest.fixture()
@@ -39,9 +45,16 @@ class TestIniConfigMigrator:
 
         return parser
 
-    def test_basic_usage(self, file):  # type: (ConfigFakeFile) -> None
+    def test_basic_usage(self, file, mocker):  # type: (ConfigFakeFile, pytest_mock.MockFixture) -> None
+        mocker.patch.object(others, 'toggl')
+        others.toggl.return_value = {
+            'data': {
+                'api_token': 'asdf'
+            }
+        }
+
         parser = self._config_parser_factory('1.0.0')
-        migrator = utils.IniConfigMigrator(parser, file)
+        migrator = migrations.IniConfigMigrator(parser, file)
         migrator.migrate((1, 0, 0))
 
         validation_parser = file.get_configparser()
