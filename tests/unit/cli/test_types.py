@@ -45,7 +45,8 @@ def config():
     return utils.Config.factory(None)
 
 
-Context = namedtuple('Context', ['obj'])
+Context = namedtuple('Context', ['obj', 'command'])
+Context.__new__.__defaults__ = (None,) * len(Context._fields)
 
 datetime_parsing_test_set = (
     ('2017.1.2', pendulum.datetime(2017, 1, 2, 0, 0)),
