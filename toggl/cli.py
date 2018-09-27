@@ -190,8 +190,8 @@ class FieldsType(click.ParamType):
         return out
 
 
-def entity_listing(cls, fields=('id', 'name',)):
-    entities = cls if isinstance(cls, Iterable) else cls.objects.all()
+def entity_listing(cls, fields=('id', 'name',), config=None):
+    entities = cls if isinstance(cls, Iterable) else cls.objects.all(config=config)
     if not entities:
         click.echo('No entries were found!')
         exit(0)
@@ -207,7 +207,7 @@ def entity_listing(cls, fields=('id', 'name',)):
     click.echo(table)
 
 
-def get_entity(cls, org_spec, field_lookup):
+def get_entity(cls, org_spec, field_lookup, config=None):
     entity = None
     for field in field_lookup:
         try:
@@ -215,7 +215,7 @@ def get_entity(cls, org_spec, field_lookup):
         except ValueError:
             continue
 
-        entity = cls.objects.get(**{field: spec})
+        entity = cls.objects.get(config=config, **{field: spec})
 
         if entity is not None:
             break
@@ -223,8 +223,8 @@ def get_entity(cls, org_spec, field_lookup):
     return entity
 
 
-def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name'):
-    entity = spec if isinstance(spec, cls) else get_entity(cls, spec, field_lookup)
+def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name', config=None):
+    entity = spec if isinstance(spec, cls) else get_entity(cls, spec, field_lookup, config=config)
 
     if entity is None:
         click.echo("{} not found!".format(cls.get_name(verbose=True)), color='red')
@@ -251,8 +251,8 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name')
         entity_string[1:]))
 
 
-def entity_remove(cls, spec, field_lookup=('id', 'name',)):
-    entity = get_entity(cls, spec, field_lookup)
+def entity_remove(cls, spec, field_lookup=('id', 'name',), config=None):
+    entity = get_entity(cls, spec, field_lookup, config)
 
     if entity is None:
         click.echo("{} not found!".format(cls.get_name(verbose=True)), color='red')
@@ -262,8 +262,8 @@ def entity_remove(cls, spec, field_lookup=('id', 'name',)):
     click.echo("{} successfully deleted!".format(cls.get_name(verbose=True)))
 
 
-def entity_update(cls, spec, field_lookup=('id', 'name',), **kwargs):
-    entity = get_entity(cls, spec, field_lookup)
+def entity_update(cls, spec, field_lookup=('id', 'name',), config=None, **kwargs):
+    entity = get_entity(cls, spec, field_lookup, config=config)
 
     if entity is None:
         click.echo("{} not found!".format(cls.get_name(verbose=True)), color='red')
@@ -307,16 +307,16 @@ def cli(ctx, quiet, verbose, debug, config=None):
     The authentication credentials can be also overridden with Environmental variables. Use
     TOGGL_API_TOKEN or TOGGL_USERNAME, TOGGL_PASSWORD.
     """
-    if config is not None:
-        config = utils.Config.factory(config)
-    else:
+    if config is None:
         config = utils.Config.factory()
-
-    ctx.obj['config'] = config
+    else:
+        config = utils.Config.factory(config)
 
     if not config.is_loaded:
         config.cli_bootstrap()
         config.persist()
+
+    ctx.obj['config'] = config
 
     main_logger = logging.getLogger('toggl')
     main_logger.setLevel(logging.DEBUG)
@@ -350,6 +350,7 @@ def cli(ctx, quiet, verbose, debug, config=None):
 def visit_www():
     from .toggl import WEB_CLIENT_ADDRESS
     webbrowser.open(WEB_CLIENT_ADDRESS)
+
 
 # ----------------------------------------------------------------------------
 # Time Entries
@@ -390,6 +391,7 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
 
     # Create a time entry.
     entry = api.TimeEntry(
+        config=ctx.obj['config'],
         description=descr,
         start=start,
         stop=end,
@@ -411,9 +413,9 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
 @click.pass_context
 def entry_ls(ctx, start, stop, fields):
     if start is not None or stop is not None:
-        entities = api.TimeEntry.objects.filter(start=start, stop=stop)
+        entities = api.TimeEntry.objects.filter(start=start, stop=stop, config=ctx.obj['config'])
     else:
-        entities = api.TimeEntry.objects.all()
+        entities = api.TimeEntry.objects.all(config=ctx.obj['config'])
 
     if not entities:
         click.echo('No entries were found!')
@@ -450,7 +452,7 @@ def entry_ls(ctx, start, stop, fields):
 @click.argument('spec')
 @click.pass_context
 def entry_rm(ctx, spec):
-    entity_remove(api.TimeEntry, spec)
+    entity_remove(api.TimeEntry, spec, config=ctx.obj['config'])
 
 
 @cli.command('start', short_help='starts new time entry')
@@ -464,6 +466,7 @@ def entry_rm(ctx, spec):
 @click.pass_context
 def entry_start(ctx, descr, start, project, workspace):
     api.TimeEntry.start_and_save(
+        config=ctx.obj['config'],
         start=start,
         description=descr,
         project=project,
@@ -480,7 +483,7 @@ def entry_start(ctx, descr, start, project, workspace):
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
 def entry_now(ctx, **kwargs):
-    current = api.TimeEntry.objects.current()
+    current = api.TimeEntry.objects.current(config=ctx.obj['config'])
 
     if current is None:
         click.echo('There is no time entry running!')
@@ -495,14 +498,14 @@ def entry_now(ctx, **kwargs):
     if updated:
         current.save()
 
-    entity_detail(api.TimeEntry, current, primary_field='description')
+    entity_detail(api.TimeEntry, current, primary_field='description', config=ctx.obj['config'])
 
 
 @cli.command('stop', short_help='stops current time entry')
 @click.option('--stop', '-p', type=DateTimeType(allow_now=True), help='Sets stop time.')
 @click.pass_context
 def entry_stop(ctx, stop):
-    current = api.TimeEntry.objects.current()
+    current = api.TimeEntry.objects.current(config=ctx.obj['config'])
 
     if current is None:
         click.echo('There is no time entry running!')
@@ -520,9 +523,9 @@ def entry_stop(ctx, stop):
 def entry_continue(ctx, descr, start):
     try:
         if descr is None:
-            entry = api.TimeEntry.objects.all()[0]
+            entry = api.TimeEntry.objects.all(config=ctx.obj['config'])[0]
         else:
-            entry = api.TimeEntry.objects.filter(contain=True, description=descr)[0]
+            entry = api.TimeEntry.objects.filter(contain=True, description=descr, config=ctx.obj['config'])[0]
     except IndexError:
         click.echo('You don\'t have any time entries in past 9 days!')
         exit(1)
@@ -554,7 +557,8 @@ def clients_add(ctx, name, note, workspace):
     client = api.Client(
         name=name,
         wid=workspace['id'] if workspace else None,
-        notes=note
+        notes=note,
+        config=ctx.obj['config']
     )
 
     client.save()
@@ -567,27 +571,27 @@ def clients_add(ctx, name, note, workspace):
 @click.option('--notes', help='Specifies a note linked to the client', )
 @click.pass_context
 def clients_update(ctx, spec, **kwargs):
-    entity_update(api.Client, spec, **kwargs)
+    entity_update(api.Client, spec, config=ctx.obj['config'], **kwargs)
 
 
 @clients.command('ls', short_help='list clients')
 @click.pass_context
 def clients_ls(ctx):
-    entity_listing(api.Client)
+    entity_listing(api.Client, config=ctx.obj['config'])
 
 
 @clients.command('get', short_help='retrieve details of a client')
 @click.argument('spec')
 @click.pass_context
 def clients_get(ctx, spec):
-    entity_detail(api.Client, spec)
+    entity_detail(api.Client, spec, config=ctx.obj['config'])
 
 
 @clients.command('rm', short_help='delete a specific client')
 @click.argument('spec')
 @click.pass_context
 def clients_rm(ctx, spec):
-    entity_remove(api.Client, spec)
+    entity_remove(api.Client, spec, config=ctx.obj['config'])
 
 
 # ----------------------------------------------------------------------------
@@ -602,7 +606,7 @@ def projects(ctx):
 @projects.command('add', short_help='create new project')
 @click.option('--name', '-n', prompt='Name of the project',
               help='Specifies the name of the project', )
-@click.option('--customer', '-c', envvar="TOGGL_CLIENT", type=ResourceType(api.Client),
+@click.option('--client', '-c', envvar="TOGGL_CLIENT", type=ResourceType(api.Client),
               help='Specifies a client to which the project will be assigned to. Can be ID or name of the client ('
                    'ENV: TOGGL_CLIENT)')
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=ResourceType(api.Workspace),
@@ -626,7 +630,8 @@ def projects_add(ctx, name, client, workspace, public, billable, auto_estimates,
         billable=billable,
         auto_estimates=auto_estimates,
         color=color,
-        rate=rate
+        rate=rate,
+        config=ctx.obj['config']
     )
 
     project.save()
@@ -649,27 +654,27 @@ def projects_add(ctx, name, client, workspace, public, billable, auto_estimates,
 @click.option('--color', type=click.INT, help='ID of color used for the project')
 @click.pass_context
 def projects_update(ctx, spec, **kwargs):
-    entity_update(api.Project, spec, **kwargs)
+    entity_update(api.Project, spec, config=ctx.obj['config'], **kwargs)
 
 
 @projects.command('ls', short_help='list projects')
 @click.pass_context
 def projects_ls(ctx):
-    entity_listing(api.Project)
+    entity_listing(api.Project, config=ctx.obj['config'])
 
 
 @projects.command('get', short_help='retrieve details of a project')
 @click.argument('spec')
 @click.pass_context
 def projects_get(ctx, spec):
-    entity_detail(api.Project, spec)
+    entity_detail(api.Project, spec, config=ctx.obj['config'])
 
 
 @projects.command('rm', short_help='delete a specific client')
 @click.argument('spec')
 @click.pass_context
 def projects_rm(ctx, spec):
-    entity_remove(api.Project, spec)
+    entity_remove(api.Project, spec, config=ctx.obj['config'])
 
 
 # ----------------------------------------------------------------------------
@@ -687,14 +692,14 @@ def workspaces(ctx):
 @workspaces.command('ls', short_help='list workspaces')
 @click.pass_context
 def workspaces_ls(ctx):
-    entity_listing(api.Workspace)
+    entity_listing(api.Workspace, config=ctx.obj['config'])
 
 
 @workspaces.command('get', short_help='retrieve details of a workspace')
 @click.argument('spec')
 @click.pass_context
 def workspaces_get(ctx, spec):
-    entity_detail(api.Workspace, spec)
+    entity_detail(api.Workspace, spec, config=ctx.obj['config'])
 
 
 # ----------------------------------------------------------------------------
@@ -723,7 +728,7 @@ def tasks(ctx):
                    '(ENV: TOGGL_USER)')
 @click.pass_context
 def tasks_add(ctx, **kwargs):
-    task = api.Task(**kwargs)
+    task = api.Task(config=ctx.obj['config'], **kwargs)
 
     try:
         task.save()
@@ -745,27 +750,27 @@ def tasks_add(ctx, **kwargs):
                    '(ENV: TOGGL_USER)')
 @click.pass_context
 def tasks_update(ctx, spec, **kwargs):
-    entity_update(api.Task, spec, **kwargs)
+    entity_update(api.Task, spec, config=ctx.obj['config'], **kwargs)
 
 
 @tasks.command('ls', short_help='list tasks')
 @click.pass_context
 def tasks_ls(ctx):
-    entity_listing(api.Task)
+    entity_listing(api.Task, config=ctx.obj['config'])
 
 
 @tasks.command('get', short_help='retrieve details of a task')
 @click.argument('spec')
 @click.pass_context
 def tasks_get(ctx, spec):
-    entity_detail(api.Task, spec)
+    entity_detail(api.Task, spec, config=ctx.obj['config'])
 
 
 @tasks.command('rm', short_help='delete a specific task')
 @click.argument('spec')
 @click.pass_context
 def tasks_rm(ctx, spec):
-    entity_remove(api.Task, spec)
+    entity_remove(api.Task, spec, config=ctx.obj['config'])
 
 
 # ----------------------------------------------------------------------------
@@ -780,14 +785,14 @@ def users(ctx):
 @users.command('ls', short_help='list users for given workspace')
 @click.pass_context
 def users_ls(ctx):
-    entity_listing(api.User, ('id', 'email', 'fullname'))
+    entity_listing(api.User, ('id', 'email', 'fullname'), config=ctx.obj['config'])
 
 
 @users.command('get', short_help='retrieve details of a user')
 @click.argument('spec')
 @click.pass_context
 def users_get(ctx, spec):
-    entity_detail(api.User, spec, ('id', 'email', 'fullname'), 'email')
+    entity_detail(api.User, spec, ('id', 'email', 'fullname'), 'email', config=ctx.obj['config'])
 
 
 @users.command('signup', short_help='sign up a new user')
@@ -799,7 +804,7 @@ def users_get(ctx, spec):
 @click.option('--created-with', '-c', help='Information about which application created the user\' account')
 @click.pass_context
 def users_signup(ctx, email, password, timezone=None, created_with=None):
-    user = api.User.signup(email, password, timezone, created_with)
+    user = api.User.signup(email, password, timezone, created_with, config=ctx.obj['config'])
 
     click.echo("User '{}' was successfully created with ID #{}.".format(email, user.id))
 
@@ -816,14 +821,14 @@ def workspace_users(ctx):
 @workspace_users.command('ls', short_help='list workspace\'s users')
 @click.pass_context
 def workspace_users_ls(ctx):
-    entity_listing(api.WorkspaceUser, ('id', 'email', 'active', 'admin'))
+    entity_listing(api.WorkspaceUser, ('id', 'email', 'active', 'admin'), config=ctx.obj['config'])
 
 
 @workspace_users.command('get', short_help='retrieve details of a user')
 @click.argument('spec')
 @click.pass_context
 def workspace_users_get(ctx, spec):
-    entity_detail(api.WorkspaceUser, spec, ('id', 'email'), 'email')
+    entity_detail(api.WorkspaceUser, spec, ('id', 'email'), 'email', config=ctx.obj['config'])
 
 
 @workspace_users.command('invite', short_help='invite new user into workspace')
@@ -831,7 +836,7 @@ def workspace_users_get(ctx, spec):
               prompt='Email of a user to invite to the workspace')
 @click.pass_context
 def workspace_users_invite(ctx, email):
-    api.WorkspaceUser.invite(email)
+    api.WorkspaceUser.invite(email, config=ctx.obj['config'])
 
     click.echo("User '{}' was successfully invited! He needs to accept the invitation now.".format(email))
 
@@ -840,7 +845,7 @@ def workspace_users_invite(ctx, email):
 @click.argument('spec')
 @click.pass_context
 def workspace_users_rm(ctx, spec):
-    entity_remove(api.WorkspaceUser, spec, ('id', 'email'))
+    entity_remove(api.WorkspaceUser, spec, ('id', 'email'), config=ctx.obj['config'])
 
 
 @workspace_users.command('update', short_help='update a specific workspace\'s user')
@@ -849,4 +854,4 @@ def workspace_users_rm(ctx, spec):
               help='Specifies if the workspace\'s user is admin for the workspace', )
 @click.pass_context
 def workspace_users_update(ctx, spec, **kwargs):
-    entity_update(api.WorkspaceUser, spec, ('id', 'email'), **kwargs)
+    entity_update(api.WorkspaceUser, spec, ('id', 'email'), config=ctx.obj['config'], **kwargs)
