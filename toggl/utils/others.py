@@ -151,8 +151,6 @@ def toggl(url, method, data=None, headers=None, config=None):
     if response.status_code >= 300:
         handle_error(response)
 
-        response.raise_for_status()
-
     response_json = response.json()
-    logger.debug('Response data:\n' + pformat(response_json))
+    logger.debug('Response {}:\n{}'.format(response.status_code, pformat(response_json)))
     return response_json

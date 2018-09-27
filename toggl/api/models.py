@@ -62,12 +62,6 @@ class Project(WorkspaceEntity):
     color = fields.IntegerField()
     rate = fields.FloatField()
 
-    def validate(self):
-        super(Project, self).validate()
-
-        if self.customer is not None and not Client.objects.get(self.cid):
-            raise exceptions.TogglValidationException("Client specified by ID does not exists!")
-
 
 class UserSet(base.WorkspaceToggleSet):
 

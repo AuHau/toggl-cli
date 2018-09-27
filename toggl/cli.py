@@ -556,7 +556,7 @@ def clients(ctx):
 def clients_add(ctx, name, note, workspace):
     client = api.Client(
         name=name,
-        wid=workspace['id'] if workspace else None,
+        workspace=workspace,
         notes=note,
         config=ctx.obj['config']
     )
@@ -624,8 +624,8 @@ def projects(ctx):
 def projects_add(ctx, name, client, workspace, public, billable, auto_estimates, rate, color):
     project = api.Project(
         name=name,
-        wid=workspace['id'] if workspace else None,
-        cid=client['id'] if client else None,
+        workspace=workspace,
+        customer=client,
         is_private=not public,
         billable=billable,
         auto_estimates=auto_estimates,

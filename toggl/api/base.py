@@ -295,7 +295,10 @@ class TogglEntity(metaclass=TogglEntityMeta):
 
     def validate(self):
         for field in self.__fields__.values():
-            field.validate(getattr(self, field.name, None))
+            if isinstance(field, model_fields.MappingField):
+                field.validate(getattr(self, field.mapped_field, None))
+            else:
+                field.validate(getattr(self, field.name, None))
 
     def to_dict(self, serialized=False, changes_only=False):
         source_dict = self.__change_dict__ if changes_only else self.__fields__

@@ -320,7 +320,7 @@ class MappingField(TogglField):
         super(MappingField, self).__init__(*args, **kwargs)
 
         if not issubclass(mapped_cls, base.TogglEntity):
-            raise TypeError('Mapped class has to be TogglEntity subclass!')
+            raise TypeError('Mapped class has to be TogglEntity\'s subclass!')
 
         self.mapped_cls = mapped_cls
         self.mapped_field = mapped_field
@@ -341,6 +341,15 @@ class MappingField(TogglField):
                 instance.__dict__[self.mapped_field] = value
         else:
             raise NotImplementedError('Field with MANY cardinality is not supported for attribute assignment')
+
+    def validate(self, value):
+        super().validate(value)
+
+        if value is not None:
+            obj = self.mapped_cls.objects.get(value)
+
+            if obj is None:
+                raise exceptions.TogglValidationException('Mapped object does not exist!')
 
     def _set_value(self, instance, value):
         try:
