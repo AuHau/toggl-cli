@@ -1,9 +1,9 @@
-from toggl.api import base
+from toggl.api import base, fields
 from toggl import exceptions
 
 
 class RandomEntity(base.TogglEntity):
-    some_field = base.StringField()
+    some_field = fields.StringField()
 
 
 class EntityWithDummySet(base.TogglEntity):

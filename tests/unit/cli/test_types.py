@@ -6,7 +6,7 @@ import click
 import pytest as pytest
 import pytz
 
-from toggl import cli
+from toggl.cli import types
 from toggl.exceptions import TogglCliException
 
 
@@ -31,12 +31,12 @@ def datetime_time(hours=None, minutes=None, seconds=None):
 
 @pytest.fixture()
 def datetime_type():
-    return cli.DateTimeType()
+    return types.DateTimeType()
 
 
 @pytest.fixture()
 def duration_type():
-    return cli.DurationType()
+    return types.DurationType()
 
 
 Context = namedtuple('Context', ['obj'])
@@ -56,11 +56,11 @@ class TestDateTimeType(object):
             datetime_type.convert("some weird format", None, {})
 
     def test_now(self):
-        datetime_type_without_now = cli.DateTimeType(allow_now=False)
+        datetime_type_without_now = types.DateTimeType(allow_now=False)
         with pytest.raises(click.BadParameter):
             datetime_type_without_now.convert("now", None, {})
 
-        datetime_type_with_now = cli.DateTimeType(allow_now=True)
+        datetime_type_with_now = types.DateTimeType(allow_now=True)
         assert remove_tz_helper(datetime_type_with_now.convert("now", None, {})).replace(microsecond=0) \
                == datetime_time()
 
@@ -119,7 +119,7 @@ class TestResourceType:
         resource_mock = mocker.MagicMock(return_value=instance_mock)
         resource_mock.__name__ = "MockClass"
 
-        resource_type = cli.ResourceType(resource_mock)
+        resource_type = types.ResourceType(resource_mock)
         assert resource_type.convert(10, None, {}) == 'placeholder'
 
         # When nothing is found BadParameter is raised
@@ -133,7 +133,7 @@ class TestResourceType:
         resource_mock = mocker.MagicMock(return_value=instance_mock)
         resource_mock.__name__ = "MockClass"
 
-        resource_type = cli.ResourceType(resource_mock)
+        resource_type = types.ResourceType(resource_mock)
         assert resource_type.convert('asdf', None, {}) == 'placeholder'
 
         # When nothing is found BadParameter is raised
@@ -146,7 +146,7 @@ class TestResourceType:
             def __call__(self, *args, **kwargs):
                 return self
 
-        resource_type = cli.ResourceType(Mock)
+        resource_type = types.ResourceType(Mock)
 
         with pytest.raises(TogglCliException):
             resource_type.convert(10, None, {})  # find_by_id() fails
