@@ -88,6 +88,9 @@ class TogglSet(object):
             if self.can_get_detail:
                 try:
                     fetched_entity = utils.toggl(self.build_detail_url(id), 'get', config=config)
+                    if fetched_entity['data'] is None:
+                        return None
+
                     return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
                 except exceptions.TogglNotFoundException:
                     return None
