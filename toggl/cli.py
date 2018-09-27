@@ -291,6 +291,7 @@ def entity_update(cls, spec, field_lookup=('id', 'name',), config=None, **kwargs
 # ----------------------------------------------------------------------------
 # NEW CLI
 # ----------------------------------------------------------------------------
+# TODO: Support for manipulating the user's settings
 @click.group(cls=utils.SubCommandsGroup)
 @click.option('--quiet', '-q', is_flag=True, help="don't print anything")
 @click.option('--verbose', '-v', is_flag=True, help="print additional info")

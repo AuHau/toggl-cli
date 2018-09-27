@@ -11,6 +11,7 @@ from .. import exceptions
 logger = logging.getLogger('toggl.utils.bootstrap')
 
 
+# TODO: As `inquirer` package is not compatible with Windows, provide dummy bootstrap on Windows
 class ConfigBootstrap:
     """
     Create config based on the input from the User

@@ -152,6 +152,7 @@ class EnvConfigMixin:
         return super().__getattribute__(item)
 
 
+# TODO: Default timezone is similarly like default workspace, saved in Toggl settings --> create support for it
 class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     """
     Configuration class which implements hierarchy lookup to enable overloading configurations
