@@ -29,13 +29,13 @@ class DateTimeType(click.ParamType):
 
         config = ctx.obj.get('config') or utils.Config.factory()
 
-        if value == self.NOW_STRING and self._allow_now:
-            return pendulum.now(config.timezone)
+        if value == self.NOW_STRING and not self._allow_now:
+            self.fail('\'now\' support is not allowed!', param, ctx)
 
         try:
             try:
-                return pendulum.parse(value, tz=config.timezone, strict=False, dayfirst=config.day_first,
-                                      yearfirst=config.year_first)
+                return pendulum.parse(value, tz=config.timezone, strict=False, day_first=config.day_first,
+                                      year_first=config.year_first)
             except ValueError:
                 pass
         except AttributeError:
@@ -108,9 +108,7 @@ class ResourceType(click.ParamType):
             resource_id = int(value)
             return self._convert_id(resource_id, param, ctx)
         except ValueError:
-            pass
-
-        return self._convert_name(value, param, ctx)
+            return self._convert_name(value, param, ctx)
 
     def _convert_id(self, resource_id, param, ctx):
         resource = self._resource_cls.objects.get(resource_id)

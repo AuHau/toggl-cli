@@ -15,11 +15,11 @@ class CustomSet(base.TogglSet):
 
 
 class EntityWithCustomNotBindedSet(base.TogglEntity):
-    objects = CustomSet('some_url')
+    objects = CustomSet()
 
 
 class EntityWithCustomBindedSet(base.TogglEntity):
-    objects = CustomSet('some_url', RandomEntity)
+    objects = CustomSet(RandomEntity)
 
 
 class TestMetaBase:
