@@ -240,7 +240,7 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name',
     entity_string = ''
     for key, value in sorted(entity_dict.items()):
         entity_string += '\n{}: {}'.format(
-            key.replace('_', ' ').capitalize(),
+            click.style(key.replace('_', ' ').capitalize(), fg="white", dim=1),
             value
         )
 
