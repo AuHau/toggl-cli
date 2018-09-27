@@ -189,6 +189,10 @@ class FieldsType(click.ParamType):
 
         return out
 
+    @staticmethod
+    def format_fields_for_help(cls):
+        return ', '.join(cls.__fields__.keys())
+
 
 def entity_listing(cls, fields=('id', 'name',), config=None):
     entities = cls if isinstance(cls, Iterable) else cls.objects.all(config=config)
@@ -409,7 +413,7 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
 @click.option('--start', '-s', type=DateTimeType(), help='Defines start of a date range to filter the entries by.')
 @click.option('--stop', '-p', type=DateTimeType(), help='Defines stop of a date range to filter the entries by.')
 @click.option('--fields', '-f', type=FieldsType(api.TimeEntry), default='description,duration,start,stop',
-              help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: billable, description, duration, project, start, stop, tags, created_with')
+              help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + FieldsType.format_fields_for_help(api.TimeEntry))
 @click.pass_context
 def entry_ls(ctx, start, stop, fields):
     if start is not None or stop is not None:
@@ -577,7 +581,7 @@ def clients_update(ctx, spec, **kwargs):
 @clients.command('ls', short_help='list clients')
 @click.pass_context
 def clients_ls(ctx):
-    entity_listing(api.Client, config=ctx.obj['config'])
+    entity_listing(api.Client, fields=('name', 'id', 'notes'), config=ctx.obj['config'])
 
 
 @clients.command('get', short_help='retrieve details of a client')
@@ -658,9 +662,11 @@ def projects_update(ctx, spec, **kwargs):
 
 
 @projects.command('ls', short_help='list projects')
+@click.option('--fields', '-f', type=FieldsType(api.Project), default='name,customer,active,id',
+              help='Defines a set of fields of which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + FieldsType.format_fields_for_help(api.Project))
 @click.pass_context
-def projects_ls(ctx):
-    entity_listing(api.Project, config=ctx.obj['config'])
+def projects_ls(ctx, fields):
+    entity_listing(api.Project, fields, config=ctx.obj['config'])
 
 
 @projects.command('get', short_help='retrieve details of a project')
@@ -690,9 +696,11 @@ def workspaces(ctx):
 
 
 @workspaces.command('ls', short_help='list workspaces')
+@click.option('--fields', '-f', type=FieldsType(api.Workspace), default='name,premium,admin,id',
+              help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + FieldsType.format_fields_for_help(api.Workspace))
 @click.pass_context
-def workspaces_ls(ctx):
-    entity_listing(api.Workspace, config=ctx.obj['config'])
+def workspaces_ls(ctx, fields):
+    entity_listing(api.Workspace, fields, config=ctx.obj['config'])
 
 
 @workspaces.command('get', short_help='retrieve details of a workspace')
@@ -754,9 +762,11 @@ def tasks_update(ctx, spec, **kwargs):
 
 
 @tasks.command('ls', short_help='list tasks')
+@click.option('--fields', '-f', type=FieldsType(api.Task), default='name,project,user,id',
+              help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + FieldsType.format_fields_for_help(api.Task))
 @click.pass_context
-def tasks_ls(ctx):
-    entity_listing(api.Task, config=ctx.obj['config'])
+def tasks_ls(ctx, fields):
+    entity_listing(api.Task, fields, config=ctx.obj['config'])
 
 
 @tasks.command('get', short_help='retrieve details of a task')
@@ -783,9 +793,11 @@ def users(ctx):
 
 
 @users.command('ls', short_help='list users for given workspace')
+@click.option('--fields', '-f', type=FieldsType(api.User), default='email, fullname, id',
+              help='Defines a set of fieldswhich will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + FieldsType.format_fields_for_help(api.User))
 @click.pass_context
-def users_ls(ctx):
-    entity_listing(api.User, ('id', 'email', 'fullname'), config=ctx.obj['config'])
+def users_ls(ctx, fields):
+    entity_listing(api.User, fields, config=ctx.obj['config'])
 
 
 @users.command('get', short_help='retrieve details of a user')
@@ -819,9 +831,11 @@ def workspace_users(ctx):
 
 
 @workspace_users.command('ls', short_help='list workspace\'s users')
+@click.option('--fields', '-f', type=FieldsType(api.WorkspaceUser), default='email,active,admin',
+              help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + FieldsType.format_fields_for_help(api.WorkspaceUser))
 @click.pass_context
-def workspace_users_ls(ctx):
-    entity_listing(api.WorkspaceUser, ('id', 'email', 'active', 'admin'), config=ctx.obj['config'])
+def workspace_users_ls(ctx, fields):
+    entity_listing(api.WorkspaceUser, fields, config=ctx.obj['config'])
 
 
 @workspace_users.command('get', short_help='retrieve details of a user')
