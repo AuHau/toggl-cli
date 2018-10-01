@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import typing
 from abc import ABCMeta
 from collections import OrderedDict
 from inspect import Signature, Parameter
@@ -11,8 +12,10 @@ from . import fields as model_fields
 
 logger = logging.getLogger('toggl.models.base')
 
+T = typing.TypeVar('T', bound='TogglEntity')
 
-def evaluate_conditions(conditions, entity, contain=False):
+
+def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Iterable, TogglEntity, bool) -> bool
     """
     Will compare conditions dict and entity.
     Condition's keys and values must match the entities attributes, but not the other way around.
@@ -47,43 +50,52 @@ class TogglSet(object):
         self._can_get_detail = can_get_detail
         self._can_get_list = can_get_list
 
-    def bind_to_class(self, cls):
+    def bind_to_class(self, cls):  # type: (TogglEntity) -> None
         if self.entity_cls is not None:
             raise exceptions.TogglException('The instance is already bound to a class {}!'.format(self.entity_cls))
 
         self.entity_cls = cls
 
     @property
-    def url(self):
-        return self._url or self.entity_cls.get_url()
+    def url(self):  # type: (TogglSet) -> str
+        if self._url:
+            return self._url
+
+        if self.entity_cls is None:
+            raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
+
+        return self.entity_cls.get_url()
 
     @property
-    def can_get_detail(self):
+    def can_get_detail(self):  # type: (TogglSet) -> bool
         if self._can_get_detail is not None:
             return self._can_get_detail
 
-        if self.entity_cls._can_get_detail is not None:
+        if self.entity_cls and self.entity_cls._can_get_detail is not None:
             return self.entity_cls._can_get_detail
 
         return True
 
     @property
-    def can_get_list(self):
+    def can_get_list(self):  # type: (TogglSet) -> bool
         if self._can_get_list is not None:
             return self._can_get_list
 
-        if self.entity_cls._can_get_list is not None:
+        if self.entity_cls and self.entity_cls._can_get_list is not None:
             return self.entity_cls._can_get_list
 
         return True
 
-    def build_list_url(self):
+    def build_list_url(self):  # type: (TogglSet) -> str
         return '/{}'.format(self.url)
 
-    def build_detail_url(self, id):
+    def build_detail_url(self, id):  # type: (TogglSet) -> str
         return '/{}/{}'.format(self.url, id)
 
-    def get(self, id=None, config=None, **conditions):
+    def get(self, id=None, config=None, **conditions):  # type: (typing.Any, utils.Config, dict) -> TogglEntity
+        if self.entity_cls is None:
+            raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
+
         if id is not None:
             if self.can_get_detail:
                 try:
@@ -107,7 +119,10 @@ class TogglSet(object):
 
         return entries[0]
 
-    def filter(self, order='asc', config=None, contain=False, **conditions):
+    def filter(self, order='asc', config=None, contain=False, **conditions):  # type: (str, utils.Config, bool, dict) -> typing.List[TogglEntity]
+        if self.entity_cls is None:
+            raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
+
         fetched_entities = self.all(order, config)
 
         if fetched_entities is None:
@@ -115,7 +130,10 @@ class TogglSet(object):
 
         return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity, contain)]
 
-    def all(self, order='asc', config=None):
+    def all(self, order='asc', config=None):  # type: (str, utils.Config) -> typing.List[TogglEntity]
+        if self.entity_cls is None:
+            raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
+
         if not self.can_get_list:
             raise exceptions.TogglException('Entity {} is not allowed to fetch list from the API!'
                                             .format(self.entity_cls))
@@ -141,10 +159,10 @@ class TogglSet(object):
 
 class WorkspaceToggleSet(TogglSet):
 
-    def build_list_url(self, wid=None):
+    def build_list_url(self, wid=None):  # type: (int) -> str
         return '/workspaces/{}/{}'.format(wid, self.url)
 
-    def filter(self, order='asc', wid=None, config=None, contain=False, **conditions):
+    def filter(self, order='asc', wid=None, config=None, contain=False, **conditions):  # type: (str, int, utils.Config, bool, dict) -> typing.List[TogglEntity]
         fetched_entities = self.all(order, wid, config)
 
         if fetched_entities is None:
@@ -152,7 +170,7 @@ class WorkspaceToggleSet(TogglSet):
 
         return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity, contain)]
 
-    def all(self, order='asc', wid=None, config=None):
+    def all(self, order='asc', wid=None, config=None):  # type: (str, int, utils.Config) -> typing.List[typing.Generic[T]]
         if not self.can_get_list:
             raise exceptions.TogglException('Entity {} is not allowed to fetch list from the API!'
                                             .format(self.entity_cls))
@@ -179,7 +197,8 @@ class WorkspaceToggleSet(TogglSet):
 
 class TogglEntityMeta(ABCMeta):
 
-    def _make_signature(fields):
+    @staticmethod
+    def _make_signature(fields):  # type: (typing.Dict[str, model_fields.TogglField]) -> Signature
         non_default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD) for field in fields.values()
                                   if field.name != 'id' and field.required]
         default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD, default=field.default) for field in
@@ -188,20 +207,33 @@ class TogglEntityMeta(ABCMeta):
 
         return Signature(non_default_parameters + default_parameters)
 
-    def _make_fields(attrs, parents):
+    @staticmethod
+    def _make_fields(attrs, parents):  # type: (typing.Dict, typing.List[typing.Type[TogglEntity]]) -> OrderedDict
         fields = OrderedDict()
         for parent in parents:
             fields.update(parent.__fields__)
 
         for key, field in attrs.items():
             if isinstance(field, model_fields.TogglField):
+                if key in fields:
+                    logger.warning('Field \'{}\' is being overridden'.format(key))
+
                 field.name = key
                 fields[key] = field
 
         return fields
 
-    def _make_mapped_fields(fields):
-        return {field.mapped_field: field for field in fields.values() if isinstance(field, model_fields.MappingField)}
+    @staticmethod
+    def _make_mapped_fields(fields):  # type: (typing.Dict[str, model_fields.TogglField]) -> typing.Dict[str, model_fields.MappingField]
+        out = {}
+        for field in fields.values():
+            if isinstance(field, model_fields.MappingField):
+                if field.mapped_field in out:
+                    raise TypeError('MappingField conflict! There is already other field who is mapped to \'{}\''.format(field.mapped_field))
+
+                out[field.mapped_field] = field
+
+        return out
 
     def __new__(mcs, name, bases, attrs, **kwargs):
         new_class = super().__new__(mcs, name, bases, attrs, **kwargs)
@@ -226,7 +258,6 @@ class TogglEntityMeta(ABCMeta):
 class TogglEntity(metaclass=TogglEntityMeta):
     __signature__ = Signature()
     __fields__ = OrderedDict()
-    __change_dict__ = {}
 
     _validate_workspace = True
     _can_create = True
@@ -235,10 +266,11 @@ class TogglEntity(metaclass=TogglEntityMeta):
     _can_get_detail = True
     _can_get_list = True
 
-    id = model_fields.IntegerField(required=False)
+    id = model_fields.IntegerField(required=False, default=None)
 
     def __init__(self, config=None, **kwargs):
         self._config = config or utils.Config.factory()
+        self.__change_dict__ = {}
 
         for field in self.__fields__.values():
             if field.name in {'id'}:
@@ -255,82 +287,91 @@ class TogglEntity(metaclass=TogglEntityMeta):
                     field.init(self, kwargs.get(field.mapped_field))
                     continue
 
-                if field.default is None and field.required:
-                    raise TypeError('We need "{}" attribute!'.format(field.mapped_field))
+                if field.default is model_fields.NOTSET and field.required:
+                    raise TypeError('We need \'{}\' attribute!'.format(field.mapped_field))
                 continue
 
             if field.name not in kwargs:
-                if field.default is None and field.required:
-                    raise TypeError('We need "{}" attribute!'.format(field.name))
+                if field.default is model_fields.NOTSET and field.required:
+                    raise TypeError('We need \'{}\' attribute!'.format(field.name))
             else:  # Set the attribute only when there is some value to set, so default values could work properly
                 field.init(self, kwargs[field.name])
 
-    def save(self, config=None):
+    def save(self, config=None):  # type: (utils.Config) -> None
         if not self._can_update and self.id is not None:
-            raise exceptions.TogglException("Updating this entity is not allowed!")
+            raise exceptions.TogglException('Updating this entity is not allowed!')
 
         if not self._can_create and self.id is None:
-            raise exceptions.TogglException("Creating this entity is not allowed!")
+            raise exceptions.TogglException('Creating this entity is not allowed!')
 
         config = config or self._config
 
         self.validate()
 
         if self.id is not None:  # Update
-            utils.toggl("/{}/{}".format(self.get_url(), self.id), "put", self.json(update=True), config=config)
+            utils.toggl('/{}/{}'.format(self.get_url(), self.id), 'put', self.json(update=True), config=config)
             self.__change_dict__ = {}  # Reset tracking changes
         else:  # Create
-            data = utils.toggl("/{}".format(self.get_url()), "post", self.json(), config=config)
+            data = utils.toggl('/{}'.format(self.get_url()), 'post', self.json(), config=config)
             self.id = data['data']['id']  # Store the returned ID
 
-    def delete(self, config=None):
+    def delete(self, config=None):  # type: (utils.Config) -> None
         if not self._can_delete:
-            raise exceptions.TogglException("Deleting this entity is not allowed!")
+            raise exceptions.TogglException('Deleting this entity is not allowed!')
+        
+        if not self.id:
+            raise exceptions.TogglException()
 
-        utils.toggl("/{}/{}".format(self.get_url(), self.id), "delete", config=config or self._config)
+        utils.toggl('/{}/{}'.format(self.get_url(), self.id), 'delete', config=config or self._config)
         self.id = None  # Invalidate the object, so when save() is called after delete a new object is created
 
-    def json(self, update=False):
+    def json(self, update=False):  # type: (bool) -> str
         return json.dumps({self.get_name(): self.to_dict(serialized=True, changes_only=update)})
 
-    def validate(self):
+    def validate(self):  # type: () -> None
         for field in self.__fields__.values():
             if isinstance(field, model_fields.MappingField):
                 field.validate(getattr(self, field.mapped_field, None))
             else:
                 field.validate(getattr(self, field.name, None))
 
-    def to_dict(self, serialized=False, changes_only=False):
+    def to_dict(self, serialized=False, changes_only=False):  # type: (bool, bool) -> typing.Dict
         source_dict = self.__change_dict__ if changes_only else self.__fields__
         entity_dict = {}
-        for field_name in source_dict:
-            field = self.__fields__[field_name]
+        for field_name in source_dict.keys():
             try:
-                entity_dict[field.mapped_field] = getattr(self, field.name).id
-            except AttributeError:
+                field = self.__fields__[field_name]
+            except KeyError:
+                field = self.__mapped_fields__[field_name]
+
+            try:
+                entity_dict[field.mapped_field] = self.__dict__[field.mapped_field]
+            except (KeyError, AttributeError):
                 value = getattr(self, field.name, None)
                 entity_dict[field.name] = field.serialize(value) if serialized else value
 
         return entity_dict
 
-    def __cmp__(self, other):
+    def __cmp__(self, other):  # type: (typing.Generic[T]) -> bool
         if not isinstance(other, self.__class__):
-            raise RuntimeError("You are trying to compare instances of different classes!")
+            raise RuntimeError('You are trying to compare instances of different classes!')
 
+        # TODO: What to do if ID is not set? Should there be value's comparision fallback?
         return self.id == other.id
 
-    def __copy__(self):
+    # TODO: Problem with unique field's. Copy ==> making invalid option ==> Some validation?
+    def __copy__(self):  # type: () -> typing.Generic[T]
         cls = self.__class__
         new_instance = cls.__new__(cls)
         new_instance.__dict__.update(self.__dict__)
         new_instance.id = None  # New instance was never saved ==> no ID for it yet
         return new_instance
 
-    def __str__(self):
-        return "{} (#{})".format(getattr(self, 'name'), self.id)
+    def __str__(self):  # type: () -> str
+        return '{} (#{})'.format(getattr(self, 'name', None) or self.__class__.__name__, self.id)
 
     @classmethod
-    def get_name(cls, verbose=False):
+    def get_name(cls, verbose=False):  # type: (bool) -> str
         name = cls.__name__
         name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
         name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
@@ -341,11 +382,11 @@ class TogglEntity(metaclass=TogglEntityMeta):
         return name
 
     @classmethod
-    def get_url(cls):
+    def get_url(cls):  # type: () -> str
         return cls.get_name() + 's'
 
     @classmethod
-    def deserialize(cls, config=None, **kwargs):
+    def deserialize(cls, config=None, **kwargs):  # type: (utils.Config, typing.Dict) -> typing.Generic[T]
         try:
             kwargs.pop('at')
         except KeyError:

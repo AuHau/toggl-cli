@@ -13,11 +13,19 @@ from . import base
 
 logger = logging.getLogger('toggl.models.fields')
 
+NOTSET = object()
+
 
 class TogglField:
     _field_type = None
+    name = None
+    verbose_name = None
+    required = False
+    default = None
+    admin_only = False
+    is_read_only = False
 
-    def __init__(self, verbose_name=None, required=False, default=None, admin_only=False, is_read_only=False):
+    def __init__(self, verbose_name=None, required=False, default=NOTSET, admin_only=False, is_read_only=False):
         self.name = None
         self.verbose_name = verbose_name
         self.required = required
@@ -74,7 +82,10 @@ class TogglField:
         try:
             return instance.__dict__[self.name]
         except KeyError:
-            return self.default() if callable(self.default) else self.default
+            if self.default is not NOTSET:
+                return self.default() if callable(self.default) else self.default
+
+            raise AttributeError('Instance {} has not set \'{}\''.format(instance, self.name))
 
     def __set__(self, instance, value):
         if self.is_read_only:
@@ -330,7 +341,7 @@ class MappingField(TogglField):
         if self.cardinality == MappingCardinality.ONE:
             try:
                 if not isinstance(value, self.mapped_cls):
-                    logger.warning('Assigning class {} to MappedField with class {}.'.format(type(value),
+                    logger.warning('Assigning instance of class {} to MappedField with class {}.'.format(type(value),
                                                                                              self.mapped_cls))
 
                 instance.__dict__[self.mapped_field] = value.id
@@ -373,8 +384,8 @@ class MappingField(TogglField):
                 default = self.default
 
                 # No default, no point of continuing
-                if default is None:
-                    return None
+                if default is NOTSET:
+                    raise AttributeError('Instance {} has not set mapping field \'{}\'/\'{}\''.format(instance, self.name, self.mapped_field))
 
                 if callable(default):
                     default = default(instance._config)
