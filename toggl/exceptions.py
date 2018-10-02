@@ -28,6 +28,7 @@ class TogglCliException(TogglException, click.ClickException):
 class TogglPremiumException(TogglException):
     pass
 
+
 # API Exceptions
 class TogglServerException(TogglException):
     pass
@@ -39,6 +40,7 @@ class TogglApiException(TogglException):
         self.message = message
 
         super().__init__(*args, **kwargs)
+
 
 class TogglAuthorizationException(TogglApiException):
     pass
