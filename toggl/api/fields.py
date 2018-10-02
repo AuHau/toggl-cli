@@ -2,7 +2,7 @@ import datetime
 import logging
 from builtins import int
 from enum import Enum
-from typing import Any, Union
+import typing
 
 import pendulum
 from validate_email import validate_email
@@ -14,6 +14,8 @@ from . import base
 logger = logging.getLogger('toggl.models.fields')
 
 NOTSET = object()
+
+Field = typing.TypeVar('Field', bound='TogglField')
 
 
 class TogglField:
@@ -33,14 +35,14 @@ class TogglField:
         self.admin_only = admin_only
         self.is_read_only = is_read_only
 
-    def validate(self, value):
-        if self.required and self.default is None and not value:
+    def validate(self, value):  # type: (typing.Any) -> None
+        if self.required and self.default is NOTSET and not value:
             raise exceptions.TogglValidationException('The field \'{}\' is required!'.format(self.name))
 
-    def serialize(self, value):
+    def serialize(self, value):  # type: (typing.Any) -> None
         return value
 
-    def parse(self, value, config=None):
+    def parse(self, value, config=None):  # type: (typing.Any, utils.Config) -> typing.Union[str, None]
         if value is None:
             return None
 
@@ -49,19 +51,19 @@ class TogglField:
 
         return value
 
-    def format(self, value, config=None):  # type: (Any, Union[utils.Config, None]) -> str
+    def format(self, value, config=None):  # type: (typing.Any, utils.Config) -> str
         if value is None:
             return ''
 
         return value
 
-    def init(self, instance, value):
+    def init(self, instance, value):  # type: (typing.Generic[base.Entity], typing.Any) -> None
         if self.name in instance.__dict__:
             raise exceptions.TogglException('Field \'{}.{}\' is already initiated!'
                                             .format(instance.__class__.__name__, self.name))
 
         try:
-            value = self.parse(value, instance._config)
+            value = self.parse(value, getattr(instance, '_config', None))
         except ValueError as e:
             raise TypeError(
                 'Expected for field \'{}\' type {} got {}'.format(self.name, self._field_type, type(value)))
@@ -69,6 +71,9 @@ class TogglField:
         instance.__dict__[self.name] = value
 
     def _set_value(self, instance, value):
+        if not self.name:
+            raise RuntimeError('Name of the field is not defined!')
+
         try:
             if instance.__dict__[self.name] == value:
                 return
@@ -79,6 +84,9 @@ class TogglField:
         instance.__dict__[self.name] = value
 
     def __get__(self, instance, owner):
+        if not self.name:
+            raise RuntimeError('Name of the field is not defined!')
+
         try:
             return instance.__dict__[self.name]
         except KeyError:
@@ -88,6 +96,9 @@ class TogglField:
             raise AttributeError('Instance {} has not set \'{}\''.format(instance, self.name))
 
     def __set__(self, instance, value):
+        if not self.name:
+            raise RuntimeError('Name of the field is not defined!')
+
         if self.is_read_only:
             raise exceptions.TogglException('Attribute \'{}\' is read only!'.format(self.name))
 
@@ -102,12 +113,15 @@ class TogglField:
                         .format(instance.__class__.__name__, self.name)
                 )
 
-        if value is None and not self.required:
-            self._set_value(instance, value)
-            return
+        if value is None:
+            if not self.required:
+                self._set_value(instance, value)
+                return
+            else:
+                raise TypeError('Field \'{}\' is required! None value is not allowed!'.format(self.name))
 
         try:
-            value = self.parse(value, instance._config)
+            value = self.parse(value, getattr(instance, '_config', None))
         except ValueError:
             raise TypeError(
                 'Expected for field \'{}\' type {} got {}'.format(self.name, self._field_type, type(value)))
@@ -200,7 +214,7 @@ class DateTimeField(StringField):
 class EmailField(StringField):
 
     def validate(self, value):
-        super(EmailField, self).validate(value)
+        super().validate(value)
 
         if not validate_email(value):
             raise exceptions.TogglValidationException('Email \'{}\' is not valid email address!'.format(value))
@@ -276,7 +290,7 @@ class ChoiceField(TogglField):
     choices = {}
 
     def __init__(self, choices, *args, **kwargs):
-        super(ChoiceField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.choices = choices
 
@@ -288,10 +302,10 @@ class ChoiceField(TogglField):
                     value = key
                     break
 
-        super(ChoiceField, self).__set__(instance, value)
+        super().__set__(instance, value)
 
     def validate(self, value):
-        super(ChoiceField, self).validate(value)
+        super().validate(value)
 
         if value not in self.choices and value not in self.choices.values():
             raise exceptions.TogglValidationException('Value \'{}\' is not valid choice!'.format(value))
@@ -325,10 +339,11 @@ class MappingCardinality(Enum):
     MANY = 'many'
 
 
+# TODO: Finish MappingCardinality.MANY implementation
 class MappingField(TogglField):
 
     def __init__(self, mapped_cls, mapped_field, cardinality=MappingCardinality.ONE, *args, **kwargs):
-        super(MappingField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         if not issubclass(mapped_cls, base.TogglEntity):
             raise TypeError('Mapped class has to be TogglEntity\'s subclass!')
@@ -346,10 +361,12 @@ class MappingField(TogglField):
 
                 instance.__dict__[self.mapped_field] = value.id
             except AttributeError:
-                if not isinstance(value, int):
+                try:
+                    instance.__dict__[self.mapped_field] = int(value)
+                except ValueError:
                     logger.warning('Assigning as ID to mapped field value which is not integer!')
+                    instance.__dict__[self.mapped_field] = value
 
-                instance.__dict__[self.mapped_field] = value
         else:
             raise NotImplementedError('Field with MANY cardinality is not supported for attribute assignment')
 
@@ -388,7 +405,7 @@ class MappingField(TogglField):
                     raise AttributeError('Instance {} has not set mapping field \'{}\'/\'{}\''.format(instance, self.name, self.mapped_field))
 
                 if callable(default):
-                    default = default(instance._config)
+                    default = default(getattr(instance, '_config', None))
 
                 if isinstance(default, base.TogglEntity):
                     return default

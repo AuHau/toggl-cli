@@ -12,7 +12,7 @@ from . import fields as model_fields
 
 logger = logging.getLogger('toggl.models.base')
 
-T = typing.TypeVar('T', bound='TogglEntity')
+Entity = typing.TypeVar('Entity', bound='TogglEntity')
 
 
 def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Iterable, TogglEntity, bool) -> bool
@@ -162,7 +162,7 @@ class WorkspaceToggleSet(TogglSet):
     def build_list_url(self, wid=None):  # type: (int) -> str
         return '/workspaces/{}/{}'.format(wid, self.url)
 
-    def filter(self, order='asc', wid=None, config=None, contain=False, **conditions):  # type: (str, int, utils.Config, bool, dict) -> typing.List[TogglEntity]
+    def filter(self, order='asc', wid=None, config=None, contain=False, **conditions):  # type: (str, int, utils.Config, bool, dict) -> typing.List[typing.Generic[Entity]]
         fetched_entities = self.all(order, wid, config)
 
         if fetched_entities is None:
@@ -170,7 +170,7 @@ class WorkspaceToggleSet(TogglSet):
 
         return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity, contain)]
 
-    def all(self, order='asc', wid=None, config=None):  # type: (str, int, utils.Config) -> typing.List[typing.Generic[T]]
+    def all(self, order='asc', wid=None, config=None):  # type: (str, int, utils.Config) -> typing.List[typing.Generic[Entity]]
         if not self.can_get_list:
             raise exceptions.TogglException('Entity {} is not allowed to fetch list from the API!'
                                             .format(self.entity_cls))
@@ -208,7 +208,7 @@ class TogglEntityMeta(ABCMeta):
         return Signature(non_default_parameters + default_parameters)
 
     @staticmethod
-    def _make_fields(attrs, parents):  # type: (typing.Dict, typing.List[typing.Type[TogglEntity]]) -> OrderedDict
+    def _make_fields(attrs, parents):  # type: (typing.Dict, typing.List[typing.Type[TogglEntity]]) -> typing.Dict[str, model_fields.Field]
         fields = OrderedDict()
         for parent in parents:
             fields.update(parent.__fields__)
@@ -352,7 +352,7 @@ class TogglEntity(metaclass=TogglEntityMeta):
 
         return entity_dict
 
-    def __cmp__(self, other):  # type: (typing.Generic[T]) -> bool
+    def __cmp__(self, other):  # type: (typing.Generic[Entity]) -> bool
         if not isinstance(other, self.__class__):
             raise RuntimeError('You are trying to compare instances of different classes!')
 
@@ -360,7 +360,7 @@ class TogglEntity(metaclass=TogglEntityMeta):
         return self.id == other.id
 
     # TODO: Problem with unique field's. Copy ==> making invalid option ==> Some validation?
-    def __copy__(self):  # type: () -> typing.Generic[T]
+    def __copy__(self):  # type: () -> typing.Generic[Entity]
         cls = self.__class__
         new_instance = cls.__new__(cls)
         new_instance.__dict__.update(self.__dict__)
@@ -386,7 +386,7 @@ class TogglEntity(metaclass=TogglEntityMeta):
         return cls.get_name() + 's'
 
     @classmethod
-    def deserialize(cls, config=None, **kwargs):  # type: (utils.Config, typing.Dict) -> typing.Generic[T]
+    def deserialize(cls, config=None, **kwargs):  # type: (utils.Config, typing.Dict) -> typing.Generic[Entity]
         try:
             kwargs.pop('at')
         except KeyError:
