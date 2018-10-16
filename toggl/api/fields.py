@@ -336,9 +336,13 @@ class PropertyField(TogglField):
         :param instance: Instance of the entity
         :param value: Value to be set
         :param init: Boolean that describe if the value is being set during creation of the entity's instance
-        :return: None
+        :return: Boolean which indicates whether the value resulted in updated state of the instance
+                (for tracking changes for correct PUT behavior). True if state was changed.
         """
+        org_value = instance.__dict__.get(name)
         instance.__dict__[name] = value
+
+        return org_value != value
 
     @staticmethod
     def default_getter(name, instance):
@@ -349,9 +353,12 @@ class PropertyField(TogglField):
         :param instance: Instance of the entity
         :return: Value of the field
         """
-        return instance.__dict__[name]
+        return instance.__dict__.get(name)
 
     def init(self, instance, value):
+        if not self.name:
+            raise RuntimeError('Name of the field is not defined!')
+
         self.setter(self.name, instance, value, init=True)
 
     def format(self, value, config=None):
@@ -361,9 +368,15 @@ class PropertyField(TogglField):
         return self.serializer(value) if self.serializer else super().serialize(value)
 
     def __get__(self, instance, owner):
+        if not self.name:
+            raise RuntimeError('Name of the field is not defined!')
+
         return self.getter(self.name, instance)
 
     def __set__(self, instance, value):
+        if not self.name:
+            raise RuntimeError('Name of the field is not defined!')
+
         if self.is_read_only:
             raise exceptions.TogglException('Attribute \'{}\' is read only!'.format(self.name))
 
@@ -376,7 +389,13 @@ class PropertyField(TogglField):
                         .format(instance.__class__.__name__, self.name, workspace.name)
                 )
 
-        return self.setter(self.name, instance, value, init=False)
+        has_updated_state = self.setter(self.name, instance, value, init=False)
+
+        if has_updated_state is not True and has_updated_state is not False:
+            raise TypeError('Setter must return bool!')
+
+        if has_updated_state is True:
+            instance.__change_dict__[self.name] = value
 
 
 class ChoiceField(StringField):

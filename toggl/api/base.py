@@ -505,7 +505,7 @@ class TogglEntity(metaclass=TogglEntityMeta):
         return cls.get_name() + 's'
 
     @classmethod
-    def deserialize(cls, config=None, **kwargs):  # type: (utils.Config, typing.Dict) -> typing.Generic[Entity]
+    def deserialize(cls, config=None, **kwargs):  # type: (utils.Config, **typing.Any) -> typing.Generic[Entity]
         """
         Method which takes kwargs as dict representing the Entity's data and return actuall instance of the Entity.
         """

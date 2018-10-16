@@ -177,6 +177,10 @@ class PropertyFieldStore:
     value = None
 
 
+class PropertyFieldStateChanged:
+    value = True
+
+
 def getter(name, instance, serializing=False):
     assert name == 'field'
 
@@ -185,6 +189,7 @@ def getter(name, instance, serializing=False):
 
 def setter(name, instance, value, init=False):
     PropertyFieldStore.value = value
+    return PropertyFieldStateChanged.value
 
 
 class PropertyEntity(base.TogglEntity):
@@ -246,6 +251,13 @@ class TestPropertyField:
         obj = PropertyEntity(field='some value')
         assert len(obj.__change_dict__) == 0
 
+        # Simulating that setting the value does not change the instance's state
+        PropertyFieldStateChanged.value = False
+        obj.field = 'some other value'
+        assert len(obj.__change_dict__) == 0
+
+        # Simulating that the value changed the state
+        PropertyFieldStateChanged.value = True
         obj.field = 'some other value'
         assert len(obj.__change_dict__) == 1
 

@@ -223,7 +223,7 @@ def get_duration(name, instance):  # type: (str, base.Entity) -> int
     return int((instance.stop - instance.start).in_seconds())
 
 
-def set_duration(name, instance, value, init=False):  # type: (str, base.Entity, typing.Any, bool) -> None
+def set_duration(name, instance, value, init=False):  # type: (str, base.Entity, typing.Any, bool) -> bool
     """
     Setter for Duration Property field.
     """
@@ -236,6 +236,8 @@ def set_duration(name, instance, value, init=False):  # type: (str, base.Entity,
     else:
         instance.is_running = True
         instance.stop = None
+
+    return True  # Any change will result in updated instance's state.
 
 
 def format_duration(value, config=None):  # type: (typing.Any, utils.Config) -> str
