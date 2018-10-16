@@ -152,7 +152,7 @@ class TogglField:
         except KeyError:
             if self.default is not NOTSET:
                 # TODO: [Q/Design] Should be callable evaluated every time on only during the initialization?
-                return self.default() if callable(self.default) else self.default
+                return self.default(getattr(instance, '_config', None)) if callable(self.default) else self.default
 
             raise AttributeError('Instance {} has not set \'{}\''.format(instance, self.name))
 
@@ -485,6 +485,11 @@ class MappingField(TogglField):
     Then b.field will return object_a while b.field_id (eq. the mapped field) will return the object_a's ID: 123.
 
     The objects are retrieved using the mapped_cls's TogglSet.
+
+    The 'default' attribute has bit different behaviour then with other fields. If it is callable then it is called
+    as expected, but then the returned value is submitted to following checks as it would be if the value would not be callable.
+    If it is TogglEntity than it is returned as expected.
+    But if it anything else then the value is used as ID of the Mapped entity and fetched.
     """
 
     def __init__(self, mapped_cls, mapped_field, cardinality=MappingCardinality.ONE, *args, **kwargs):

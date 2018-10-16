@@ -3,7 +3,7 @@ import datetime
 import pendulum
 
 from toggl.api import base, fields, models
-from toggl import exceptions
+from toggl import exceptions, utils
 import pytest
 
 
@@ -99,7 +99,7 @@ class TestTogglField:
         obj = Entity()
         obj.__dict__ = {}
 
-        field = fields.StringField(default=lambda: '123')
+        field = fields.StringField(default=lambda _: '123')
         field.name = 'field'
         assert field.__get__(obj, None) == '123'
 
@@ -167,6 +167,34 @@ class TestMappingField:
 
         with pytest.raises(TypeError):
             fields.MappingField(A, 'a')
+
+    def test_default(self, mocker):
+        config = utils.Config.factory(None)
+        a = Entity(config=config)
+        b = Entity()
+        c = Entity()
+
+        field = fields.MappingField(Entity, 'a', default=b)
+        assert field.__get__(a, None) is b
+
+        mocker.patch.object(base.TogglSet, 'get')
+        base.TogglSet.get.return_value = c
+
+        field = fields.MappingField(Entity, 'a', default=123)
+        assert field.__get__(a, None) is c
+        base.TogglSet.get.assert_called_with(123)
+        base.TogglSet.get.reset_mock()
+
+        field = fields.MappingField(Entity, 'a', default=lambda _: 321)
+        assert field.__get__(a, None) is c
+        base.TogglSet.get.assert_called_with(321)
+
+        stub = mocker.stub()
+        stub.return_value = c
+        field = fields.MappingField(Entity, 'a', default=stub)
+        field.__get__(a, None)
+        stub.assert_called_once_with(config)
+
 
 
 #########################################################################################
