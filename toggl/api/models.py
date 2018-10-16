@@ -33,7 +33,7 @@ class Workspace(base.TogglEntity):
 
 
 class WorkspaceEntity(base.TogglEntity):
-    workspace = fields.MappingField(Workspace, 'wid', default=lambda config: config.default_workspace.id)  # type: Workspace
+    workspace = fields.MappingField(Workspace, 'wid', default=lambda config: config.default_workspace)  # type: Workspace
 
 
 # Premium Entity
@@ -260,8 +260,20 @@ class TimeEntrySet(base.TogglSet):
     Moreover it extends the filtrating mechanism by native filtering according start and/or stop time.
     """
 
-    def build_list_url(self, wid=None):  # type: (int) -> str
-        return '/{}'.format(self.url)
+    def build_list_url(self, caller, config, **kwargs):  # type: (str, utils.Config, **typing.Any) -> str
+        url = '/{}'.format(self.base_url)
+
+        if caller == 'filter':
+            start = kwargs.get('start')
+            stop = kwargs.get('stop')
+
+            if start is not None:
+                url += 'start_date={}&'.format(urlencode(start.isoformat()))
+
+            if stop is not None:
+                url += 'stop_date={}&'.format(urlencode(stop.isoformat()))
+
+        return url
 
     def current(self, config=None):  # type: (utils.Config) -> TimeEntry
         config = config or utils.Config.factory()
@@ -271,43 +283,6 @@ class TimeEntrySet(base.TogglSet):
             return None
 
         return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
-
-    # TODO: [Refactor/High] Refactor to avoid the loop implementation - keep it DRY!
-    def filter(self, order='desc', start=None, stop=None, config=None, contain=False, **conditions):  # type: (str, pendulum.DateTime, pendulum.DateTime, utils.Config, bool, **str) -> typing.List[base.Entity]
-        if start is None and stop is None:
-            return super().filter(order=order, config=config, contain=contain, **conditions)
-
-        config = config or utils.Config.factory()
-        url = self.build_list_url() + '?'
-
-        if start is not None:
-            url += 'start_date={}&'.format(urlencode(start.isoformat()))
-
-        if stop is not None:
-            url += 'stop_date={}&'.format(urlencode(stop.isoformat()))
-
-        fetched_entities = utils.toggl(url, 'get', config=config)
-
-        if fetched_entities is None:
-            return []
-
-        output = []
-        i = 0 if order == 'asc' else len(fetched_entities) - 1
-        while 0 <= i < len(fetched_entities):
-            entity = self.entity_cls.deserialize(config=config, **fetched_entities[i])
-
-            if base.evaluate_conditions(conditions, entity, contain):
-                output.append(entity)
-
-            if order == 'asc':
-                i += 1
-            else:
-                i -= 1
-
-        return output
-
-    def all(self, order='desc', wid=None, config=None):
-        return super().all(order=order, config=config)
 
 
 class TimeEntry(WorkspaceEntity):

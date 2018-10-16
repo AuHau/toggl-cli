@@ -70,7 +70,7 @@ class TogglSet(object):
         self.entity_cls = cls
 
     @property
-    def url(self):  # type: (TogglSet) -> str
+    def base_url(self):  # type: (TogglSet) -> str
         """
         Returns base URL which will be used for building listing or detail URLs.
         """
@@ -81,6 +81,26 @@ class TogglSet(object):
             raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
 
         return self.entity_cls.get_url()
+
+    def build_list_url(self, caller, config, **kwargs):  # type: (str, utils.Config, **typing.Any) -> str
+        """
+        Build the listing URL.
+
+        :param caller: Defines which method called this method, it can be either 'filter' or 'all'.
+        :param config: Config
+        :param kwargs: If caller == 'filter' then kwargs contain conditions for filtering.
+        """
+        return '/{}'.format(self.base_url)
+
+    def build_detail_url(self, id, config):  # type: (int, utils.Config) -> str
+        """
+        Build the detail URL.
+
+        :param id: ID of the entity to fetch.
+        :param config: Config
+        """
+        return '/{}/{}'.format(self.base_url, id)
+
 
     @property
     def can_get_detail(self):  # type: (TogglSet) -> bool
@@ -108,12 +128,6 @@ class TogglSet(object):
 
         return True
 
-    def build_list_url(self):  # type: (TogglSet) -> str
-        return '/{}'.format(self.url)
-
-    def build_detail_url(self, id):  # type: (TogglSet) -> str
-        return '/{}/{}'.format(self.url, id)
-
     def get(self, id=None, config=None, **conditions):  # type: (typing.Any, utils.Config, dict) -> Entity
         """
         Method for fetching detail object of the entity. it fetches the object based on specified conditions.
@@ -129,10 +143,12 @@ class TogglSet(object):
         if self.entity_cls is None:
             raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
 
+        config = config or utils.Config.factory()
+
         if id is not None:
             if self.can_get_detail:
                 try:
-                    fetched_entity = utils.toggl(self.build_detail_url(id), 'get', config=config)
+                    fetched_entity = utils.toggl(self.build_detail_url(id, config), 'get', config=config)
                     if fetched_entity['data'] is None:
                         return None
 
@@ -153,6 +169,27 @@ class TogglSet(object):
 
         return entries[0]
 
+    def _fetch_all(self, url, order, config):  # type: (str, str, utils.Config) -> typing.List[Entity]
+        """
+        Helper method that fetches all objects from given URL and deserialize them.
+        """
+        fetched_entities = utils.toggl(url, 'get', config=config)
+
+        if fetched_entities is None:
+            return []
+
+        output = []
+        i = 0 if order == 'asc' else len(fetched_entities) - 1
+        while 0 <= i < len(fetched_entities):
+            output.append(self.entity_cls.deserialize(config=config, **fetched_entities[i]))
+
+            if order == 'asc':
+                i += 1
+            else:
+                i -= 1
+
+        return output
+
     def filter(self, order='asc', config=None, contain=False, **conditions):  # type: (str, utils.Config, bool, dict) -> typing.List[Entity]
         """
         Method that fetches all entries and filter them out based on specified conditions.
@@ -165,7 +202,8 @@ class TogglSet(object):
         if self.entity_cls is None:
             raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
 
-        fetched_entities = self.all(order, config)
+        url = self.build_list_url('filter', config, **conditions)
+        fetched_entities = self._fetch_all(url, order, config)
 
         if fetched_entities is None:
             return []
@@ -176,8 +214,9 @@ class TogglSet(object):
 
         return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity, contain)]
 
-    def all(self, order='asc', config=None):  # type: (str, utils.Config) -> typing.List[Entity]
+    def all(self, order='asc', config=None, **kwargs):  # type: (str, utils.Config, **typing.Any) -> typing.List[Entity]
         """
+        Method that fetches all entries and deserialize them into instances of the binded entity.
 
         :param order: Strings 'asc' or 'desc' which specifies how the results will be sorted (
         :param config: Config instance
@@ -191,22 +230,9 @@ class TogglSet(object):
                                             .format(self.entity_cls))
 
         config = config or utils.Config.factory()
-        fetched_entities = utils.toggl(self.build_list_url(), 'get', config=config)
+        url = self.build_list_url('all', config, **kwargs)
 
-        if fetched_entities is None:
-            return []
-
-        output = []
-        i = 0 if order == 'asc' else len(fetched_entities) - 1
-        while 0 <= i < len(fetched_entities):
-            output.append(self.entity_cls.deserialize(config=config, **fetched_entities[i]))
-
-            if order == 'asc':
-                i += 1
-            else:
-                i -= 1
-
-        return output
+        return self._fetch_all(url, order, config)
 
     def __str__(self):
         return 'ToggleSet<{}>'.format(self.entity_cls.__name__)
@@ -217,41 +243,9 @@ class WorkspaceToggleSet(TogglSet):
     Specialized TogglSet for Workspaced entities.
     """
 
-    def build_list_url(self, wid=None):  # type: (int) -> str
-        return '/workspaces/{}/{}'.format(wid, self.url)
-
-    def filter(self, order='asc', wid=None, config=None, contain=False, **conditions):  # type: (str, int, utils.Config, bool, dict) -> typing.List[typing.Generic[Entity]]
-        fetched_entities = self.all(order, wid, config)
-
-        if fetched_entities is None:
-            return []
-
-        return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity, contain)]
-
-    # TODO: Refactor to _fetch_all()
-    def all(self, order='asc', wid=None, config=None):  # type: (str, int, utils.Config) -> typing.List[typing.Generic[Entity]]
-        if not self.can_get_list:
-            raise exceptions.TogglException('Entity {} is not allowed to fetch list from the API!'
-                                            .format(self.entity_cls))
-
-        config = config or utils.Config.factory()
-        wid = wid or config.default_workspace.id
-        fetched_entities = utils.toggl(self.build_list_url(wid), 'get', config=config)
-
-        if fetched_entities is None:
-            return []
-
-        output = []
-        i = 0 if order == 'asc' else len(fetched_entities) - 1
-        while 0 <= i < len(fetched_entities):
-            output.append(self.entity_cls.deserialize(config=config, **fetched_entities[i]))
-
-            if order == 'asc':
-                i += 1
-            else:
-                i -= 1
-
-        return output
+    def build_list_url(self, caller, config, **kwargs):  # type: (str, utils.Config, **typing.Any) -> str
+        wid = kwargs.get('wid') or config.default_workspace.id
+        return '/workspaces/{}/{}'.format(wid, self.base_url)
 
 
 class TogglEntityMeta(ABCMeta):

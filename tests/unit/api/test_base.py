@@ -114,14 +114,14 @@ class TestTogglSet:
             tset.filter()
 
         with pytest.raises(exceptions.TogglException):
-            tset.url
+            tset.base_url
 
     def test_url(self):
         tset = base.TogglSet(url='http://some-url.com')
-        assert tset.url == 'http://some-url.com'
+        assert tset.base_url == 'http://some-url.com'
 
         tset = base.TogglSet(RandomEntity)
-        assert tset.url == 'random_entitys'
+        assert tset.base_url == 'random_entitys'
 
     def test_can_get_detail(self):
         tset = base.TogglSet(can_get_detail=False)
@@ -504,8 +504,6 @@ class TestTogglEntity:
         different_obj.id = 124
 
         mapped_obj = EntityWithMapping(string='asd', mapping=obj)
-        # import pdb;
-        # pdb.set_trace()
 
         obj_dict = mapped_obj.to_dict()
 

@@ -533,6 +533,12 @@ class MappingField(TogglField):
             if obj is None:
                 raise exceptions.TogglValidationException('Mapped object does not exist!')
 
+    def serialize(self, value):
+        if value is None:
+            return None
+
+        return value.id
+
     def _set_value(self, instance, value):
         try:
             if instance.__dict__[self.mapped_field] == value:
