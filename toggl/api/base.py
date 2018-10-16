@@ -15,7 +15,7 @@ logger = logging.getLogger('toggl.api.base')
 Entity = typing.TypeVar('Entity', bound='TogglEntity')
 
 
-def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dict, TogglEntity, bool) -> bool
+def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dict, Entity, bool) -> bool
     """
     Will compare conditions dict and entity.
     Condition's keys and values must match the entities attributes, but not the other way around.
@@ -58,7 +58,7 @@ class TogglSet(object):
         self._can_get_detail = can_get_detail
         self._can_get_list = can_get_list
 
-    def bind_to_class(self, cls):  # type: (TogglEntity) -> None
+    def bind_to_class(self, cls):  # type: (Entity) -> None
         """
         Binds an Entity to the instance.
 
@@ -114,7 +114,7 @@ class TogglSet(object):
     def build_detail_url(self, id):  # type: (TogglSet) -> str
         return '/{}/{}'.format(self.url, id)
 
-    def get(self, id=None, config=None, **conditions):  # type: (typing.Any, utils.Config, dict) -> TogglEntity
+    def get(self, id=None, config=None, **conditions):  # type: (typing.Any, utils.Config, dict) -> Entity
         """
         Method for fetching detail object of the entity. it fetches the object based on specified conditions.
 
@@ -274,7 +274,7 @@ class TogglEntityMeta(ABCMeta):
         return Signature(non_default_parameters + default_parameters)
 
     @staticmethod
-    def _make_fields(attrs, parents):  # type: (typing.Dict, typing.List[typing.Type[TogglEntity]]) -> typing.Dict[str, model_fields.Field]
+    def _make_fields(attrs, parents):  # type: (typing.Dict, typing.List[typing.Type[Entity]]) -> typing.Dict[str, model_fields.Field]
         """
         Builds dict where keys are name of the fields and values are the TogglField's instances.
         """
