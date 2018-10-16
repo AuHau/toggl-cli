@@ -1,6 +1,7 @@
 import configparser
 import logging
 import os
+import typing
 from collections import namedtuple
 
 import requests
@@ -10,11 +11,15 @@ from .. import exceptions, get_version
 
 logger = logging.getLogger('toggl.utils.config')
 
-
+# Defines which attrs of all parents will be merged into the new config class -> related to ConfigMeta
 MERGE_ATTRS = ('INI_MAPPING', 'ENV_MAPPING')
 
 
 class ConfigMeta(metas.CachedFactoryMeta, metas.ClassAttributeModificationWarning):
+    """
+    Meta class which implements merging of defined attrs from base classes into the new one.
+    See MERGE_ATTRS.
+    """
 
     def __new__(mcs, name, bases, attrs, **kwargs):
         attrs = mcs._merge_attrs(attrs, bases)
@@ -39,13 +44,23 @@ IniEntry = namedtuple('IniEntry', ['section', 'type'])
 
 
 class IniConfigMixin:
+    """
+    Class mixin for implementing __getattribute__ which have a source of a data in config file that is implemented
+    using ConfigParser.
+
+    INI_MAPPING defines mapping of config (ini) file structure (eq. sections -> options) into just attribute's names.
+    It also defines the types of the values for correct type casting.
+
+    Only attributes that have entry in INI_MAPPING will be considered during the lookup, if the attribute does not have
+    entry the look continues with propagating the lookup to next in line, with super().
+    """
     INI_MAPPING = {
         'version': IniEntry('version', str),
     }
 
     DEFAULT_CONFIG_PATH = os.path.expanduser('~/.togglrc')
 
-    def __init__(self, config_path=sentinel, **kwargs):
+    def __init__(self, config_path=sentinel, **kwargs):  # type: (str, **typing.Any) -> None
         self._config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path
         self._store = configparser.ConfigParser(interpolation=None)
         self._loaded = False
@@ -58,10 +73,17 @@ class IniConfigMixin:
 
         super().__init__(**kwargs)
 
-    def _need_migrate(self):
+    def _need_migrate(self):  # type: () -> bool
+        """
+        Method checks whether the current config needs to migrate.
+        """
         return self._get_version() != get_version()
 
-    def _get_version(self, raw=False):
+    def _get_version(self, raw=False):  # type: (bool) -> typing.Union[str, tuple]
+        """
+        Method get version of the current config.
+        It can return the version as semver string or parsed tuple.
+        """
         version = self._get('version')
 
         # Version 1.0 of TogglCLI
@@ -76,7 +98,11 @@ class IniConfigMixin:
 
         return version
 
-    def _resolve_type(self, entry, item):
+    def _resolve_type(self, entry, item):  # type: (IniEntry, str) -> typing.Any
+        """
+        Method returns value in config file defined by entry.section and item (eq. option).
+        The value is type-casted into proper type defined in the entry.type.
+        """
         if entry is None:
             return None
 
@@ -89,11 +115,17 @@ class IniConfigMixin:
         else:
             return self._store.get(entry.section, item, fallback=None)
 
-    def _get(self, item):
+    def _get(self, item):  # type: (str) -> typing.Any
+        """
+        Method return config's value defined by property name 'item'.
+        """
         mapping_dict = object.__getattribute__(self, 'INI_MAPPING')
         return self._resolve_type(mapping_dict.get(item), item)
 
-    def __getattribute__(self, item):
+    def __getattribute__(self, item):  # type: (str) -> typing.Any
+        """
+        Attr lookup method which implements the main logic.
+        """
         mapping_dict = object.__getattribute__(self, 'INI_MAPPING')
         if item in mapping_dict:
             value = self._resolve_type(mapping_dict[item], item)
@@ -103,10 +135,18 @@ class IniConfigMixin:
         return super(IniConfigMixin, self).__getattribute__(item)
 
     @property
-    def is_loaded(self):
+    def is_loaded(self):  # type: () -> bool
+        """
+        Method states if the config file associated with this config's instance was loaded. Eq. if the file exists,
+        is readable and was loaded into memory.
+        """
         return bool(self._loaded)
 
-    def persist(self, items=None):
+    def persist(self, items=None):  # type: (dict) -> None
+        """
+        Method persists the Config's values which are related to IniConfigMixin (eq. are defined in the INI_MAPPING)
+        into config's file.
+        """
         if self._config_path is None or items is None:
             return
 
@@ -128,13 +168,24 @@ EnvEntry = namedtuple('EnvEntry', ['variable', 'type'])
 
 
 class EnvConfigMixin:
+    """
+    Class mixin for implementing __getattribute__ which have a source of a data in environment's variables, where
+    mapping between the env variables and config's attributes is specified in ENV_MAPPING.
+
+    Only attributes that have entry in ENV_MAPPING will be considered during the lookup, if the attribute does not have
+    entry the look continues with propagating the lookup to next in line, with super().
+    """
+
     ENV_MAPPING = {}
 
-    def __init__(self, read_env=True, **kwargs):
+    def __init__(self, read_env=True, **kwargs):  # type: (bool, **typing.Any) -> None
         self._read_env = read_env
         super(EnvConfigMixin, self).__init__(**kwargs)
 
-    def _resolve_variable(self, entry):
+    def _resolve_variable(self, entry):  # type: (EnvEntry) -> typing.Any
+        """
+        Method returns correctly type-casted value of env. variable defined by the entry.
+        """
         value = os.environ.get(entry.variable)
 
         if value is None:
@@ -142,7 +193,10 @@ class EnvConfigMixin:
 
         return entry.type(value)
 
-    def __getattribute__(self, item):
+    def __getattribute__(self, item):  # type: (str) -> typing.Any
+        """
+        Attr lookup method which implements the main logic.
+        """
         mapping_dict = object.__getattribute__(self, 'ENV_MAPPING')
         if item in mapping_dict:
             value = self._resolve_variable(mapping_dict[item])
@@ -159,9 +213,9 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     based on several aspects.
 
     Supported hierarchy in order of priority:
-         1) config instance's dict if present
+         1) config instance's dict if value is defined
          2) if associated env variable is present, then the env variable is used
-         3) if config file specified, appropriate value is used
+         3) if config file specified and associated ini variable is defined appropriate value is used
          4) class's dict for default fallback
     """
 
@@ -173,7 +227,6 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     file_logging = False
     file_logging_path = None
     timezone = None
-    # TODO: use_native_datetime = False
 
     ENV_MAPPING = {
         'api_token': EnvEntry('TOGGL_API_TOKEN', str),
@@ -197,12 +250,13 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         'default_wid': IniEntry('options', int),
     }
 
-    def __init__(self, config_path=sentinel, read_env=True, **kwargs):
+    def __init__(self, config_path=sentinel, read_env=True, **kwargs):  # type: (str, bool, **typing.Any) -> None
         super().__init__(config_path=config_path, read_env=read_env, **kwargs)
 
         self._user = None
         self._default_workspace = None
 
+        # Validate that only proper attributes are set
         for key, value in kwargs.items():
             if key.isupper() or key[0] == '_':
                 raise AttributeError('You can not overload constants (eq. uppercase attributes) and private attributes'
@@ -210,12 +264,9 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
 
             setattr(self, key, value)
 
-    def __getattribute__(self, item):
+    def __getattribute__(self, item):  # type: (str) -> typing.Any
         """
         Implements hierarchy lookup as described in the class docstring.
-
-        :param item:
-        :return:
         """
         value_exists = True
         retrieved_value = None
@@ -225,6 +276,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
             value_exists = False
 
         # We are not interested in special attributes (private attributes or constants, methods)
+        # for the hierarchy lookup
         if item.isupper() or item[0] == '_' or (value_exists and callable(retrieved_value)):
             return retrieved_value
 
@@ -234,16 +286,20 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
 
         return super().__getattribute__(item)
 
-    def _get_class_attribute(self, attr):
+    def _get_class_attribute(self, attr):  # type: (str) -> typing.Any
         return self.__class__.__dict__.get(attr)
 
-    def cli_bootstrap(self):
+    def cli_bootstrap(self):  # type: () -> None
+        """
+        Method which will call ConfigBootstrap and then the retrieved values copy to the Config's instance.
+        :return:
+        """
         values_dict = bootstrap.ConfigBootstrap().start()
         for key, value in values_dict.items():
             setattr(self, key, value)
 
     @property
-    def user(self):
+    def user(self):  # type: () -> '..api.User'
         # Cache the User defined by the instance's config
         if self._user is None:
             from ..api import User
@@ -252,7 +308,10 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         return self._user
 
     @property
-    def default_workspace(self):
+    def default_workspace(self):  # type: () -> '..api.Workspace'
+        """
+        Method returns user's default workspace
+        """
         if self._default_workspace is not None:
             return self._default_workspace
 
@@ -265,8 +324,11 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
 
         return self.user.default_workspace
 
-    def persist(self, items=None):
-        # TODO: Decide if default values should be also persisted for backwards compatibility
+    # TODO: Decide if default values should be also persisted for backwards compatibility
+    def persist(self, items=None):  # type: (typing.Iterable) -> None
+        """
+        Method that enables persist the config and its parent's parts (eq. IniConfigMixin saves a file).
+        """
         if items is None:
             items = []
             for item, value in vars(self).items():
@@ -277,12 +339,11 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
 
         super().persist(items)
 
-    def get_auth(self):
+    def get_auth(self):  # type: () -> requests.auth.HTTPBasicAuth
         """
         Returns HTTPBasicAuth object to be used with request.
 
         :raises exceptions.TogglConfigsException: When no credentials are available.
-        :return: requests.auth.HTTPBasicAuth
         """
         try:
             return requests.auth.HTTPBasicAuth(self.api_token, 'api_token')

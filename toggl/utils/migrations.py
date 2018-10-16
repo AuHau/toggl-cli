@@ -93,6 +93,11 @@ class Migration200:
 
 
 class IniConfigMigrator:
+    """
+    Class which orchestrate migration of configuration files between versions.
+    """
+
+    # List of all migrations and the versions they are migrating to, order is important!
     migrations = {
         (2, 0, 0): Migration200
     }
@@ -102,7 +107,11 @@ class IniConfigMigrator:
         self.config_file = config_path
 
     @staticmethod
-    def _should_be_migration_executed(current_version, from_version):
+    def _should_be_migration_executed(current_version, from_version):  # type: (typing.Tuple[int, int, int], typing.Tuple[int, int, int]) -> bool
+        """
+        Method which verifies if the current_version is newer then from_version.
+        It assumes semver style. It boils down to: current_version > from_version.
+        """
         if current_version[0] > from_version[0]:
             return True
 
@@ -117,6 +126,9 @@ class IniConfigMigrator:
         return False
 
     def _set_version(self, version):  # type: (tuple) -> None
+        """
+        Method which set a version into the config's file.
+        """
         if not self.store.has_section('version'):
             self.store.add_section('version')
 
@@ -125,9 +137,15 @@ class IniConfigMigrator:
         self.store.set('version', 'version', verbose_version)
 
     def _format_version(self, version, delimiter='.'):  # type: (typing.Tuple[int, int, int], str) -> str
+        """
+        Format tuple version into semver string.
+        """
         return delimiter.join(str(e) for e in version)
 
-    def migrate(self, from_version):  # type: (tuple) -> None
+    def migrate(self, from_version):  # type: (typing.Tuple[int, int, int]) -> None
+        """
+        Main entry point for running the migration. The starting point of the migration is defined by from_version.
+        """
         if len(from_version) != 3:
             raise exceptions.TogglConfigException('Unknown format of from_version: \'{}\'! '
                                                   'Tuple with three elements is expected!'.format(from_version))

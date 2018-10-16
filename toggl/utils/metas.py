@@ -9,7 +9,7 @@ sentinel = object()
 
 class CachedFactoryMeta(type):
     """
-    Similar to Singleton patter, except there are more instances cached based on a input parameter.
+    Meta class that implements patern similar to Singleton, except there are more instances cached based on a input parameter.
     It utilizes Factory pattern and forbids direct instantion of the class.
     """
 
@@ -52,10 +52,13 @@ class CachedFactoryMeta(type):
 
 
 class ClassAttributeModificationWarning(type):
+    """
+    Meta class that logs warnings when class's attributes are overridden.
+    """
     def __setattr__(cls, attr, value):
         logger.warning('You are modifying class attribute of \'{}\' class. You better know what you are doing!'
                        .format(cls.__name__))
 
         logger.debug(pformat(format_stack()))
 
-        super(ClassAttributeModificationWarning, cls).__setattr__(attr, value)
+        super().__setattr__(attr, value)

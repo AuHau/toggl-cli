@@ -11,10 +11,11 @@ from .. import exceptions
 logger = logging.getLogger('toggl.utils.bootstrap')
 
 
+# TODO: Toggl keeps user's timezone --> allow user to keep the Toggl's default
 # TODO: As `inquirer` package is not compatible with Windows, provide dummy bootstrap on Windows
 class ConfigBootstrap:
     """
-    Create config based on the input from the User
+    Class for facilitation of bootstraping the TogglCLI application with user's configuration.
     """
 
     KEEP_TOGGLS_DEFAULT_WORKSPACE = '-- Keep Toggl\'s default --'
@@ -25,7 +26,10 @@ class ConfigBootstrap:
     def __init__(self):
         self.workspaces = None
 
-    def _build_tmp_config(self, api_token=None, username=None, password=None):
+    def _build_tmp_config(self, api_token=None, username=None, password=None):  # type: (str, str, str) -> Config
+        """
+        Method for creating temporary Config with specified credentials (eq. either api token or username/password)
+        """
         from .config import Config
         config = Config.factory(None)
 
@@ -37,7 +41,10 @@ class ConfigBootstrap:
 
         return config
 
-    def _get_workspaces(self, api_token):
+    def _get_workspaces(self, api_token):  # type: (str) -> list
+        """
+        Retrieve all workspaces for user defined by api token.
+        """
         from ..api import Workspace
         config = self._build_tmp_config(api_token=api_token)
 
@@ -48,7 +55,10 @@ class ConfigBootstrap:
 
         return self.workspaces
 
-    def _map_answers(self, **answers):
+    def _map_answers(self, **answers):  # type: (**str) -> dict
+        """
+        Creates dict which follows the ConfigParser convention from the provided user's answers.
+        """
         output = {
             'api_token': answers['api_token'],
 
@@ -69,6 +79,12 @@ class ConfigBootstrap:
         return output
 
     def _get_api_token(self):  # type: () -> typing.Union[str, None]
+        """
+        Method guide the user through first phase of the bootstrap: credentials gathering.
+        It supports two ways of authentication: api token or credentials.
+        But in case of user's credentials, they are converted into API token for security reason as the secret is
+        stored in plain-text configuration file.
+        """
         from .others import are_credentials_valid
 
         type_auth = inquirer.shortcuts.list_input(message="Type of authentication you want to use",
@@ -99,12 +115,18 @@ class ConfigBootstrap:
             except exceptions.TogglAuthenticationException:
                 click.echo('The provided credentials are not valid! Please try again.')
 
-    def _exit(self):
+    def _exit(self):  # type: () -> None
         click.secho("We were not able to setup the needed configuration and we are unfortunately not able to "
                     "proceed without it.", bg="white", fg="red")
         exit(-1)
 
-    def start(self):
+    def start(self):  # type: () -> dict
+        """
+        Entry point for the bootstrap process.
+        The process will gather required information for configuration and then return those information in dict which
+        follows the utils.config.Config attribute's naming.
+        """
+
         click.secho(""" _____                 _   _____  _     _____ 
 |_   _|               | | /  __ \| |   |_   _|
   | | ___   __ _  __ _| | | /  \/| |     | |  
@@ -114,6 +136,7 @@ class ConfigBootstrap:
             __/ | __/ |                       
            |___/ |___/                        
 """, fg="red")
+
         click.echo("Welcome to Toggl CLI!\n"
                    "We need to setup some configuration before you start using this awesome tool!\n")
 

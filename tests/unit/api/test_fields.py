@@ -6,9 +6,6 @@ from toggl.api import base, fields, models
 from toggl import exceptions
 import pytest
 
-#########################################################################################
-# PropertyField
-
 
 class Entity(base.TogglEntity):
     string = fields.StringField()
@@ -142,6 +139,7 @@ class TestTogglField:
     def test_set_admin(self):
         class WorkspaceMock:
             admin = True
+            name = 'WorkspaceMock'
 
         class WorkspaceEntityMock(models.WorkspaceEntity):
             workspace = WorkspaceMock
@@ -155,7 +153,7 @@ class TestTogglField:
         assert obj.__dict__['field'] == 'asd'
 
         WorkspaceMock.admin = False
-        with pytest.raises(exceptions.TogglAuthorizationException):
+        with pytest.raises(exceptions.TogglNotAllowedException):
             field.__set__(obj, 'asd')
 
 
@@ -243,6 +241,14 @@ class TestPropertyField:
         with pytest.raises(exceptions.TogglException):
             instance.field = 'some value'
 
+    def test_changes(self):
+        PropertyFieldStore.value = None
+        obj = PropertyEntity(field='some value')
+        assert len(obj.__change_dict__) == 0
+
+        obj.field = 'some other value'
+        assert len(obj.__change_dict__) == 1
+
 
 #########################################################################################
 # DateTimeField
@@ -274,7 +280,7 @@ class TestDateTimeField:
 # ListField
 
 class ListEntity(base.TogglEntity):
-    field = fields.ListField()
+    field = fields.ListField()  # type: list
 
 
 class TestListField:
@@ -304,3 +310,17 @@ class TestListField:
         value = None
         formatted_value = instance.__fields__['field'].format(value)
         assert formatted_value == ''
+
+    def test_init(self):
+        instance = ListEntity(field=[1,2,3])
+
+        assert len(instance.field) == 3
+        assert isinstance(instance.field, list)
+
+    def test_update(self):
+        instance = ListEntity(field=[1,2,3])
+
+        assert len(instance.field) == 3
+        instance.field.append(4)
+        assert len(instance.field) == 4
+

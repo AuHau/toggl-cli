@@ -11,7 +11,7 @@ from .. import exceptions
 from .. import utils
 from . import base
 
-logger = logging.getLogger('toggl.models.fields')
+logger = logging.getLogger('toggl.api.fields')
 
 NOTSET = object()
 
@@ -19,7 +19,33 @@ Field = typing.TypeVar('Field', bound='TogglField')
 
 
 class TogglField:
+    """
+    Base descriptor for all Toggl's Fields implementation.
+
+    Its main function is to set/get values from the Entity's instance, but it also perform's serialization, validation,
+    parsing and many other features related to the Field and data it represents.
+
+    Attributes common to all fields: name, verbose_name, required, default, admin_only, is_read_only.
+
+    Attribute 'name' is a special attribute which is set by TogglEntityMeta and equals to the name of attribute under
+    which is the field assigned to the Entity.
+
+    Attribute 'verbose_name' is used for CLI interfaces for human-readable format, if omitted 'name' is used.
+
+    Attribute 'required' defines if the field can be empty or not during creation of new instance.
+
+    Attribute 'default' defines a default value to be used if no value is provided (None is valid default value).
+    It can also be callable, which is evaluated everytime
+
+    Attribute 'admin_only' specifies that the field can be set only when the user has admin role in the related Workspace
+    (meaningful for WorkspaceEntity and its subclasses).
+
+    Attribute 'is_read_only' specifies if user can set value to the field.
+    """
+
+    # Represents Python's primitive type for easy implementation of basic Fields like String, Integer etc. using Python builtins (eq. bool, str, etc.).
     _field_type = None
+
     name = None
     verbose_name = None
     required = False
@@ -36,13 +62,29 @@ class TogglField:
         self.is_read_only = is_read_only
 
     def validate(self, value):  # type: (typing.Any) -> None
+        """
+        Validates if the passed value is valid from the perspective of the data type that the field represents.
+
+        Basic implementation validate only 'required' attribute.
+
+        :param value: Any value
+        :raises exceptions.TogglValidationException: When the passed value is not valid.
+        """
         if self.required and self.default is NOTSET and not value:
             raise exceptions.TogglValidationException('The field \'{}\' is required!'.format(self.name))
 
-    def serialize(self, value):  # type: (typing.Any) -> None
+    def serialize(self, value):  # type: (typing.Any) -> typing.Any
+        """
+        Returns value serialized into Python's primitives.
+        """
         return value
 
-    def parse(self, value, config=None):  # type: (typing.Any, utils.Config) -> typing.Union[str, None]
+    def parse(self, value, config=None):  # type: (typing.Union[None, str], utils.Config) -> typing.Union[str, None]
+        """
+        Parses value from string into value type of the field.
+
+        Basic implementation uses Python's primitives for conversation specified in '_field_type' attribute.
+        """
         if value is None:
             return None
 
@@ -52,25 +94,37 @@ class TogglField:
         return value
 
     def format(self, value, config=None):  # type: (typing.Any, utils.Config) -> str
+        """
+        Formats the value into human-readable string, for CLI purpose.
+        """
         if value is None:
             return ''
 
         return value
 
-    def init(self, instance, value):  # type: (typing.Generic[base.Entity], typing.Any) -> None
+    def init(self, instance, value):  # type: (base.Entity, typing.Any) -> None
+        """
+        Method used to initialize the value in the instance.
+
+        Used mainly for TogglEntity's __init__() and deserialize().
+        """
         if self.name in instance.__dict__:
             raise exceptions.TogglException('Field \'{}.{}\' is already initiated!'
                                             .format(instance.__class__.__name__, self.name))
 
         try:
             value = self.parse(value, getattr(instance, '_config', None))
-        except ValueError as e:
+        except ValueError:
             raise TypeError(
                 'Expected for field \'{}\' type {} got {}'.format(self.name, self._field_type, type(value)))
 
         instance.__dict__[self.name] = value
 
     def _set_value(self, instance, value):
+        """
+        Helper method for setting value into instance to correctly track changes.
+        :raises RuntimeError: If the field does not have 'name' attribute set.
+        """
         if not self.name:
             raise RuntimeError('Name of the field is not defined!')
 
@@ -84,6 +138,12 @@ class TogglField:
         instance.__dict__[self.name] = value
 
     def __get__(self, instance, owner):
+        """
+        Main TogglField's method that defines how the value of the field is retrieved from TogglEntity's instance.
+
+        :raises RuntimeError: If the field does not have 'name' attribute set.
+        :raises AttributeError: If the instance does not have set the corresponding attribute.
+        """
         if not self.name:
             raise RuntimeError('Name of the field is not defined!')
 
@@ -91,26 +151,33 @@ class TogglField:
             return instance.__dict__[self.name]
         except KeyError:
             if self.default is not NOTSET:
+                # TODO: [Q/Design] Should be callable evaluated every time on only during the initialization?
                 return self.default() if callable(self.default) else self.default
 
             raise AttributeError('Instance {} has not set \'{}\''.format(instance, self.name))
 
     def __set__(self, instance, value):
+        """
+        Main TogglField's method that defines how the value of the field is stored in the TogglEntity's instance.
+
+        :raises RuntimeError: If the field does not have 'name' attribute set.
+        :raises exceptions.TogglNotAllowedException: If the field is read only or is only available only for admin's and
+                                                     the user does not have admin role in the assigned Workspace.
+        :raises TypeError: If the value to be set is of wrong type.
+        """
         if not self.name:
             raise RuntimeError('Name of the field is not defined!')
 
         if self.is_read_only:
-            raise exceptions.TogglException('Attribute \'{}\' is read only!'.format(self.name))
+            raise exceptions.TogglNotAllowedException('Attribute \'{}\' is read only!'.format(self.name))
 
         if self.admin_only:
-            from .models import Workspace, WorkspaceEntity
-
-            if (isinstance(instance, WorkspaceEntity) and not instance.workspace.admin) \
-                    or (isinstance(instance, Workspace) and not instance.admin):
-                raise exceptions.TogglAuthorizationException(
-                    None, None,
-                    'You are trying edit field \'{}.{}\' which is admin only field, but you are not an admin!'
-                        .format(instance.__class__.__name__, self.name)
+            from .models import WorkspaceEntity, Workspace
+            workspace = instance.workspace if isinstance(instance, WorkspaceEntity) else instance  # type: Workspace
+            if not workspace.admin:
+                raise exceptions.TogglNotAllowedException(
+                    'You are trying edit field \'{}.{}\' which is admin only field, but you are not an admin in workspace \'{}\'!'
+                        .format(instance.__class__.__name__, self.name, workspace.name)
                 )
 
         if value is None:
@@ -132,6 +199,10 @@ class TogglField:
         return '{} - {}'.format(self.__class__.__name__, self.name)
 
 
+#########################################################################
+## Primitive fields implementation using _field_type
+
+
 class StringField(TogglField):
     _field_type = str
 
@@ -148,7 +219,18 @@ class BooleanField(TogglField):
     _field_type = bool
 
 
+#########################################################################
+## Advanced fields
+
+
 class DateTimeField(StringField):
+    """
+    Field that represents DateTime.
+
+    It mainly utilizes the pendulum.DateTime object.
+    For serialization the ISO 8601 format is used.
+    For parsing it uses best-guess method which tries to guess the format using dateutil.parse().
+    """
 
     @staticmethod
     def _is_naive(value):  # type: (datetime.datetime) -> bool
@@ -212,6 +294,9 @@ class DateTimeField(StringField):
 
 
 class EmailField(StringField):
+    """
+    Field that performs validation for valid email address.
+    """
 
     def validate(self, value):
         super().validate(value)
@@ -221,11 +306,22 @@ class EmailField(StringField):
 
 
 class PropertyField(TogglField):
+    """
+    Advanced field that is inspired by @property decorator.
 
-    def __init__(self, getter, setter=None, serializer=None, formater=None, verbose_name=None, admin_only=False):
+    It allows you to write easily custom fields by defining getter, setter, serialized and formatter.
+
+    For more info about getter and setter see default_getter() and default_setter() methods which shows the signature and default behaviour.
+
+    Serializer is a function that has to serialize into Python primitive, so it can be converted into JSON.
+
+    Formatter is a function that has to return string in human-readable format.
+    """
+
+    def __init__(self, getter, setter=None, serializer=None, formatter=None, verbose_name=None, admin_only=False):
         self.getter = getter
         self.serializer = serializer
-        self.formater = formater
+        self.formatter = formatter
         self.setter = setter or self.default_setter
 
         super().__init__(verbose_name=verbose_name, admin_only=admin_only, is_read_only=setter is None)
@@ -245,13 +341,12 @@ class PropertyField(TogglField):
         instance.__dict__[name] = value
 
     @staticmethod
-    def default_getter(name, instance, serializing=False):
+    def default_getter(name, instance):
         """
         Default getter which retrieves the value from instance's dict.
 
         :param name: Field's name
         :param instance: Instance of the entity
-        :param serializing: Whether the function is called during serialization of the instance into JSON
         :return: Value of the field
         """
         return instance.__dict__[name]
@@ -260,7 +355,7 @@ class PropertyField(TogglField):
         self.setter(self.name, instance, value, init=True)
 
     def format(self, value, config=None):
-        return self.formater(value, config) if self.formater else super().format(value, config)
+        return self.formatter(value, config) if self.formatter else super().format(value, config)
 
     def serialize(self, value):
         return self.serializer(value) if self.serializer else super().serialize(value)
@@ -273,20 +368,24 @@ class PropertyField(TogglField):
             raise exceptions.TogglException('Attribute \'{}\' is read only!'.format(self.name))
 
         if self.admin_only:
-            from .models import Workspace, WorkspaceEntity
-
-            if (isinstance(instance, WorkspaceEntity) and not instance.workspace.admin) \
-                    or (isinstance(instance, Workspace) and not instance.admin):
-                raise exceptions.TogglAuthorizationException(
-                    None, None,
-                    'You are trying edit field \'{}.{}\' which is admin only field, but you are not an admin!'
-                        .format(instance.__class__.__name__, self.name)
+            from .models import WorkspaceEntity, Workspace
+            workspace = instance.workspace if isinstance(instance, WorkspaceEntity) else instance  # type: Workspace
+            if not workspace.admin:
+                raise exceptions.TogglNotAllowedException(
+                    'You are trying edit field \'{}.{}\' which is admin only field, but you are not an admin in workspace \'{}\'!'
+                        .format(instance.__class__.__name__, self.name, workspace.name)
                 )
 
         return self.setter(self.name, instance, value, init=False)
 
 
-class ChoiceField(TogglField):
+class ChoiceField(StringField):
+    """
+    Field that limits the range of possible values.
+
+    The choices are defined as dict where keys are values of the field and the dict's values are labels for these values.
+    """
+
     choices = {}
 
     def __init__(self, choices, *args, **kwargs):
@@ -317,7 +416,13 @@ class ChoiceField(TogglField):
         return self.choices[value]
 
 
+# TODO: [Bug/High] If in-place operations are made, TogglEntity won't detect changes so for updates ListFields will be never sent.
 class ListField(TogglField):
+    """
+    Field that represents list of values.
+
+    It only accept list value's. As list is mutable object the in-place operators can be used to modify the object.
+    """
     def format(self, value, config=None):
         if value is None:
             return ''
@@ -329,7 +434,7 @@ class ListField(TogglField):
 
     def __set__(self, instance, value):
         if not isinstance(value, list):
-            raise TypeError('ListField expects list instance when settings a value to the field.')
+            raise TypeError('ListField expects list instance when setting a value to the field.')
 
         super().__set__(instance, value)
 
@@ -339,8 +444,29 @@ class MappingCardinality(Enum):
     MANY = 'many'
 
 
-# TODO: Finish MappingCardinality.MANY implementation
+# TODO: [Feature/Low] Finish MappingCardinality.MANY implementation
 class MappingField(TogglField):
+    """
+    Special Field which behaves similarly to ForeignKey in Django ORM. It lets user to map attribute to different TogglEntity.
+
+    It needs 'mapped_cls' which represents another TogglEntity that this field is mapped to. Also it needs information
+    about 'mapped_field' where it stores the actual ID of the mapped entity.
+    To better explain the mapping let us assume code:
+
+    >>> class A(base.TogglEntity):
+    >>>     pass
+    >>>
+    >>> class B(base.TogglEntity):
+    >>>     field = MappingField(mapped_cls=A, mapped_field='field_id')
+    >>>
+    >>> object_a = A()
+    >>> object_a.id = 123
+    >>> b = B(field=object_a)
+
+    Then b.field will return object_a while b.field_id (eq. the mapped field) will return the object_a's ID: 123.
+
+    The objects are retrieved using the mapped_cls's TogglSet.
+    """
 
     def __init__(self, mapped_cls, mapped_field, cardinality=MappingCardinality.ONE, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -354,16 +480,20 @@ class MappingField(TogglField):
 
     def init(self, instance, value):
         if self.cardinality == MappingCardinality.ONE:
+            if value is None:
+                instance.__dict__[self.mapped_field] = None
+                return
+
             try:
                 if not isinstance(value, self.mapped_cls):
                     logger.warning('Assigning instance of class {} to MappedField with class {}.'.format(type(value),
-                                                                                             self.mapped_cls))
+                                                                                                         self.mapped_cls))
 
                 instance.__dict__[self.mapped_field] = value.id
-            except AttributeError:
+            except AttributeError:  # It is probably not TogglEntity ==> lets try if it is ID/integer
                 try:
                     instance.__dict__[self.mapped_field] = int(value)
-                except ValueError:
+                except ValueError:  # Don't have any clue what it is, let just save the value and log warning
                     logger.warning('Assigning as ID to mapped field value which is not integer!')
                     instance.__dict__[self.mapped_field] = value
 
@@ -402,7 +532,9 @@ class MappingField(TogglField):
 
                 # No default, no point of continuing
                 if default is NOTSET:
-                    raise AttributeError('Instance {} has not set mapping field \'{}\'/\'{}\''.format(instance, self.name, self.mapped_field))
+                    raise AttributeError(
+                        'Instance {} has not set mapping field \'{}\'/\'{}\''.format(instance, self.name,
+                                                                                     self.mapped_field))
 
                 if callable(default):
                     default = default(getattr(instance, '_config', None))

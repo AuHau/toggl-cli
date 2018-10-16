@@ -1,6 +1,9 @@
 import json
+import logging
+import typing
 from copy import copy
 from urllib.parse import urlencode
+from validate_email import validate_email
 
 import pendulum
 
@@ -8,6 +11,8 @@ from . import base
 from . import fields
 from .. import utils
 from .. import exceptions
+
+logger = logging.getLogger('toggl.api.models')
 
 
 # Workspace entity
@@ -28,7 +33,7 @@ class Workspace(base.TogglEntity):
 
 
 class WorkspaceEntity(base.TogglEntity):
-    workspace = fields.MappingField(Workspace, 'wid', default=lambda config: config.default_workspace.id)
+    workspace = fields.MappingField(Workspace, 'wid', default=lambda config: config.default_workspace.id)  # type: Workspace
 
 
 # Premium Entity
@@ -36,7 +41,7 @@ class PremiumEntity(WorkspaceEntity):
     """
     Abstract entity that enforces that linked Workspace is premium (paid).
     """
-    def save(self, config=None):
+    def save(self, config=None):  # type: (utils.Config) -> None
         if not self.workspace.premium:
             raise exceptions.TogglPremiumException('The entity {} requires to be associated with Premium workspace!')
 
@@ -53,7 +58,7 @@ class Client(WorkspaceEntity):
 
 class Project(WorkspaceEntity):
     name = fields.StringField(required=True)
-    customer = fields.MappingField(Client, 'cid')
+    customer = fields.MappingField(Client, 'cid')  # type: Client
     active = fields.BooleanField(default=True)
     is_private = fields.BooleanField(default=True)
     billable = fields.BooleanField(default=True)
@@ -65,7 +70,10 @@ class Project(WorkspaceEntity):
 
 class UserSet(base.WorkspaceToggleSet):
 
-    def current_user(self, config=None):
+    def current_user(self, config=None):  # type: (utils.Config) -> User
+        """
+        Fetches details about the current user.
+        """
         fetched_entity = utils.toggl('/me', 'get', config=config)
         return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
 
@@ -78,7 +86,7 @@ class User(WorkspaceEntity):
     api_token = fields.StringField()
     send_timer_notifications = fields.BooleanField()
     openid_enabled = fields.BooleanField()
-    default_workspace = fields.MappingField(Workspace, 'default_wid')
+    default_workspace = fields.MappingField(Workspace, 'default_wid')  # type: Workspace
     email = fields.EmailField()
     fullname = fields.StringField()
     store_start_and_stop_time = fields.BooleanField()
@@ -98,12 +106,25 @@ class User(WorkspaceEntity):
     objects = UserSet()
 
     @classmethod
-    def signup(cls, email, password, timezone=None, created_with='TogglCLI', config=None):
+    def signup(cls, email, password, timezone=None, created_with='TogglCLI', config=None):  # type: (str, str, str, str, utils.Config) -> User
+        """
+        Creates brand new user. After creation confirmation email is sent to him.
+
+        :param email: Valid email of the new user.
+        :param password: Password of the new user.
+        :param timezone: Timezone to be associated with the user. If empty, than timezone from config is used.
+        :param created_with: Name of application that created the user.
+        :param config:
+        :return:
+        """
         if config is None:
             config = utils.Config.factory()
 
         if timezone is None:
             timezone = config.timezone
+
+        if not validate_email(email):
+            raise exceptions.TogglValidationException('Supplied email \'{}\' is not valid email!'.format(email))
 
         user_json = json.dumps({'user': {
             'email': email,
@@ -128,12 +149,25 @@ class WorkspaceUser(WorkspaceEntity):
     email = fields.EmailField(is_read_only=True)
     active = fields.BooleanField()
     admin = fields.BooleanField(admin_only=True)
-    user = fields.MappingField(User, 'uid', is_read_only=True)
+    user = fields.MappingField(User, 'uid', is_read_only=True)  # type: User
 
     @classmethod
-    def invite(cls, *emails, wid=None, config=None):
+    def invite(cls, *emails, wid=None, config=None):  # type: (*str, int, utils.Config) -> None
+        """
+        Invites users defined by email addresses. The users does not have to have account in Toggl, in that case after
+        accepting the invitation, they will go through process of creating the account in the Toggl web.
+
+        :param emails: List of emails to invite.
+        :param wid: Workspace ID to which invite the users
+        :param config:
+        :return: None
+        """
         config = config or utils.Config.factory()
         wid = wid or config.default_workspace.id
+
+        for email in emails:
+            if not validate_email(email):
+                raise exceptions.TogglValidationException('Supplied email \'{}\' is not valid email!'.format(email))
 
         emails_json = json.dumps({'emails': emails})
         data = utils.toggl("/workspaces/{}/invite".format(wid), "post", emails_json, config=config)
@@ -144,16 +178,22 @@ class WorkspaceUser(WorkspaceEntity):
 
 class Task(PremiumEntity):
     name = fields.StringField(required=True)
-    project = fields.MappingField(Project, 'pid', required=True)
-    user = fields.MappingField(User, 'uid')
+    project = fields.MappingField(Project, 'pid', required=True)  # type: Project
+    user = fields.MappingField(User, 'uid')  # type: User
     estimated_seconds = fields.IntegerField()
     active = fields.BooleanField(default=True)
     tracked_seconds = fields.IntegerField(is_read_only=True)
 
 
-class TimeEntryDateTimeField(fields.DateTimeField):
+# Time Entry entity
 
-    def format(self, value, config=None, instance=None, display_running=False, only_time_for_same_day=False):
+
+class TimeEntryDateTimeField(fields.DateTimeField):
+    """
+    Special extension of DateTimeField which handles better way of formatting the datetime for CLI use-case.
+    """
+
+    def format(self, value, config=None, instance=None, display_running=False, only_time_for_same_day=False):  # type: (typing.Any, utils.Config, base.Entity, bool, bool) -> typing.Any
         if not display_running and not only_time_for_same_day:
             return super().format(value, config)
 
@@ -171,14 +211,22 @@ class TimeEntryDateTimeField(fields.DateTimeField):
         return super().format(value, config)
 
 
-def get_duration(name, instance, serializing=False):
+def get_duration(name, instance):  # type: (str, base.Entity) -> int
+    """
+    Getter for Duration Property field.
+
+    Handles correctly the conversion of of negative running duration (for more refer to the Toggl API doc).
+    """
     if instance.is_running:
         return instance.start.int_timestamp * -1
 
     return int((instance.stop - instance.start).in_seconds())
 
 
-def set_duration(name, instance, value, init=False):
+def set_duration(name, instance, value, init=False):  # type: (str, base.Entity, typing.Any, bool) -> None
+    """
+    Setter for Duration Property field.
+    """
     if value is None:
         return
 
@@ -190,7 +238,10 @@ def set_duration(name, instance, value, init=False):
         instance.stop = None
 
 
-def format_duration(value, config=None):
+def format_duration(value, config=None):  # type: (typing.Any, utils.Config) -> str
+    """
+    Formatting the duration into HOURS:MINUTES:SECOND format.
+    """
     if value < 0:
         value = pendulum.now().int_timestamp + value
 
@@ -202,11 +253,15 @@ def format_duration(value, config=None):
 
 
 class TimeEntrySet(base.TogglSet):
+    """
+    TogglSet which is extended by current() method which returns the currently running TimeEntry.
+    Moreover it extends the filtrating mechanism by native filtering according start and/or stop time.
+    """
 
-    def build_list_url(self, wid=None):
+    def build_list_url(self, wid=None):  # type: (int) -> str
         return '/{}'.format(self.url)
 
-    def current(self, config=None):
+    def current(self, config=None):  # type: (utils.Config) -> TimeEntry
         config = config or utils.Config.factory()
         fetched_entity = utils.toggl('/time_entries/current', 'get', config=config)
 
@@ -215,7 +270,8 @@ class TimeEntrySet(base.TogglSet):
 
         return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
 
-    def filter(self, order='desc', start=None, stop=None, config=None, contain=False, **conditions):
+    # TODO: [Refactor/High] Refactor to avoid the loop implementation - keep it DRY!
+    def filter(self, order='desc', start=None, stop=None, config=None, contain=False, **conditions):  # type: (str, pendulum.DateTime, pendulum.DateTime, utils.Config, bool, **str) -> typing.List[base.Entity]
         if start is None and stop is None:
             return super().filter(order=order, config=config, contain=contain, **conditions)
 
@@ -254,12 +310,12 @@ class TimeEntrySet(base.TogglSet):
 
 class TimeEntry(WorkspaceEntity):
     description = fields.StringField()
-    project = fields.MappingField(Project, 'pid')
-    task = fields.MappingField(Task, 'tid')
+    project = fields.MappingField(Project, 'pid')  # type: Project
+    task = fields.MappingField(Task, 'tid')  # type: Task
     billable = fields.BooleanField(default=False, admin_only=True)
     start = TimeEntryDateTimeField(required=True)
     stop = TimeEntryDateTimeField()
-    duration = fields.PropertyField(get_duration, set_duration, formater=format_duration)
+    duration = fields.PropertyField(get_duration, set_duration, formatter=format_duration)
     created_with = fields.StringField(required=True, default='TogglCLI')
     tags = fields.ListField()
 
@@ -288,14 +344,25 @@ class TimeEntry(WorkspaceEntity):
         return super().to_dict(serialized=serialized, changes_only=changes_only)
 
     @classmethod
-    def start_and_save(cls, start=None, config=None, **kwargs):
+    def start_and_save(cls, start=None, config=None, **kwargs):  # type: (pendulum.DateTime, utils.Config, **typing.Any) -> TimeEntry
+        """
+        Creates a new running entry.
+
+        If there is another running time entry in the time of calling this method, then the running entry is stopped.
+        This is handled by Toggl's backend.
+
+        :param start: The DateTime object representing start of the new TimeEntry. If None than current time is used.
+        :param config:
+        :param kwargs: Other parameters for creating the new TimeEntry
+        :return: New running TimeEntry
+        """
         config = config or utils.Config.factory()
 
         if start is None:
             start = pendulum.now(config.timezone)
 
         if 'stop' in kwargs or 'duration' in kwargs:
-            raise RuntimeError('With start() method you can not create finished entries!')
+            raise RuntimeError('With start_and_save() method you can not create finished entries!')
 
         instance = cls.__new__(cls)
         instance.is_running = True
@@ -310,6 +377,12 @@ class TimeEntry(WorkspaceEntity):
         return instance
 
     def stop_and_save(self, stop=None):
+        """
+        Stops running the entry. It has to be running entry.
+
+        :param stop: DateTime which should be set as stop time. If None, then current time is used.
+        :return: Self
+        """
         if not self.is_running:
             raise exceptions.TogglValidationException('You can\'t stop not running entry!')
 
@@ -325,6 +398,15 @@ class TimeEntry(WorkspaceEntity):
         return self
 
     def continue_and_save(self, start=None):
+        """
+        Creates new time entry with same description as the self entry and starts running it.
+
+        :param start: The DateTime object representing start of the new TimeEntry. If None than current time is used.
+        :return: The new TimeEntry.
+        """
+        if self.is_running:
+            logger.warning('Trying to continue time entry #{} - \'{}\' which is already running!'.format(self.id, self.description))
+
         config = self._config or utils.Config.factory()
 
         if start is None:

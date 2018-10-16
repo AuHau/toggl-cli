@@ -14,6 +14,10 @@ logger = logging.getLogger('toggl.cli.commands')
 
 
 # TODO: Support for manipulating the user's settings
+# TODO: Possibility to activate/change a current workspace
+# TODO: Listing commands needs add Workspace option
+# TODO: Add confirmation option for deletion of resources
+
 @click.group(cls=utils.SubCommandsGroup)
 @click.option('--quiet', '-q', is_flag=True, help="don't print anything")
 @click.option('--verbose', '-v', is_flag=True, help="print additional info")
@@ -25,8 +29,6 @@ logger = logging.getLogger('toggl.cli.commands')
 def cli(ctx, quiet, verbose, debug, config=None):
     """
     CLI interface to interact with Toggl tracking application.
-
-    This application implements limited subsets of Toggl's functionality.
 
     Many of the options can be set through Environmental variables. The names of the variables
     are denoted in the option's helps with format "(ENV: <name of variable>)".
@@ -97,7 +99,7 @@ def visit_www():
 def entry_add(ctx, start, end, descr, tags, project, task, workspace):
     """
     Adds finished time entry to Toggl with DESCR description and start
-    datetime START which can also be a special string 'now' which denotes current
+    datetime START which can also be a special string 'now' that denotes current
     datetime. The entry also has END argument which is either specific
     datetime or duration.
 
@@ -113,6 +115,7 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
     if isinstance(end, pendulum.Duration):
         end = start + end
 
+    # TODO: Add click's type to handle directly
     if tags is not None:
         tags = tags.split(',')
 
@@ -132,6 +135,7 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
     click.echo("Time entry '{}' with #{} created.".format(entry.description, entry.id))
 
 
+# TODO: Make possible to list really all time-entries, not first 1000 in last 9 days
 @cli.command('ls', short_help='list a time entries')
 @click.option('--start', '-s', type=types.DateTimeType(), help='Defines start of a date range to filter the entries by.')
 @click.option('--stop', '-p', type=types.DateTimeType(), help='Defines stop of a date range to filter the entries by.')
@@ -139,6 +143,12 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
               help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(api.TimeEntry))
 @click.pass_context
 def entry_ls(ctx, start, stop, fields):
+    """
+    Lists time entries the user has access to.
+
+    The list is limited with 1000 entries in last 9 days.
+    """
+    # Limit the list of TimeEntries based on start/stop dates.
     if start is not None or stop is not None:
         entities = api.TimeEntry.objects.filter(start=start, stop=stop, config=ctx.obj['config'])
     else:
@@ -179,19 +189,29 @@ def entry_ls(ctx, start, stop, fields):
 @click.argument('spec')
 @click.pass_context
 def entry_rm(ctx, spec):
-    helpers.entity_remove(api.TimeEntry, spec, config=ctx.obj['config'])
+    """
+    Deletes a time entry specified by SPEC argument.
+
+    SPEC argument can be either ID or Description of the Time Entry.
+    In case multiple time entries are found, you will be prompted to confirm your deletion.
+    """
+    helpers.entity_remove(api.TimeEntry, spec, ('id', 'description'), config=ctx.obj['config'])
 
 
 @cli.command('start', short_help='starts new time entry')
 @click.argument('descr', required=False)
 @click.option('--start', '-s', type=types.DateTimeType(allow_now=True), help='Specifies start of the time entry. '
-                                                                       'If left empty \'now\' is assumed.')
+                                                                             'If left empty \'now\' is assumed.')
 @click.option('--project', '-p', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
 def entry_start(ctx, descr, start, project, workspace):
+    """
+    Starts a new time entry with description DESCR (it can be left out). If there is another currently running entry,
+    the entry will be stopped and new entry started.
+    """
     api.TimeEntry.start_and_save(
         config=ctx.obj['config'],
         start=start,
@@ -210,6 +230,12 @@ def entry_start(ctx, descr, start, project, workspace):
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
 def entry_now(ctx, **kwargs):
+    """
+    Manages currently running entry.
+
+    Without any options the command fetches the current time entry and displays it. But it also supports modification
+    of the current time entry through the options listed below.
+    """
     current = api.TimeEntry.objects.current(config=ctx.obj['config'])
 
     if current is None:
@@ -232,6 +258,9 @@ def entry_now(ctx, **kwargs):
 @click.option('--stop', '-p', type=types.DateTimeType(allow_now=True), help='Sets stop time.')
 @click.pass_context
 def entry_stop(ctx, stop):
+    """
+    Stops the current time entry.
+    """
     current = api.TimeEntry.objects.current(config=ctx.obj['config'])
 
     if current is None:
@@ -248,6 +277,11 @@ def entry_stop(ctx, stop):
 @click.option('--start', '-s', type=types.DateTimeType(), help='Sets a start time.')
 @click.pass_context
 def entry_continue(ctx, descr, start):
+    """
+    Takes the last time entry and continue its logging.
+
+    The underhood behaviour of Toggl is that it actually creates a new entry with the same description.
+    """
     try:
         if descr is None:
             entry = api.TimeEntry.objects.all(config=ctx.obj['config'])[0]
@@ -269,6 +303,9 @@ def entry_continue(ctx, descr, start):
 @cli.group('clients', short_help='clients management')
 @click.pass_context
 def clients(ctx):
+    """
+    Subcommand for management of Clients
+    """
     pass
 
 
@@ -281,6 +318,9 @@ def clients(ctx):
                    '(ENV: TOGGL_WORKSPACE)')
 @click.pass_context
 def clients_add(ctx, name, note, workspace):
+    """
+    Creates a new client.
+    """
     client = api.Client(
         name=name,
         workspace=workspace,
@@ -298,12 +338,18 @@ def clients_add(ctx, name, note, workspace):
 @click.option('--notes', help='Specifies a note linked to the client', )
 @click.pass_context
 def clients_update(ctx, spec, **kwargs):
+    """
+    Updates a client specified by SPEC argument. SPEC can be either ID or Name of the client.
+    """
     helpers.entity_update(api.Client, spec, config=ctx.obj['config'], **kwargs)
 
 
 @clients.command('ls', short_help='list clients')
 @click.pass_context
 def clients_ls(ctx):
+    """
+    Lists all clients in the workspace.
+    """
     helpers.entity_listing(api.Client, fields=('name', 'id', 'notes'), config=ctx.obj['config'])
 
 
@@ -311,6 +357,9 @@ def clients_ls(ctx):
 @click.argument('spec')
 @click.pass_context
 def clients_get(ctx, spec):
+    """
+    Gets details of a client specified by SPEC argument. SPEC can be either ID or Name of the client.
+    """
     helpers.entity_detail(api.Client, spec, config=ctx.obj['config'])
 
 
@@ -318,6 +367,9 @@ def clients_get(ctx, spec):
 @click.argument('spec')
 @click.pass_context
 def clients_rm(ctx, spec):
+    """
+    Removes a client specified by SPEC argument. SPEC can be either ID or Name of the client.
+    """
     helpers.entity_remove(api.Client, spec, config=ctx.obj['config'])
 
 
@@ -327,6 +379,9 @@ def clients_rm(ctx, spec):
 @cli.group('projects', short_help='projects management')
 @click.pass_context
 def projects(ctx):
+    """
+    Subcommand for management of projects
+    """
     pass
 
 
@@ -349,6 +404,9 @@ def projects(ctx):
 @click.option('--color', type=click.INT, help='ID of color used for the project')
 @click.pass_context
 def projects_add(ctx, name, client, workspace, public, billable, auto_estimates, rate, color):
+    """
+    Creates a new project.
+    """
     project = api.Project(
         name=name,
         workspace=workspace,
@@ -381,6 +439,9 @@ def projects_add(ctx, name, client, workspace, public, billable, auto_estimates,
 @click.option('--color', type=click.INT, help='ID of color used for the project')
 @click.pass_context
 def projects_update(ctx, spec, **kwargs):
+    """
+    Updates a project specified by SPEC which is either ID or Name of the project.
+    """
     helpers.entity_update(api.Project, spec, config=ctx.obj['config'], **kwargs)
 
 
@@ -389,6 +450,9 @@ def projects_update(ctx, spec, **kwargs):
               help='Defines a set of fields of which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(api.Project))
 @click.pass_context
 def projects_ls(ctx, fields):
+    """
+    Lists all projects for the workspace.
+    """
     helpers.entity_listing(api.Project, fields, config=ctx.obj['config'])
 
 
@@ -396,6 +460,9 @@ def projects_ls(ctx, fields):
 @click.argument('spec')
 @click.pass_context
 def projects_get(ctx, spec):
+    """
+    Retrieves details of project specified by SPEC which is either ID or Name of the project.
+    """
     helpers.entity_detail(api.Project, spec, config=ctx.obj['config'])
 
 
@@ -403,6 +470,9 @@ def projects_get(ctx, spec):
 @click.argument('spec')
 @click.pass_context
 def projects_rm(ctx, spec):
+    """
+    Removes a project specified by SPEC which is either ID or Name of the project.
+    """
     helpers.entity_remove(api.Project, spec, config=ctx.obj['config'])
 
 
@@ -415,6 +485,9 @@ def projects_rm(ctx, spec):
 @cli.group('workspaces', short_help='workspaces management')
 @click.pass_context
 def workspaces(ctx):
+    """
+    Subcommand for management of workspaces.
+    """
     pass
 
 
@@ -423,6 +496,9 @@ def workspaces(ctx):
               help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(api.Workspace))
 @click.pass_context
 def workspaces_ls(ctx, fields):
+    """
+    Lists all workspaces available to the current user.
+    """
     helpers.entity_listing(api.Workspace, fields, config=ctx.obj['config'])
 
 
@@ -430,6 +506,9 @@ def workspaces_ls(ctx, fields):
 @click.argument('spec')
 @click.pass_context
 def workspaces_get(ctx, spec):
+    """
+    Retrieves details of a workspace specified by SPEC which is either ID or Name of the workspace.
+    """
     helpers.entity_detail(api.Workspace, spec, config=ctx.obj['config'])
 
 
@@ -440,6 +519,12 @@ def workspaces_get(ctx, spec):
 @cli.group('tasks', short_help='tasks management')
 @click.pass_context
 def tasks(ctx):
+    """
+    Subcommand for management of tasks.
+
+    Tasks is a premium feature of a Toggl, therefore you can use this subcommand only together with payed workspace.
+    In case the workspace is not paid, the commands will fail.
+    """
     pass
 
 
@@ -459,6 +544,9 @@ def tasks(ctx):
                    '(ENV: TOGGL_USER)')
 @click.pass_context
 def tasks_add(ctx, **kwargs):
+    """
+    Creates a new task.
+    """
     task = api.Task(config=ctx.obj['config'], **kwargs)
 
     try:
@@ -481,6 +569,9 @@ def tasks_add(ctx, **kwargs):
                    '(ENV: TOGGL_USER)')
 @click.pass_context
 def tasks_update(ctx, spec, **kwargs):
+    """
+    Updates a task specified by SPEC which is either ID or Name of the task.
+    """
     helpers.entity_update(api.Task, spec, config=ctx.obj['config'], **kwargs)
 
 
@@ -489,6 +580,9 @@ def tasks_update(ctx, spec, **kwargs):
               help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(api.Task))
 @click.pass_context
 def tasks_ls(ctx, fields):
+    """
+    Lists tasks for current workspace.
+    """
     helpers.entity_listing(api.Task, fields, config=ctx.obj['config'])
 
 
@@ -496,6 +590,9 @@ def tasks_ls(ctx, fields):
 @click.argument('spec')
 @click.pass_context
 def tasks_get(ctx, spec):
+    """
+    Retrieves details of a task specified by SPEC which is either ID or Name of the task.
+    """
     helpers.entity_detail(api.Task, spec, config=ctx.obj['config'])
 
 
@@ -503,6 +600,9 @@ def tasks_get(ctx, spec):
 @click.argument('spec')
 @click.pass_context
 def tasks_rm(ctx, spec):
+    """
+    Removes a task specified by SPEC which is either ID or Name of the task.
+    """
     helpers.entity_remove(api.Task, spec, config=ctx.obj['config'])
 
 
@@ -512,14 +612,20 @@ def tasks_rm(ctx, spec):
 @cli.group('users', short_help='users management')
 @click.pass_context
 def users(ctx):
+    """
+    Subcommand for management of users.
+    """
     pass
 
 
-@users.command('ls', short_help='list users for given workspace')
+@users.command('ls', short_help='list users')
 @click.option('--fields', '-f', type=types.FieldsType(api.User), default='email, fullname, id',
               help='Defines a set of fieldswhich will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(api.User))
 @click.pass_context
 def users_ls(ctx, fields):
+    """
+    List users for current workspace.
+    """
     helpers.entity_listing(api.User, fields, config=ctx.obj['config'])
 
 
@@ -527,6 +633,9 @@ def users_ls(ctx, fields):
 @click.argument('spec')
 @click.pass_context
 def users_get(ctx, spec):
+    """
+    Retrieves details of a user specified by SPEC which is either ID, Email or Fullname.
+    """
     helpers.entity_detail(api.User, spec, ('id', 'email', 'fullname'), 'email', config=ctx.obj['config'])
 
 
@@ -539,6 +648,11 @@ def users_get(ctx, spec):
 @click.option('--created-with', '-c', help='Information about which application created the user\' account')
 @click.pass_context
 def users_signup(ctx, email, password, timezone=None, created_with=None):
+    """
+    Creates a new user.
+
+    After running the command the user will receive confirmation email.
+    """
     user = api.User.signup(email, password, timezone, created_with, config=ctx.obj['config'])
 
     click.echo("User '{}' was successfully created with ID #{}.".format(email, user.id))
@@ -550,6 +664,9 @@ def users_signup(ctx, email, password, timezone=None, created_with=None):
 @cli.group('workspace_users', short_help='workspace\'s users management (eq. access management for the workspace)')
 @click.pass_context
 def workspace_users(ctx):
+    """
+    Subcommand for management of workspace's users.
+    """
     pass
 
 
@@ -558,6 +675,9 @@ def workspace_users(ctx):
               help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(api.WorkspaceUser))
 @click.pass_context
 def workspace_users_ls(ctx, fields):
+    """
+    Lists all users in current workspace and some related information.
+    """
     helpers.entity_listing(api.WorkspaceUser, fields, config=ctx.obj['config'])
 
 
@@ -565,14 +685,21 @@ def workspace_users_ls(ctx, fields):
 @click.argument('spec')
 @click.pass_context
 def workspace_users_get(ctx, spec):
+    """
+    Retrieves detail of a workspace's user specified by SPEC which is either ID or Email.
+    """
     helpers.entity_detail(api.WorkspaceUser, spec, ('id', 'email'), 'email', config=ctx.obj['config'])
 
 
 @workspace_users.command('invite', short_help='invite new user into workspace')
-@click.option('--email', '-e', help='Email address where will be the invite to the worspace send',
+@click.option('--email', '-e', help='Email address where will be the invite to the workspace send',
               prompt='Email of a user to invite to the workspace')
 @click.pass_context
 def workspace_users_invite(ctx, email):
+    """
+    Invites a new user into the current workspace. It can be either an existing user or somebody who is not present at the
+    Toggl platform. After the invitation is sent, the user needs to accept invitation to be fully part of the workspace.
+    """
     api.WorkspaceUser.invite(email, config=ctx.obj['config'])
 
     click.echo("User '{}' was successfully invited! He needs to accept the invitation now.".format(email))
@@ -582,6 +709,9 @@ def workspace_users_invite(ctx, email):
 @click.argument('spec')
 @click.pass_context
 def workspace_users_rm(ctx, spec):
+    """
+    Removes a user from the current workspace. User is specified by SPEC which is either ID or Email.
+    """
     helpers.entity_remove(api.WorkspaceUser, spec, ('id', 'email'), config=ctx.obj['config'])
 
 
@@ -591,4 +721,7 @@ def workspace_users_rm(ctx, spec):
               help='Specifies if the workspace\'s user is admin for the workspace', )
 @click.pass_context
 def workspace_users_update(ctx, spec, **kwargs):
+    """
+    Updates a workspace user specified by SPEC which is either ID or Email.
+    """
     helpers.entity_update(api.WorkspaceUser, spec, ('id', 'email'), config=ctx.obj['config'], **kwargs)

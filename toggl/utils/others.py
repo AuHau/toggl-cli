@@ -114,7 +114,7 @@ def handle_error(response):
         )
 
     if 500 <= response.status_code < 600:
-        raise exceptions.TogglServerException()
+        raise exceptions.TogglServerException(response.status_code, response.text, 'Toggl\'s API is currently unavailable!')
 
     raise exceptions.TogglApiException(
         response.status_code, response.text,

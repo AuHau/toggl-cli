@@ -10,12 +10,12 @@ from .. import exceptions
 from .. import utils
 from . import fields as model_fields
 
-logger = logging.getLogger('toggl.models.base')
+logger = logging.getLogger('toggl.api.base')
 
 Entity = typing.TypeVar('Entity', bound='TogglEntity')
 
 
-def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Iterable, TogglEntity, bool) -> bool
+def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dict, TogglEntity, bool) -> bool
     """
     Will compare conditions dict and entity.
     Condition's keys and values must match the entities attributes, but not the other way around.
@@ -44,13 +44,26 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Ite
 
 # TODO: Caching
 class TogglSet(object):
-    def __init__(self, entity_cls=None, url=None, can_get_detail=None, can_get_list=None):
+    """
+    Class that is mainly responsible for fetching objects from the API.
+
+    It is always binded to an entity class that represents entities which will be fetched from the API. The binding is
+    done either passing the Entity's class to constructor or later on calling method bind_to_class. Without
+    binded Entity the class can not perform any action.
+    """
+
+    def __init__(self, entity_cls=None, url=None, can_get_detail=None, can_get_list=None):  # type: (Entity, typing.Union[str, None], typing.Union[bool, None], typing.Union[bool, None]) -> None
         self.entity_cls = entity_cls
         self._url = url
         self._can_get_detail = can_get_detail
         self._can_get_list = can_get_list
 
     def bind_to_class(self, cls):  # type: (TogglEntity) -> None
+        """
+        Binds an Entity to the instance.
+
+        :raises exceptions.TogglException: When instance is already bound TogglException is raised.
+        """
         if self.entity_cls is not None:
             raise exceptions.TogglException('The instance is already bound to a class {}!'.format(self.entity_cls))
 
@@ -58,6 +71,9 @@ class TogglSet(object):
 
     @property
     def url(self):  # type: (TogglSet) -> str
+        """
+        Returns base URL which will be used for building listing or detail URLs.
+        """
         if self._url:
             return self._url
 
@@ -68,6 +84,9 @@ class TogglSet(object):
 
     @property
     def can_get_detail(self):  # type: (TogglSet) -> bool
+        """
+        Property which defines if TogglSet can fetch detail of the binded Entity.
+        """
         if self._can_get_detail is not None:
             return self._can_get_detail
 
@@ -78,6 +97,9 @@ class TogglSet(object):
 
     @property
     def can_get_list(self):  # type: (TogglSet) -> bool
+        """
+        Property which defines if TogglSet can fetch list of all objects of the binded Entity.
+        """
         if self._can_get_list is not None:
             return self._can_get_list
 
@@ -93,6 +115,17 @@ class TogglSet(object):
         return '/{}/{}'.format(self.url, id)
 
     def get(self, id=None, config=None, **conditions):  # type: (typing.Any, utils.Config, dict) -> TogglEntity
+        """
+        Method for fetching detail object of the entity. it fetches the object based on specified conditions.
+
+        If ID is used then detail URL is used to fetch object.
+        If other conditions are used to specify the object, then TogglSet will fetch all objects using listing URL and
+        filter out objects based on passed conditions.
+
+        In any case result must be only one object or no object at all. Returned is the fetched object or None.
+
+        :raises exceptions.TogglMultipleResultsException: When multiple results is returned base on the specified conditions.
+        """
         if self.entity_cls is None:
             raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
 
@@ -107,6 +140,7 @@ class TogglSet(object):
                 except exceptions.TogglNotFoundException:
                     return None
             else:
+                # TODO: [Q/Design] Is this desired fallback?
                 conditions['id'] = id
 
         entries = self.filter(config=config, **conditions)
@@ -119,7 +153,15 @@ class TogglSet(object):
 
         return entries[0]
 
-    def filter(self, order='asc', config=None, contain=False, **conditions):  # type: (str, utils.Config, bool, dict) -> typing.List[TogglEntity]
+    def filter(self, order='asc', config=None, contain=False, **conditions):  # type: (str, utils.Config, bool, dict) -> typing.List[Entity]
+        """
+        Method that fetches all entries and filter them out based on specified conditions.
+
+        :param order: Strings 'asc' or 'desc' which specifies how the results will be sorted (
+        :param config: Config instance
+        :param contain: Specify how evaluation of conditions is performed. If True condition is evaluated using 'in' operator, otherwise hard equality (==) is enforced.
+        :param conditions: Dict of conditions to filter the results. It has structure 'name of property' => 'value'
+        """
         if self.entity_cls is None:
             raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
 
@@ -128,14 +170,24 @@ class TogglSet(object):
         if fetched_entities is None:
             return []
 
+        # There are no specified conditions ==> return all
+        if not conditions:
+            return fetched_entities
+
         return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity, contain)]
 
-    def all(self, order='asc', config=None):  # type: (str, utils.Config) -> typing.List[TogglEntity]
+    def all(self, order='asc', config=None):  # type: (str, utils.Config) -> typing.List[Entity]
+        """
+
+        :param order: Strings 'asc' or 'desc' which specifies how the results will be sorted (
+        :param config: Config instance
+        :raises exceptions.TogglNotAllowedException: When retrieving a list of objects is not allowed.
+        """
         if self.entity_cls is None:
             raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
 
         if not self.can_get_list:
-            raise exceptions.TogglException('Entity {} is not allowed to fetch list from the API!'
+            raise exceptions.TogglNotAllowedException('Entity {} is not allowed to fetch list from the API!'
                                             .format(self.entity_cls))
 
         config = config or utils.Config.factory()
@@ -156,8 +208,14 @@ class TogglSet(object):
 
         return output
 
+    def __str__(self):
+        return 'ToggleSet<{}>'.format(self.entity_cls.__name__)
+
 
 class WorkspaceToggleSet(TogglSet):
+    """
+    Specialized TogglSet for Workspaced entities.
+    """
 
     def build_list_url(self, wid=None):  # type: (int) -> str
         return '/workspaces/{}/{}'.format(wid, self.url)
@@ -170,6 +228,7 @@ class WorkspaceToggleSet(TogglSet):
 
         return [entity for entity in fetched_entities if evaluate_conditions(conditions, entity, contain)]
 
+    # TODO: Refactor to _fetch_all()
     def all(self, order='asc', wid=None, config=None):  # type: (str, int, utils.Config) -> typing.List[typing.Generic[Entity]]
         if not self.can_get_list:
             raise exceptions.TogglException('Entity {} is not allowed to fetch list from the API!'
@@ -196,9 +255,16 @@ class WorkspaceToggleSet(TogglSet):
 
 
 class TogglEntityMeta(ABCMeta):
+    """
+    Toggl Entity's Meta, which collects all Fields of a Entity and build related properties ('__fields__', '__mapped_fields__', '__signature__')
+    Also if not defined it creates TogglSet instance binded to the Entity under 'objects' property.
+    """
 
     @staticmethod
     def _make_signature(fields):  # type: (typing.Dict[str, model_fields.TogglField]) -> Signature
+        """
+        Creates Signature object for validation of passed args and kwargs. Currently not used for validation.
+        """
         non_default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD) for field in fields.values()
                                   if field.name != 'id' and field.required]
         default_parameters = [Parameter(field.name, Parameter.POSITIONAL_OR_KEYWORD, default=field.default) for field in
@@ -209,6 +275,9 @@ class TogglEntityMeta(ABCMeta):
 
     @staticmethod
     def _make_fields(attrs, parents):  # type: (typing.Dict, typing.List[typing.Type[TogglEntity]]) -> typing.Dict[str, model_fields.Field]
+        """
+        Builds dict where keys are name of the fields and values are the TogglField's instances.
+        """
         fields = OrderedDict()
         for parent in parents:
             fields.update(parent.__fields__)
@@ -225,6 +294,10 @@ class TogglEntityMeta(ABCMeta):
 
     @staticmethod
     def _make_mapped_fields(fields):  # type: (typing.Dict[str, model_fields.TogglField]) -> typing.Dict[str, model_fields.MappingField]
+        """
+        Similar to _make_fields(), except it takes in consideration MappedFields.
+        The keys of the result dict are 'mapped_field's (see MappedField implementation)
+        """
         out = {}
         for field in fields.values():
             if isinstance(field, model_fields.MappingField):
@@ -256,6 +329,16 @@ class TogglEntityMeta(ABCMeta):
 
 
 class TogglEntity(metaclass=TogglEntityMeta):
+    """
+    Base class for all Toggl Entities.
+
+    Simplest Entities consists only of fields declaration (eq. TogglField and its subclasses), but it is also possible
+    to implement custom class or instance methods for specific tasks.
+
+    This class handles serialization, saving new instances, updating the existing one, deletion etc.
+    Support for these operation can be customized using _can_* attributes, by default everything is enabled.
+    """
+
     __signature__ = Signature()
     __fields__ = OrderedDict()
 
@@ -298,11 +381,23 @@ class TogglEntity(metaclass=TogglEntityMeta):
                 field.init(self, kwargs[field.name])
 
     def save(self, config=None):  # type: (utils.Config) -> None
+        """
+        Main method for saving the entity.
+
+        If it is a new entity (eq. entity.id is not set), then calling this method will result in creation of new object using POST call.
+        If this is already existing entity, then calling this method will result in updating of the object using PUT call.
+
+        For updating the entity, only changed fields are sent (this is tracked using self.__change_dict__).
+
+        Before the API call validations are performed on the instance and only after successful validation, the call is made.
+
+        :raises exceptions.TogglNotAllowedException: When action (create/update) is not allowed.
+        """
         if not self._can_update and self.id is not None:
-            raise exceptions.TogglException('Updating this entity is not allowed!')
+            raise exceptions.TogglNotAllowedException('Updating this entity is not allowed!')
 
         if not self._can_create and self.id is None:
-            raise exceptions.TogglException('Creating this entity is not allowed!')
+            raise exceptions.TogglNotAllowedException('Creating this entity is not allowed!')
 
         config = config or self._config
 
@@ -316,19 +411,37 @@ class TogglEntity(metaclass=TogglEntityMeta):
             self.id = data['data']['id']  # Store the returned ID
 
     def delete(self, config=None):  # type: (utils.Config) -> None
+        """
+        Method for deletion of the entity through API using DELETE call.
+
+        This will not delete the instance's object in Python, therefore calling save() method after deletion will
+        result in new object created using POST call.
+
+        :raises exceptions.TogglNotAllowedException: When action is not allowed.
+        """
         if not self._can_delete:
-            raise exceptions.TogglException('Deleting this entity is not allowed!')
-        
+            raise exceptions.TogglNotAllowedException('Deleting this entity is not allowed!')
+
         if not self.id:
-            raise exceptions.TogglException()
+            raise exceptions.TogglException('This instance has not been saved yet!')
 
         utils.toggl('/{}/{}'.format(self.get_url(), self.id), 'delete', config=config or self._config)
         self.id = None  # Invalidate the object, so when save() is called after delete a new object is created
 
     def json(self, update=False):  # type: (bool) -> str
+        """
+        Serialize the entity into JSON string.
+
+        :param update: Specifies if the resulted JSON should contain only changed fields (for PUT call) or whole entity.
+        """
         return json.dumps({self.get_name(): self.to_dict(serialized=True, changes_only=update)})
 
     def validate(self):  # type: () -> None
+        """
+        Performs validation across all Entity's fields.
+
+        If overloading then don't forget to call super().validate()!
+        """
         for field in self.__fields__.values():
             if isinstance(field, model_fields.MappingField):
                 field.validate(getattr(self, field.mapped_field, None))
@@ -336,6 +449,12 @@ class TogglEntity(metaclass=TogglEntityMeta):
                 field.validate(getattr(self, field.name, None))
 
     def to_dict(self, serialized=False, changes_only=False):  # type: (bool, bool) -> typing.Dict
+        """
+        Method that returns dict representing the instance.
+
+        :param serialized: If True, the returned dict contains only Python primitive types and no objects (eq. so JSON serialization could happen)
+        :param changes_only: If True, the returned dict contains only changes to the instance since last call of save() method.
+        """
         source_dict = self.__change_dict__ if changes_only else self.__fields__
         entity_dict = {}
         for field_name in source_dict.keys():
@@ -356,10 +475,10 @@ class TogglEntity(metaclass=TogglEntityMeta):
         if not isinstance(other, self.__class__):
             raise RuntimeError('You are trying to compare instances of different classes!')
 
-        # TODO: What to do if ID is not set? Should there be value's comparision fallback?
+        # TODO: [Q/Design] What to do if ID is not set? Should there be value's comparision fallback?
         return self.id == other.id
 
-    # TODO: Problem with unique field's. Copy ==> making invalid option ==> Some validation?
+    # TODO: [Q/Design] Problem with unique field's. Copy ==> making invalid option ==> Some validation?
     def __copy__(self):  # type: () -> typing.Generic[Entity]
         cls = self.__class__
         new_instance = cls.__new__(cls)
@@ -387,6 +506,9 @@ class TogglEntity(metaclass=TogglEntityMeta):
 
     @classmethod
     def deserialize(cls, config=None, **kwargs):  # type: (utils.Config, typing.Dict) -> typing.Generic[Entity]
+        """
+        Method which takes kwargs as dict representing the Entity's data and return actuall instance of the Entity.
+        """
         try:
             kwargs.pop('at')
         except KeyError:

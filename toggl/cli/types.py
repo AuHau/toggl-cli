@@ -1,5 +1,6 @@
 import logging
 import re
+import typing
 from collections import OrderedDict
 
 import click
@@ -20,7 +21,7 @@ class DateTimeType(click.ParamType):
     name = 'datetime'
     NOW_STRING = 'now'
 
-    def __init__(self, allow_now=False):
+    def __init__(self, allow_now=False):  # type: (bool) -> None
         self._allow_now = allow_now
 
     def convert(self, value, param, ctx):
@@ -93,6 +94,7 @@ class DurationType(DateTimeType):
         return base
 
 
+# TODO: Add 'fields' parameter that will specify the lookup fields
 class ResourceType(click.ParamType):
     """
     Takes an Entity class and based on the type of entered specification searches either
@@ -140,6 +142,7 @@ class FieldsType(click.ParamType):
         self._resource_cls = resource_cls
 
     def _diff_mode(self, value, param, ctx):
+        # Using OrderedDict as OrderedSet (eq. all values are None)
         if param is None:
             out = OrderedDict()
         else:
@@ -157,9 +160,11 @@ class FieldsType(click.ParamType):
             if field not in self._resource_cls.__fields__:
                 self.fail("Unknown field '{}'!".format(field), param, ctx)
 
+            # Add field
             if modifier == '+':
                 out[field] = None
 
+            # Remove field
             if modifier == '-':
                 try:
                     del out[field]

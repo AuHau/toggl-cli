@@ -6,6 +6,6 @@ TOGGL_URL = "https://www.toggl.com/api/v8"
 WEB_CLIENT_ADDRESS = "https://www.toggl.com/app/"
 
 
-def main():
-    """toggle.toggle.main: Main entry point for Toggle CLI application"""
-    cli.cli(sys.argv[1:], obj={})
+def main(args=None):
+    """Main entry point for Toggle CLI application"""
+    cli.cli(args or sys.argv[1:], obj={})
