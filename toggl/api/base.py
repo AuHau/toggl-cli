@@ -457,11 +457,15 @@ class TogglEntity(metaclass=TogglEntityMeta):
             except KeyError:
                 field = self.__mapped_fields__[field_name]
 
-            try:
-                entity_dict[field.mapped_field] = self.__dict__[field.mapped_field]
-            except (KeyError, AttributeError):
-                value = getattr(self, field.name, None)
-                entity_dict[field.name] = field.serialize(value) if serialized else value
+            value = getattr(self, field.name, None)
+
+            if serialized:
+                try:
+                    entity_dict[field.mapped_field] = field.serialize(value)
+                except AttributeError:
+                    entity_dict[field.name] = field.serialize(value)
+            else:
+                entity_dict[field.name] = value
 
         return entity_dict
 

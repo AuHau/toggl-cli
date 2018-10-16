@@ -510,8 +510,7 @@ class MappingField(TogglField):
 
             try:
                 if not isinstance(value, self.mapped_cls):
-                    logger.warning('Assigning instance of class {} to MappedField with class {}.'.format(type(value),
-                                                                                                         self.mapped_cls))
+                    logger.warning('Assigning instance of class {} to MappedField with class {}.'.format(type(value), self.mapped_cls))
 
                 instance.__dict__[self.mapped_field] = value.id
             except AttributeError:  # It is probably not TogglEntity ==> lets try if it is ID/integer

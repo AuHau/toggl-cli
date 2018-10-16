@@ -452,6 +452,11 @@ class EntityWithRequired(Entity):
     required = fields.StringField(required=True)
 
 
+class EntityWithDefault(Entity):
+    default = fields.StringField(default='asd')
+    callable_default = fields.StringField(default=lambda _: 'aaa')
+
+
 class EntityWithMapping(Entity):
     mapping = fields.MappingField(RandomEntity, 'eid')
 
@@ -496,7 +501,26 @@ class TestTogglEntity:
         assert obj_dict['string'] == 'asd'
         assert obj_dict['integer'] == 123
 
-    def test_to_dict_mapping(self):
+    def test_to_dict_default(self):
+        obj = EntityWithDefault(string='asd', integer=123)
+        obj_dict = obj.to_dict()
+
+        assert obj_dict['string'] == 'asd'
+        assert obj_dict['integer'] == 123
+        assert obj_dict['default'] == 'asd'
+        assert obj_dict['callable_default'] == 'aaa'
+
+    def test_to_dict_mapping_default(self):
+        a = RandomEntity()
+
+        class EntityWithDefaultMapping(Entity):
+            default = fields.MappingField(RandomEntity, 'eid', default=a)
+
+        obj = EntityWithDefaultMapping()
+        obj_dict = obj.to_dict()
+        assert obj_dict['default'] is a
+
+    def test_to_dict_mapping(self, mocker):
         obj = Entity(integer=321)
         obj.id = 123
 
@@ -505,15 +529,25 @@ class TestTogglEntity:
 
         mapped_obj = EntityWithMapping(string='asd', mapping=obj)
 
-        obj_dict = mapped_obj.to_dict()
+        mocker.patch.object(base.TogglSet, 'get')
+        base.TogglSet.get.return_value = obj
 
+        obj_dict = mapped_obj.to_dict()
+        assert obj_dict['string'] == 'asd'
+        assert obj_dict['mapping'] is obj
+        base.TogglSet.get.assert_called_with(123)
+        base.TogglSet.get.reset_mock()
+
+        obj_dict = mapped_obj.to_dict(serialized=True)
         assert obj_dict['string'] == 'asd'
         assert obj_dict['eid'] == 123
 
+        base.TogglSet.get.return_value = different_obj
         mapped_obj.mapping = different_obj
         change_obj_dict = mapped_obj.to_dict(changes_only=True)
         assert 'string' not in change_obj_dict
-        assert change_obj_dict['eid'] == 124
+        assert change_obj_dict['mapping'] is different_obj
+        base.TogglSet.get.assert_called_with(124)
 
     def test_to_dict_changes(self):
 
