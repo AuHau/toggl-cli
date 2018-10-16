@@ -19,7 +19,7 @@ def entity_listing(cls, fields=('id', 'name',), config=None):
     table.align = 'l'
 
     for entity in entities:
-        table.add_row([str(entity.__fields__[field].format(getattr(entity, field))) for field in fields])
+        table.add_row([str(entity.__fields__[field].format(getattr(entity, field, ''))) for field in fields])
 
     click.echo(table)
 
@@ -53,7 +53,7 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name',
 
     entity_dict = {}
     for field in entity.__fields__.values():
-        entity_dict[field.name] = field.format(getattr(entity, field.name))
+        entity_dict[field.name] = field.format(getattr(entity, field.name, ''))
 
     del entity_dict[primary_field]
     del entity_dict['id']
@@ -67,7 +67,7 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name',
 
     click.echo("""{} {}
 {}""".format(
-        click.style(getattr(entity, primary_field) or '', fg='green'),
+        click.style(getattr(entity, primary_field, ''), fg='green'),
         click.style('#' + str(entity.id), fg='green', dim=1),
         entity_string[1:]))
 
