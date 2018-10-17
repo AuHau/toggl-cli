@@ -82,6 +82,7 @@ class User(WorkspaceEntity):
     _can_create = False
     _can_update = False
     _can_delete = False
+    _can_get_detail = False
 
     api_token = fields.StringField()
     send_timer_notifications = fields.BooleanField()
@@ -342,6 +343,7 @@ class TimeEntry(WorkspaceEntity):
             raise RuntimeError('With start_and_save() method you can not create finished entries!')
 
         instance = cls.__new__(cls)
+        instance.__change_dict__ = {}
         instance.is_running = True
         instance._config = config
         instance.start = start

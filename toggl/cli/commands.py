@@ -17,6 +17,8 @@ logger = logging.getLogger('toggl.cli.commands')
 # TODO: Possibility to activate/change a current workspace
 # TODO: Listing commands needs add Workspace option
 # TODO: Add confirmation option for deletion of resources
+# TODO: Proper error handling (catch exceptions and print nice error to stderr)
+# TODO: Implement support for ProjectUsers
 
 @click.group(cls=utils.SubCommandsGroup)
 @click.option('--quiet', '-q', is_flag=True, help="don't print anything")
@@ -137,10 +139,12 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
 
 # TODO: Make possible to list really all time-entries, not first 1000 in last 9 days
 @cli.command('ls', short_help='list a time entries')
-@click.option('--start', '-s', type=types.DateTimeType(), help='Defines start of a date range to filter the entries by.')
+@click.option('--start', '-s', type=types.DateTimeType(),
+              help='Defines start of a date range to filter the entries by.')
 @click.option('--stop', '-p', type=types.DateTimeType(), help='Defines stop of a date range to filter the entries by.')
 @click.option('--fields', '-f', type=types.FieldsType(api.TimeEntry), default='description,duration,start,stop',
-              help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(api.TimeEntry))
+              help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(
+                  api.TimeEntry))
 @click.pass_context
 def entry_ls(ctx, start, stop, fields):
     """
@@ -428,8 +432,9 @@ def projects_add(ctx, name, client, workspace, public, billable, auto_estimates,
 @click.option('--name', '-n', help='Specifies the name of the project', )
 @click.option('--customer', '-c', type=types.ResourceType(api.Client),
               help='Specifies a client to which the project will be assigned to. Can be ID or name of the client')
-@click.option('--public/--no-public', default=None, help='Specifies whether project is accessible for all workspace'
-                                                         ' users (=public) or just only project\'s users.')
+@click.option('--private/--public', 'is_private', default=None,
+              help='Specifies whether project is accessible for all workspace'
+                   ' users (=public) or just only project\'s users.')
 @click.option('--billable/--no-billable', default=None, help='Specifies whether project is billable or not.'
                                                              ' (Premium only)')
 @click.option('--auto-estimates/--no-auto-estimates', default=None,
@@ -447,7 +452,8 @@ def projects_update(ctx, spec, **kwargs):
 
 @projects.command('ls', short_help='list projects')
 @click.option('--fields', '-f', type=types.FieldsType(api.Project), default='name,customer,active,id',
-              help='Defines a set of fields of which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(api.Project))
+              help='Defines a set of fields of which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(
+                  api.Project))
 @click.pass_context
 def projects_ls(ctx, fields):
     """
@@ -493,7 +499,8 @@ def workspaces(ctx):
 
 @workspaces.command('ls', short_help='list workspaces')
 @click.option('--fields', '-f', type=types.FieldsType(api.Workspace), default='name,premium,admin,id',
-              help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(api.Workspace))
+              help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(
+                  api.Workspace))
 @click.pass_context
 def workspaces_ls(ctx, fields):
     """
@@ -536,11 +543,12 @@ def tasks(ctx):
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
               help='Specifies a workspace where the client will be created. Can be ID or name of the workspace '
                    '(ENV: TOGGL_WORKSPACE)')
-@click.option('--project', '-p', prompt='Name or ID of project to have the task assigned to', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
+@click.option('--project', '-p', prompt='Name or ID of project to have the task assigned to', envvar="TOGGL_PROJECT",
+              type=types.ResourceType(api.Project),
               help='Specifies a project to which the task will be linked to. Can be ID or name of the project '
                    '(ENV: TOGGL_PROJECT)')
-@click.option('--user', '-u', envvar="TOGGL_USER", type=types.ResourceType(api.User),
-              help='Specifies a user to whom the task will be assigned. Can be ID or name of the user '
+@click.option('--user', '-u', envvar="TOGGL_USER", type=types.ResourceType(api.User, fields=('id', 'email')),
+              help='Specifies a user to whom the task will be assigned. Can be ID or email of the user '
                    '(ENV: TOGGL_USER)')
 @click.pass_context
 def tasks_add(ctx, **kwargs):
@@ -564,8 +572,8 @@ def tasks_add(ctx, **kwargs):
 @click.option('--name', '-n', help='Specifies the name of the task', )
 @click.option('--estimated_seconds', '-e', type=click.INT, help='Specifies estimated duration for the task in seconds')
 @click.option('--active/--no-active', default=True, help='Specifies whether the task is active', )
-@click.option('--user', '-u', envvar="TOGGL_USER", type=types.ResourceType(api.User),
-              help='Specifies a user to whom the task will be assigned. Can be ID or name of the user '
+@click.option('--user', '-u', envvar="TOGGL_USER", type=types.ResourceType(api.User, fields=('id', 'email')),
+              help='Specifies a user to whom the task will be assigned. Can be ID or email of the user '
                    '(ENV: TOGGL_USER)')
 @click.pass_context
 def tasks_update(ctx, spec, **kwargs):
@@ -577,7 +585,8 @@ def tasks_update(ctx, spec, **kwargs):
 
 @tasks.command('ls', short_help='list tasks')
 @click.option('--fields', '-f', type=types.FieldsType(api.Task), default='name,project,user,id',
-              help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(api.Task))
+              help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(
+                  api.Task))
 @click.pass_context
 def tasks_ls(ctx, fields):
     """
@@ -620,7 +629,8 @@ def users(ctx):
 
 @users.command('ls', short_help='list users')
 @click.option('--fields', '-f', type=types.FieldsType(api.User), default='email, fullname, id',
-              help='Defines a set of fieldswhich will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(api.User))
+              help='Defines a set of fieldswhich will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(
+                  api.User))
 @click.pass_context
 def users_ls(ctx, fields):
     """
@@ -671,8 +681,9 @@ def workspace_users(ctx):
 
 
 @workspace_users.command('ls', short_help='list workspace\'s users')
-@click.option('--fields', '-f', type=types.FieldsType(api.WorkspaceUser), default='email,active,admin',
-              help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(api.WorkspaceUser))
+@click.option('--fields', '-f', type=types.FieldsType(api.WorkspaceUser), default='email,active,admin,id',
+              help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(
+                  api.WorkspaceUser))
 @click.pass_context
 def workspace_users_ls(ctx, fields):
     """

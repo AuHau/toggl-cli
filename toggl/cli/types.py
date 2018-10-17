@@ -6,7 +6,7 @@ from collections import OrderedDict
 import click
 import pendulum
 
-from .. import utils
+from .. import utils, exceptions
 
 logger = logging.getLogger('toggl.cli')
 
@@ -97,36 +97,34 @@ class DurationType(DateTimeType):
 # TODO: Add 'fields' parameter that will specify the lookup fields
 class ResourceType(click.ParamType):
     """
-    Takes an Entity class and based on the type of entered specification searches either
-    for ID or Name of the entity
+    Takes an Entity class and then perform lookup of the resource based on the fields specified.
+
+    By default the lookup is based on ID and Name. It is worth mentioning that extending the field lookup
+    set introduces load on the API as every lookup equals to call to API. (Possible problems with throttling)
     """
     name = 'resource-type'
 
-    def __init__(self, resource_cls):
+    def __init__(self, resource_cls, fields=('id', 'name')):
         self._resource_cls = resource_cls
+        self._fields_lookup = fields
 
     def convert(self, value, param, ctx):
-        try:
-            resource_id = int(value)
-            return self._convert_id(resource_id, param, ctx)
-        except ValueError:
-            return self._convert_name(value, param, ctx)
+        for field_name in self._fields_lookup:
+            if field_name == 'id':
+                try:
+                    value = int(value)
+                except ValueError:
+                    continue  # If the value is not Integer, no point to try send it to API
 
-    def _convert_id(self, resource_id, param, ctx):
-        resource = self._resource_cls.objects.get(resource_id)
+            try:
+                obj = self._resource_cls.objects.get(**{field_name: value})
 
-        if resource is None:
-            self.fail("Unknown {}'s ID!".format(self._resource_cls.get_name(verbose=True)), param, ctx)
+                if obj is not None:
+                    return obj
+            except exceptions.TogglMultipleResultsException:
+                pass
 
-        return resource
-
-    def _convert_name(self, value, param, ctx):
-        resource = self._resource_cls.objects.get(name=value)
-
-        if resource is None:
-            self.fail("Unknown {}'s name!".format(self._resource_cls.get_name(verbose=True)), param, ctx)
-
-        return resource
+        self.fail("Unknown {} under specification \'{}\'!".format(self._resource_cls.get_name(verbose=True), value), param, ctx)
 
 
 class FieldsType(click.ParamType):

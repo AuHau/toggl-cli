@@ -509,10 +509,10 @@ class MappingField(TogglField):
                 return
 
             try:
+                instance.__dict__[self.mapped_field] = value.id
+
                 if not isinstance(value, self.mapped_cls):
                     logger.warning('Assigning instance of class {} to MappedField with class {}.'.format(type(value), self.mapped_cls))
-
-                instance.__dict__[self.mapped_field] = value.id
             except AttributeError:  # It is probably not TogglEntity ==> lets try if it is ID/integer
                 try:
                     instance.__dict__[self.mapped_field] = int(value)
@@ -526,6 +526,7 @@ class MappingField(TogglField):
     def validate(self, value):
         super().validate(value)
 
+        # TODO: By default turn off this validation as it is rather expensive, until Caching is introduced
         if value is not None:
             obj = self.mapped_cls.objects.get(value)
 

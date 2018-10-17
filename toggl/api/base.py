@@ -6,8 +6,7 @@ from abc import ABCMeta
 from collections import OrderedDict
 from inspect import Signature, Parameter
 
-from .. import exceptions
-from .. import utils
+from .. import utils, exceptions
 from . import fields as model_fields
 
 logger = logging.getLogger('toggl.api.base')
@@ -157,6 +156,8 @@ class TogglSet(object):
                     return None
             else:
                 # TODO: [Q/Design] Is this desired fallback?
+                # Most probably it is for Toggl usecase, because some Entities does not have detail view (eq. Users) and need
+                # to do query for whole list and then filter out the entity based on ID.
                 conditions['id'] = id
 
         entries = self.filter(config=config, **conditions)
@@ -201,6 +202,10 @@ class TogglSet(object):
         """
         if self.entity_cls is None:
             raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
+
+        if not self.can_get_list:
+            raise exceptions.TogglNotAllowedException('Entity {} is not allowed to fetch list from the API!'
+                                            .format(self.entity_cls))
 
         url = self.build_list_url('filter', config, **conditions)
         fetched_entities = self._fetch_all(url, order, config)
@@ -514,6 +519,7 @@ class TogglEntity(metaclass=TogglEntityMeta):
 
         instance = cls.__new__(cls)
         instance._config = config
+        instance.__change_dict__ = {}
 
         for key, value in kwargs.items():
             try:
