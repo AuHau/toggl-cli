@@ -16,7 +16,6 @@ logger = logging.getLogger('toggl.cli.commands')
 
 # TODO: Support for manipulating the user's settings
 # TODO: Implement support for ProjectUsers
-# TODO: Fix versions of the packages
 
 def entrypoint(args, obj):
     """
