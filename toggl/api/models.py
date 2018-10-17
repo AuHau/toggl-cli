@@ -92,13 +92,13 @@ class User(WorkspaceEntity):
     fullname = fields.StringField()
     store_start_and_stop_time = fields.BooleanField()
     beginning_of_week = fields.ChoiceField({
-        0: 'Sunday',
-        1: 'Monday',
-        2: 'Tuesday',
-        3: 'Wednesday',
-        4: 'Thursday',
-        5: 'Friday',
-        6: 'Saturday'
+        '0': 'Sunday',
+        '1': 'Monday',
+        '2': 'Tuesday',
+        '3': 'Wednesday',
+        '4': 'Thursday',
+        '5': 'Friday',
+        '6': 'Saturday'
     })
     language = fields.StringField()
     image_url = fields.StringField()
