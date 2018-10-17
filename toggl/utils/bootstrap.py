@@ -78,7 +78,7 @@ class ConfigBootstrap:
 
         return output
 
-    def _get_api_token(self):  # type: () -> typing.Union[str, None]
+    def _get_api_token(self):  # type: () -> typing.Optional[str]
         """
         Method guide the user through first phase of the bootstrap: credentials gathering.
         It supports two ways of authentication: api token or credentials.

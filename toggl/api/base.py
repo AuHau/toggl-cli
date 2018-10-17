@@ -51,7 +51,7 @@ class TogglSet(object):
     binded Entity the class can not perform any action.
     """
 
-    def __init__(self, entity_cls=None, url=None, can_get_detail=None, can_get_list=None):  # type: (Entity, typing.Union[str, None], typing.Union[bool, None], typing.Union[bool, None]) -> None
+    def __init__(self, entity_cls=None, url=None, can_get_detail=None, can_get_list=None):  # type: (Entity, typing.Optional[str], typing.Optional[bool], typing.Optional[bool]) -> None
         self.entity_cls = entity_cls
         self._url = url
         self._can_get_detail = can_get_detail

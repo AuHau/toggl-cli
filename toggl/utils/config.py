@@ -325,7 +325,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         return self.user.default_workspace
 
     # TODO: Decide if default values should be also persisted for backwards compatibility
-    def persist(self, items=None):  # type: (typing.Iterable) -> None
+    def persist(self, items=None):  # type: (typing.Sequence) -> None
         """
         Method that enables persist the config and its parent's parts (eq. IniConfigMixin saves a file).
         """

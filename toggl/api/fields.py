@@ -79,7 +79,7 @@ class TogglField:
         """
         return value
 
-    def parse(self, value, config=None):  # type: (typing.Union[None, str], utils.Config) -> typing.Union[str, None]
+    def parse(self, value, config=None):  # type: (typing.Optional[str], utils.Config) -> typing.Optional[str]
         """
         Parses value from string into value type of the field.
 

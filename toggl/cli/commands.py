@@ -16,7 +16,6 @@ logger = logging.getLogger('toggl.cli.commands')
 # TODO: Support for manipulating the user's settings
 # TODO: Possibility to activate/change a current workspace
 # TODO: Listing commands needs add Workspace option
-# TODO: Add confirmation option for deletion of resources
 # TODO: Proper error handling (catch exceptions and print nice error to stderr)
 # TODO: Implement support for ProjectUsers
 
@@ -137,7 +136,7 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
     click.echo("Time entry '{}' with #{} created.".format(entry.description, entry.id))
 
 
-# TODO: Make possible to list really all time-entries, not first 1000 in last 9 days
+# TODO: [Feature/Medium] Make possible to list really all time-entries, not first 1000 in last 9 days
 @cli.command('ls', short_help='list a time entries')
 @click.option('--start', '-s', type=types.DateTimeType(),
               help='Defines start of a date range to filter the entries by.')
@@ -367,7 +366,8 @@ def clients_get(ctx, spec):
     helpers.entity_detail(api.Client, spec, config=ctx.obj['config'])
 
 
-@clients.command('rm', short_help='delete a specific client')
+@clients.command('rm', short_help='delete a client')
+@click.confirmation_option(prompt='Are you sure you want to remove the client?')
 @click.argument('spec')
 @click.pass_context
 def clients_rm(ctx, spec):
@@ -472,7 +472,8 @@ def projects_get(ctx, spec):
     helpers.entity_detail(api.Project, spec, config=ctx.obj['config'])
 
 
-@projects.command('rm', short_help='delete a specific client')
+@projects.command('rm', short_help='delete a project')
+@click.confirmation_option(prompt='Are you sure you want to remove the project?')
 @click.argument('spec')
 @click.pass_context
 def projects_rm(ctx, spec):
@@ -605,7 +606,8 @@ def tasks_get(ctx, spec):
     helpers.entity_detail(api.Task, spec, config=ctx.obj['config'])
 
 
-@tasks.command('rm', short_help='delete a specific task')
+@tasks.command('rm', short_help='delete a task')
+@click.confirmation_option(prompt='Are you sure you want to remove the task?')
 @click.argument('spec')
 @click.pass_context
 def tasks_rm(ctx, spec):
@@ -716,7 +718,8 @@ def workspace_users_invite(ctx, email):
     click.echo("User '{}' was successfully invited! He needs to accept the invitation now.".format(email))
 
 
-@workspace_users.command('rm', short_help='delete a specific workspace\'s user')
+@workspace_users.command('rm', short_help='delete a workspace\'s user')
+@click.confirmation_option(prompt='Are you sure you want to remove the workspace\'s user?')
 @click.argument('spec')
 @click.pass_context
 def workspace_users_rm(ctx, spec):

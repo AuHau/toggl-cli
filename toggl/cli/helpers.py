@@ -1,13 +1,17 @@
 import logging
+import typing
 from collections import Iterable
 
 import click
 from prettytable import PrettyTable
 
+from .. import utils
+from ..api import base
+
 logger = logging.getLogger('toggl.cli')
 
 
-def entity_listing(cls, fields=('id', 'name',), config=None):
+def entity_listing(cls, fields=('id', 'name',), config=None):  # type: (typing.Union[typing.Sequence, base.Entity], typing.Sequence, utils.Config) -> None
     entities = cls if isinstance(cls, Iterable) else cls.objects.all(config=config)
     if not entities:
         click.echo('No entries were found!')
@@ -79,12 +83,12 @@ def entity_remove(cls, spec, field_lookup=('id', 'name',), config=None):
         click.echo('{} not found!'.format(cls.get_name(verbose=True)), color='red')
         exit(1)
     elif len(entities) == 1:
-        entity = entities[1]
+        entity = entities[0]
         entity.delete()
         click.echo('{} successfully deleted!'.format(cls.get_name(verbose=True)))
     else:
         click.secho('Your SPEC resulted in {} following entries:'.format(len(entities)), fg='red')
-        entity_listing(entities, ('description', 'start', 'stop', 'duration'), config=config)
+        entity_listing(entities, field_lookup, config=config)
         click.confirm('Do you really want to to delete all of these entries?', abort=True)
 
         for entity in entities:
