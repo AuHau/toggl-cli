@@ -156,18 +156,18 @@ class WorkspaceUser(WorkspaceEntity):
     user = fields.MappingField(User, 'uid', is_read_only=True)  # type: User
 
     @classmethod
-    def invite(cls, *emails, wid=None, config=None):  # type: (*str, int, utils.Config) -> None
+    def invite(cls, *emails, workspace=None, config=None):  # type: (*str, Workspace, utils.Config) -> None
         """
         Invites users defined by email addresses. The users does not have to have account in Toggl, in that case after
         accepting the invitation, they will go through process of creating the account in the Toggl web.
 
         :param emails: List of emails to invite.
-        :param wid: Workspace ID to which invite the users
+        :param workspace: Workspace to which invite the users
         :param config:
         :return: None
         """
         config = config or utils.Config.factory()
-        wid = wid or config.default_workspace.id
+        wid = workspace.id if workspace is not None else config.default_workspace.id
 
         for email in emails:
             if not validate_email(email):

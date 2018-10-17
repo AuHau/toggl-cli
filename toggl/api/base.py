@@ -156,7 +156,7 @@ class TogglSet(object):
                     return None
             else:
                 # TODO: [Q/Design] Is this desired fallback?
-                # Most probably it is for Toggl usecase, because some Entities does not have detail view (eq. Users) and need
+                # Most probably it is desired for Toggl usecase, because some Entities does not have detail view (eq. Users) and need
                 # to do query for whole list and then filter out the entity based on ID.
                 conditions['id'] = id
 
@@ -249,7 +249,11 @@ class WorkspaceToggleSet(TogglSet):
     """
 
     def build_list_url(self, caller, config, **kwargs):  # type: (str, utils.Config, **typing.Any) -> str
-        wid = kwargs.get('wid') or config.default_workspace.id
+        if 'workspace' in kwargs and kwargs['workspace'] is not None:
+            wid = kwargs['workspace'].id
+        else:
+            wid = kwargs.get('wid') or config.default_workspace.id
+
         return '/workspaces/{}/{}'.format(wid, self.base_url)
 
 

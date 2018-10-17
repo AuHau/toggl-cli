@@ -15,9 +15,8 @@ logger = logging.getLogger('toggl.cli.commands')
 
 
 # TODO: Support for manipulating the user's settings
-# TODO: Possibility to activate/change a current workspace
-# TODO: Listing commands needs add Workspace option
 # TODO: Implement support for ProjectUsers
+# TODO: Fix versions of the packages
 
 def entrypoint(args, obj):
     """
@@ -48,6 +47,11 @@ def cli(ctx, quiet, verbose, debug, config=None):
 
     The authentication credentials can be also overridden with Environmental variables. Use
     TOGGL_API_TOKEN or TOGGL_USERNAME, TOGGL_PASSWORD.
+
+    \b
+    Currently known limitations:
+     - For every non-ID (using names, emails etc.) resource lookup the lookup is done
+       in the default workspace, unless there is option to specify workspace in the command.
     """
     if config is None:
         config = utils.Config.factory()
@@ -317,31 +321,30 @@ def entry_continue(ctx, descr, start):
 # ----------------------------------------------------------------------------
 
 @cli.group('clients', short_help='clients management')
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
+              help='Specifies a workspace in which the clients will be managed in. Can be ID or name of the workspace '
+                   '(ENV: TOGGL_WORKSPACE)')
 @click.pass_context
-def clients(ctx):
+def clients(ctx, workspace):
     """
     Subcommand for management of Clients
     """
-    pass
+    ctx.obj['workspace'] = workspace
 
 
 @clients.command('add', short_help='create new client')
 @click.option('--name', '-n', prompt='Name of the client',
               help='Specifies the name of the client', )
 @click.option('--notes', help='Specifies a note linked to the client', )
-@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
-              help='Specifies a workspace where the client will be created. Can be ID or name of the workspace '
-                   '(ENV: TOGGL_WORKSPACE)')
 @click.pass_context
-def clients_add(ctx, name, note, workspace):
+def clients_add(ctx, **kwargs):
     """
     Creates a new client.
     """
     client = api.Client(
-        name=name,
-        workspace=workspace,
-        notes=note,
-        config=ctx.obj['config']
+        workspace=ctx.obj['workspace'],
+        config=ctx.obj['config'],
+        **kwargs
     )
 
     client.save()
@@ -356,6 +359,8 @@ def clients_add(ctx, name, note, workspace):
 def clients_update(ctx, spec, **kwargs):
     """
     Updates a client specified by SPEC argument. SPEC can be either ID or Name of the client.
+
+    In case using Name of the Client, the Client will be looked up in the default workspace.
     """
     helpers.entity_update(api.Client, spec, config=ctx.obj['config'], **kwargs)
 
@@ -366,7 +371,7 @@ def clients_ls(ctx):
     """
     Lists all clients in the workspace.
     """
-    helpers.entity_listing(api.Client, fields=('name', 'id', 'notes'), config=ctx.obj['config'])
+    helpers.entity_listing(api.Client, fields=('name', 'id', 'notes'), workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 @clients.command('get', short_help='retrieve details of a client')
@@ -375,8 +380,10 @@ def clients_ls(ctx):
 def clients_get(ctx, spec):
     """
     Gets details of a client specified by SPEC argument. SPEC can be either ID or Name of the client.
+
+    If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
     """
-    helpers.entity_detail(api.Client, spec, config=ctx.obj['config'])
+    helpers.entity_detail(api.Client, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 @clients.command('rm', short_help='delete a client')
@@ -386,20 +393,25 @@ def clients_get(ctx, spec):
 def clients_rm(ctx, spec):
     """
     Removes a client specified by SPEC argument. SPEC can be either ID or Name of the client.
+
+    If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
     """
-    helpers.entity_remove(api.Client, spec, config=ctx.obj['config'])
+    helpers.entity_remove(api.Client, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 # ----------------------------------------------------------------------------
 # Projects
 # ----------------------------------------------------------------------------
 @cli.group('projects', short_help='projects management')
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
+              help='Specifies a workspace in which the projects will be managed in. Can be ID or name of the workspace '
+                   '(ENV: TOGGL_WORKSPACE)')
 @click.pass_context
-def projects(ctx):
+def projects(ctx, workspace):
     """
     Subcommand for management of projects
     """
-    pass
+    ctx.obj['workspace'] = workspace
 
 
 @projects.command('add', short_help='create new project')
@@ -408,9 +420,6 @@ def projects(ctx):
 @click.option('--client', '-c', envvar="TOGGL_CLIENT", type=types.ResourceType(api.Client),
               help='Specifies a client to which the project will be assigned to. Can be ID or name of the client ('
                    'ENV: TOGGL_CLIENT)')
-@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
-              help='Specifies a workspace where the project will be created. Can be ID or name of the workspace (ENV: '
-                   'TOGGL_WORKSPACE)')
 @click.option('--public', '-p', is_flag=True, help='Specifies whether project is accessible for all workspace users ('
                                                    '=public) or just only project\'s users.')
 @click.option('--billable/--no-billable', default=True, help='Specifies whether project is billable or not. '
@@ -426,13 +435,13 @@ def projects_add(ctx, name, client, workspace, public, billable, auto_estimates,
     """
     project = api.Project(
         name=name,
-        workspace=workspace,
         customer=client,
         is_private=not public,
         billable=billable,
         auto_estimates=auto_estimates,
         color=color,
         rate=rate,
+        workspace=ctx.obj['workspace'],
         config=ctx.obj['config']
     )
 
@@ -460,7 +469,7 @@ def projects_update(ctx, spec, **kwargs):
     """
     Updates a project specified by SPEC which is either ID or Name of the project.
     """
-    helpers.entity_update(api.Project, spec, config=ctx.obj['config'], **kwargs)
+    helpers.entity_update(api.Project, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'], **kwargs)
 
 
 @projects.command('ls', short_help='list projects')
@@ -472,7 +481,7 @@ def projects_ls(ctx, fields):
     """
     Lists all projects for the workspace.
     """
-    helpers.entity_listing(api.Project, fields, config=ctx.obj['config'])
+    helpers.entity_listing(api.Project, fields, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 @projects.command('get', short_help='retrieve details of a project')
@@ -482,7 +491,7 @@ def projects_get(ctx, spec):
     """
     Retrieves details of project specified by SPEC which is either ID or Name of the project.
     """
-    helpers.entity_detail(api.Project, spec, config=ctx.obj['config'])
+    helpers.entity_detail(api.Project, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 @projects.command('rm', short_help='delete a project')
@@ -493,7 +502,7 @@ def projects_rm(ctx, spec):
     """
     Removes a project specified by SPEC which is either ID or Name of the project.
     """
-    helpers.entity_remove(api.Project, spec, config=ctx.obj['config'])
+    helpers.entity_remove(api.Project, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 # ----------------------------------------------------------------------------
@@ -538,15 +547,18 @@ def workspaces_get(ctx, spec):
 # ----------------------------------------------------------------------------
 
 @cli.group('tasks', short_help='tasks management')
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
+              help='Specifies a workspace in which the tasks will be managed in. Can be ID or name of the workspace '
+                   '(ENV: TOGGL_WORKSPACE)')
 @click.pass_context
-def tasks(ctx):
+def tasks(ctx, workspace):
     """
     Subcommand for management of tasks.
 
     Tasks is a premium feature of a Toggl, therefore you can use this subcommand only together with payed workspace.
     In case the workspace is not paid, the commands will fail.
     """
-    pass
+    ctx.obj['workspace'] = workspace
 
 
 @tasks.command('add', short_help='create new task')
@@ -554,9 +566,6 @@ def tasks(ctx):
               help='Specifies the name of the task', )
 @click.option('--estimated_seconds', '-e', type=click.INT, help='Specifies estimated duration for the task in seconds')
 @click.option('--active/--no-active', default=True, help='Specifies whether the task is active', )
-@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
-              help='Specifies a workspace where the client will be created. Can be ID or name of the workspace '
-                   '(ENV: TOGGL_WORKSPACE)')
 @click.option('--project', '-p', prompt='Name or ID of project to have the task assigned to', envvar="TOGGL_PROJECT",
               type=types.ResourceType(api.Project),
               help='Specifies a project to which the task will be linked to. Can be ID or name of the project '
@@ -569,7 +578,7 @@ def tasks_add(ctx, **kwargs):
     """
     Creates a new task.
     """
-    task = api.Task(config=ctx.obj['config'], **kwargs)
+    task = api.Task(config=ctx.obj['config'], workspace=ctx.obj['workspace'], **kwargs)
 
     try:
         task.save()
@@ -585,7 +594,7 @@ def tasks_add(ctx, **kwargs):
 @click.argument('spec')
 @click.option('--name', '-n', help='Specifies the name of the task', )
 @click.option('--estimated_seconds', '-e', type=click.INT, help='Specifies estimated duration for the task in seconds')
-@click.option('--active/--no-active', default=True, help='Specifies whether the task is active', )
+@click.option('--active/--no-active', default=None, help='Specifies whether the task is active', )
 @click.option('--user', '-u', envvar="TOGGL_USER", type=types.ResourceType(api.User, fields=('id', 'email')),
               help='Specifies a user to whom the task will be assigned. Can be ID or email of the user '
                    '(ENV: TOGGL_USER)')
@@ -594,7 +603,7 @@ def tasks_update(ctx, spec, **kwargs):
     """
     Updates a task specified by SPEC which is either ID or Name of the task.
     """
-    helpers.entity_update(api.Task, spec, config=ctx.obj['config'], **kwargs)
+    helpers.entity_update(api.Task, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'], **kwargs)
 
 
 @tasks.command('ls', short_help='list tasks')
@@ -606,7 +615,7 @@ def tasks_ls(ctx, fields):
     """
     Lists tasks for current workspace.
     """
-    helpers.entity_listing(api.Task, fields, config=ctx.obj['config'])
+    helpers.entity_listing(api.Task, fields, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 @tasks.command('get', short_help='retrieve details of a task')
@@ -616,7 +625,7 @@ def tasks_get(ctx, spec):
     """
     Retrieves details of a task specified by SPEC which is either ID or Name of the task.
     """
-    helpers.entity_detail(api.Task, spec, config=ctx.obj['config'])
+    helpers.entity_detail(api.Task, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 @tasks.command('rm', short_help='delete a task')
@@ -627,19 +636,22 @@ def tasks_rm(ctx, spec):
     """
     Removes a task specified by SPEC which is either ID or Name of the task.
     """
-    helpers.entity_remove(api.Task, spec, config=ctx.obj['config'])
+    helpers.entity_remove(api.Task, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 # ----------------------------------------------------------------------------
 # Users
 # ----------------------------------------------------------------------------
 @cli.group('users', short_help='users management')
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
+              help='Specifies a workspace in which the users will be managed in. Can be ID or name of the workspace '
+                   '(ENV: TOGGL_WORKSPACE)')
 @click.pass_context
-def users(ctx):
+def users(ctx, workspace):
     """
     Subcommand for management of users.
     """
-    pass
+    ctx.obj['workspace'] = workspace
 
 
 @users.command('ls', short_help='list users')
@@ -651,7 +663,7 @@ def users_ls(ctx, fields):
     """
     List users for current workspace.
     """
-    helpers.entity_listing(api.User, fields, config=ctx.obj['config'])
+    helpers.entity_listing(api.User, fields, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 @users.command('get', short_help='retrieve details of a user')
@@ -661,7 +673,7 @@ def users_get(ctx, spec):
     """
     Retrieves details of a user specified by SPEC which is either ID, Email or Fullname.
     """
-    helpers.entity_detail(api.User, spec, ('id', 'email', 'fullname'), 'email', config=ctx.obj['config'])
+    helpers.entity_detail(api.User, spec, ('id', 'email', 'fullname'), 'email', workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 @users.command('signup', short_help='sign up a new user')
@@ -687,12 +699,15 @@ def users_signup(ctx, email, password, timezone=None, created_with=None):
 # Workspace users
 # ----------------------------------------------------------------------------
 @cli.group('workspace_users', short_help='workspace\'s users management (eq. access management for the workspace)')
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
+              help='Specifies a workspace in which the workspace users will be managed in. Can be ID or name of the workspace '
+                   '(ENV: TOGGL_WORKSPACE)')
 @click.pass_context
-def workspace_users(ctx):
+def workspace_users(ctx, workspace):
     """
     Subcommand for management of workspace's users.
     """
-    pass
+    ctx.obj['workspace'] = workspace
 
 
 @workspace_users.command('ls', short_help='list workspace\'s users')
@@ -704,7 +719,7 @@ def workspace_users_ls(ctx, fields):
     """
     Lists all users in current workspace and some related information.
     """
-    helpers.entity_listing(api.WorkspaceUser, fields, config=ctx.obj['config'])
+    helpers.entity_listing(api.WorkspaceUser, fields, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 @workspace_users.command('get', short_help='retrieve details of a user')
@@ -714,7 +729,7 @@ def workspace_users_get(ctx, spec):
     """
     Retrieves detail of a workspace's user specified by SPEC which is either ID or Email.
     """
-    helpers.entity_detail(api.WorkspaceUser, spec, ('id', 'email'), 'email', config=ctx.obj['config'])
+    helpers.entity_detail(api.WorkspaceUser, spec, ('id', 'email'), 'email', workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 @workspace_users.command('invite', short_help='invite new user into workspace')
@@ -726,7 +741,7 @@ def workspace_users_invite(ctx, email):
     Invites a new user into the current workspace. It can be either an existing user or somebody who is not present at the
     Toggl platform. After the invitation is sent, the user needs to accept invitation to be fully part of the workspace.
     """
-    api.WorkspaceUser.invite(email, config=ctx.obj['config'])
+    api.WorkspaceUser.invite(email, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
     click.echo("User '{}' was successfully invited! He needs to accept the invitation now.".format(email))
 
@@ -739,7 +754,7 @@ def workspace_users_rm(ctx, spec):
     """
     Removes a user from the current workspace. User is specified by SPEC which is either ID or Email.
     """
-    helpers.entity_remove(api.WorkspaceUser, spec, ('id', 'email'), config=ctx.obj['config'])
+    helpers.entity_remove(api.WorkspaceUser, spec, ('id', 'email'), workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
 @workspace_users.command('update', short_help='update a specific workspace\'s user')
@@ -751,4 +766,4 @@ def workspace_users_update(ctx, spec, **kwargs):
     """
     Updates a workspace user specified by SPEC which is either ID or Email.
     """
-    helpers.entity_update(api.WorkspaceUser, spec, ('id', 'email'), config=ctx.obj['config'], **kwargs)
+    helpers.entity_update(api.WorkspaceUser, spec, ('id', 'email'), workspace=ctx.obj['workspace'], config=ctx.obj['config'], **kwargs)

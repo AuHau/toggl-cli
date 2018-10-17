@@ -6,13 +6,13 @@ import click
 from prettytable import PrettyTable
 
 from .. import utils
-from ..api import base
+from ..api import base, Workspace
 
 logger = logging.getLogger('toggl.cli')
 
 
-def entity_listing(cls, fields=('id', 'name',), config=None):  # type: (typing.Union[typing.Sequence, base.Entity], typing.Sequence, utils.Config) -> None
-    entities = cls if isinstance(cls, Iterable) else cls.objects.all(config=config)
+def entity_listing(cls, fields=('id', 'name',), workspace=None, config=None):  # type: (typing.Union[typing.Sequence, base.Entity], typing.Sequence, typing.Optional[Workspace], utils.Config) -> None
+    entities = cls if isinstance(cls, Iterable) else cls.objects.all(config=config, workspace=workspace)
     if not entities:
         click.echo('No entries were found!')
         exit(0)
@@ -28,7 +28,7 @@ def entity_listing(cls, fields=('id', 'name',), config=None):  # type: (typing.U
     click.echo(table)
 
 
-def get_entity(cls, org_spec, field_lookup, multiple=False, config=None):
+def get_entity(cls, org_spec, field_lookup, multiple=False, workspace=None, config=None):
     for field in field_lookup:
         # If the passed SPEC is not valid value for the field --> skip
         try:
@@ -37,19 +37,19 @@ def get_entity(cls, org_spec, field_lookup, multiple=False, config=None):
             continue
 
         if multiple:
-            entities = cls.objects.filter(config=config, **{field: spec})
+            entities = cls.objects.filter(config=config, workspace=workspace, **{field: spec})
             if entities:
                 return entities
         else:
-            entities = cls.objects.get(config=config, **{field: spec})
+            entities = cls.objects.get(config=config, workspace=workspace, **{field: spec})
             if entities is not None:
                 return entities
 
         return [] if multiple else None
 
 
-def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name', config=None):
-    entity = spec if isinstance(spec, cls) else get_entity(cls, spec, field_lookup, config=config)
+def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name', workspace=None, config=None):
+    entity = spec if isinstance(spec, cls) else get_entity(cls, spec, field_lookup, workspace=workspace, config=config)
 
     if entity is None:
         click.echo('{} not found!'.format(cls.get_name(verbose=True)), color='red')
@@ -76,8 +76,8 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name',
         entity_string[1:]))
 
 
-def entity_remove(cls, spec, field_lookup=('id', 'name',), config=None):
-    entities = get_entity(cls, spec, field_lookup, multiple=True, config=config)
+def entity_remove(cls, spec, field_lookup=('id', 'name',), workspace=None, config=None):
+    entities = get_entity(cls, spec, field_lookup, multiple=True, workspace=workspace, config=config)
 
     if not entities:
         click.echo('{} not found!'.format(cls.get_name(verbose=True)), color='red')
@@ -97,8 +97,8 @@ def entity_remove(cls, spec, field_lookup=('id', 'name',), config=None):
         click.echo('Successfully deleted {} entries'.format(len(entities)))
 
 
-def entity_update(cls, spec, field_lookup=('id', 'name',), config=None, **kwargs):
-    entity = get_entity(cls, spec, field_lookup, config=config)
+def entity_update(cls, spec, field_lookup=('id', 'name',), workspace=None, config=None, **kwargs):
+    entity = get_entity(cls, spec, field_lookup, workspace=workspace, config=config)
 
     if entity is None:
         click.echo('{} not found!'.format(cls.get_name(verbose=True)), color='red')
