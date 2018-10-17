@@ -8,4 +8,4 @@ WEB_CLIENT_ADDRESS = "https://www.toggl.com/app/"
 
 def main(args=None):
     """Main entry point for Toggle CLI application"""
-    cli.cli(args or sys.argv[1:], obj={})
+    cli.entrypoint(args or sys.argv[1:], obj={})

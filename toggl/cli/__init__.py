@@ -1,1 +1,1 @@
-from .commands import cli
+from .commands import entrypoint

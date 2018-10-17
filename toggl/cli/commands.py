@@ -1,4 +1,5 @@
 import logging
+import traceback
 import webbrowser
 
 import click
@@ -16,8 +17,19 @@ logger = logging.getLogger('toggl.cli.commands')
 # TODO: Support for manipulating the user's settings
 # TODO: Possibility to activate/change a current workspace
 # TODO: Listing commands needs add Workspace option
-# TODO: Proper error handling (catch exceptions and print nice error to stderr)
 # TODO: Implement support for ProjectUsers
+
+def entrypoint(args, obj):
+    """
+    CLI entry point, where exceptions are handled.
+    """
+
+    try:
+        cli(args, obj=obj)
+    except Exception as e:
+        logger.error(str(e).strip())
+        logger.debug(traceback.format_exc())
+
 
 @click.group(cls=utils.SubCommandsGroup)
 @click.option('--quiet', '-q', is_flag=True, help="don't print anything")
@@ -51,6 +63,7 @@ def cli(ctx, quiet, verbose, debug, config=None):
     main_logger = logging.getLogger('toggl')
     main_logger.setLevel(logging.DEBUG)
 
+    # Logging to Stderr
     default = logging.StreamHandler()
     default_formatter = logging.Formatter('%(levelname)s: %(message)s')
     default.setFormatter(default_formatter)
@@ -63,7 +76,7 @@ def cli(ctx, quiet, verbose, debug, config=None):
         default.setLevel(logging.ERROR)
 
     if quiet:
-        # Is this good idea?
+        # TODO: [Q/Design] Is this good idea?
         click.echo = lambda *args, **kwargs: None
     else:
         main_logger.addHandler(default)
