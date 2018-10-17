@@ -142,6 +142,9 @@ class User(WorkspaceEntity):
         workspace_user = WorkspaceUser.objects.get(wid=wid, uid=self.id)
         return workspace_user.admin
 
+    def __str__(self):
+        return '{} (#{})'.format(self.fullname, self.id)
+
 
 class WorkspaceUser(WorkspaceEntity):
     _can_get_detail = False
@@ -175,6 +178,9 @@ class WorkspaceUser(WorkspaceEntity):
 
         if 'notifications' in data and data['notifications']:
             raise exceptions.TogglException(data['notifications'])
+
+    def __str__(self):
+        return '{} (#{})'.format(self.email, self.id)
 
 
 class Task(PremiumEntity):
@@ -399,3 +405,6 @@ class TimeEntry(WorkspaceEntity):
         new_entry.save(config=config)
 
         return new_entry
+
+    def __str__(self):
+        return '{} (#{})'.format(self.description, self.id)
