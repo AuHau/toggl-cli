@@ -29,7 +29,27 @@ class Workspace(base.TogglEntity):
     rounding_minutes = fields.IntegerField()
     default_hourly_rate = fields.FloatField()
 
+    # As TogglEntityMeta is by default adding WorkspaceToggleSet to TogglEntity,
+    # but we want vanilla TogglSet so defining it here explicitly.
     objects = base.TogglSet()
+
+    def invite(self, *emails):  # type: (*str) -> None
+        """
+        Invites users defined by email addresses. The users does not have to have account in Toggl, in that case after
+        accepting the invitation, they will go through process of creating the account in the Toggl web.
+
+        :param emails: List of emails to invite.
+        :return: None
+        """
+        for email in emails:
+            if not validate_email(email):
+                raise exceptions.TogglValidationException('Supplied email \'{}\' is not valid email!'.format(email))
+
+        emails_json = json.dumps({'emails': emails})
+        data = utils.toggl("/workspaces/{}/invite".format(self.id), "post", emails_json, config=self._config)
+
+        if 'notifications' in data and data['notifications']:
+            raise exceptions.TogglException(data['notifications'])
 
 
 class WorkspaceEntity(base.TogglEntity):
@@ -154,30 +174,6 @@ class WorkspaceUser(WorkspaceEntity):
     active = fields.BooleanField()
     admin = fields.BooleanField(admin_only=True)
     user = fields.MappingField(User, 'uid', is_read_only=True)  # type: User
-
-    @classmethod
-    def invite(cls, *emails, workspace=None, config=None):  # type: (*str, Workspace, utils.Config) -> None
-        """
-        Invites users defined by email addresses. The users does not have to have account in Toggl, in that case after
-        accepting the invitation, they will go through process of creating the account in the Toggl web.
-
-        :param emails: List of emails to invite.
-        :param workspace: Workspace to which invite the users
-        :param config:
-        :return: None
-        """
-        config = config or utils.Config.factory()
-        wid = workspace.id if workspace is not None else config.default_workspace.id
-
-        for email in emails:
-            if not validate_email(email):
-                raise exceptions.TogglValidationException('Supplied email \'{}\' is not valid email!'.format(email))
-
-        emails_json = json.dumps({'emails': emails})
-        data = utils.toggl("/workspaces/{}/invite".format(wid), "post", emails_json, config=config)
-
-        if 'notifications' in data and data['notifications']:
-            raise exceptions.TogglException(data['notifications'])
 
     def __str__(self):
         return '{} (#{})'.format(self.email, self.id)

@@ -23,7 +23,6 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dic
     :param entity: TogglEntity
     :param conditions: dict
     :return:
-    :rtype: bool
     """
     for key in conditions:
         if not getattr(entity, key, False):

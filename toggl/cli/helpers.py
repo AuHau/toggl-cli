@@ -30,6 +30,9 @@ def entity_listing(cls, fields=('id', 'name',), workspace=None, config=None):  #
 
 def get_entity(cls, org_spec, field_lookup, multiple=False, workspace=None, config=None):
     for field in field_lookup:
+        import pdb
+        pdb.set_trace()
+
         # If the passed SPEC is not valid value for the field --> skip
         try:
             spec = cls.__fields__[field].parse(org_spec)

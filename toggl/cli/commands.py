@@ -532,13 +532,47 @@ def workspaces_ls(ctx, fields):
 
 
 @workspaces.command('get', short_help='retrieve details of a workspace')
-@click.argument('spec')
+@click.argument('spec', required=False)
 @click.pass_context
 def workspaces_get(ctx, spec):
     """
     Retrieves details of a workspace specified by SPEC which is either ID or Name of the workspace.
+
+    You can leave SPEC empty, which will then retrieve your default workspace.
     """
-    helpers.entity_detail(api.Workspace, spec, config=ctx.obj['config'])
+    config = ctx.obj['config']
+    if spec is None:
+        spec = config.default_workspace
+
+    helpers.entity_detail(api.Workspace, spec, config=config)
+
+
+@workspaces.command('invite', short_help='invite new user into workspace')
+@click.option('--email', '-e', help='Email address where will be the invite to the workspace send',
+              prompt='Email of a user to invite to the workspace')
+@click.argument('spec', required=False)
+@click.pass_context
+def workspace_invite(ctx, email, spec):
+    """
+    Invites a new user into the workspace specified by SPEC, which can be either ID or Name of the workspace.
+    You can leave SPEC empty, which will then invite the user into your default workspace.
+
+    It can be either an existing user or somebody who is not present at the Toggl platform.
+    After the invitation is sent, the user needs to accept invitation to be fully part of the workspace.
+    """
+    config = ctx.obj['config']
+    if spec is None:
+        workspace = config.default_workspace  # type: api.Workspace
+    else:
+        workspace = helpers.get_entity(api.Workspace, spec, ('id', 'name'), config=config)  # type: api.Workspace
+
+        if workspace is None:
+            click.secho('Workspace not found!', fg='red')
+            exit(1)
+
+    workspace.invite(email)
+
+    click.echo("User '{}' was successfully invited! He needs to accept the invitation now.".format(email))
 
 
 # ----------------------------------------------------------------------------
@@ -729,20 +763,6 @@ def workspace_users_get(ctx, spec):
     Retrieves detail of a workspace's user specified by SPEC which is either ID or Email.
     """
     helpers.entity_detail(api.WorkspaceUser, spec, ('id', 'email'), 'email', workspace=ctx.obj['workspace'], config=ctx.obj['config'])
-
-
-@workspace_users.command('invite', short_help='invite new user into workspace')
-@click.option('--email', '-e', help='Email address where will be the invite to the workspace send',
-              prompt='Email of a user to invite to the workspace')
-@click.pass_context
-def workspace_users_invite(ctx, email):
-    """
-    Invites a new user into the current workspace. It can be either an existing user or somebody who is not present at the
-    Toggl platform. After the invitation is sent, the user needs to accept invitation to be fully part of the workspace.
-    """
-    api.WorkspaceUser.invite(email, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
-
-    click.echo("User '{}' was successfully invited! He needs to accept the invitation now.".format(email))
 
 
 @workspace_users.command('rm', short_help='delete a workspace\'s user')
