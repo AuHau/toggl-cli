@@ -24,17 +24,43 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dic
     :param conditions: dict
     :return:
     """
-    for key in conditions:
-        if not getattr(entity, key, False):
-            return False
+    for key, value in conditions.items():
+        try:
+            field = entity.__fields__[key]
+        except KeyError:
+            try:
+                field = entity.__mapped_fields__[key]
+            except KeyError:
+                return False
 
-        if isinstance(entity.__fields__[key], model_fields.StringField) and contain:
-            if str(conditions[key]) not in str(getattr(entity, key)):
+        if isinstance(field, model_fields.MappingField):
+            if isinstance(value, TogglEntity):
+                value = value.id
+
+                if value is None:
+                    raise RuntimeError('Condition\'s entity was not yet saved! We can\'t compere unsaved instances!')
+
+            mapped_entity_id = entity.__dict__.get(field.mapped_field)
+
+            # When both are None than it is desired ==> both not set
+            if value is None and mapped_entity_id is None:
+                continue
+
+            if value != mapped_entity_id:
                 return False
 
             continue
 
-        if str(getattr(entity, key)) != str(conditions[key]):
+        if not getattr(entity, key, False):
+            return False
+
+        if isinstance(field, model_fields.StringField) and contain:
+            if str(value) not in str(getattr(entity, key)):
+                return False
+
+            continue
+
+        if str(getattr(entity, key)) != str(value):
             return False
 
     return True
@@ -481,7 +507,9 @@ class TogglEntity(metaclass=TogglEntityMeta):
         if not isinstance(other, self.__class__):
             raise RuntimeError('You are trying to compare instances of different classes!')
 
-        # TODO: [Q/Design] What to do if ID is not set? Should there be value's comparision fallback?
+        if self.id is None or other.id is None:
+            raise RuntimeError('One of the instances was not yet saved! We can\'t compere unsaved instances!')
+
         return self.id == other.id
 
     # TODO: [Q/Design] Problem with unique field's. Copy ==> making invalid option ==> Some validation?

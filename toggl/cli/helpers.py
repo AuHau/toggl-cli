@@ -30,8 +30,6 @@ def entity_listing(cls, fields=('id', 'name',), workspace=None, config=None):  #
 
 def get_entity(cls, org_spec, field_lookup, multiple=False, workspace=None, config=None):
     for field in field_lookup:
-        import pdb
-        pdb.set_trace()
 
         # If the passed SPEC is not valid value for the field --> skip
         try:
@@ -39,12 +37,17 @@ def get_entity(cls, org_spec, field_lookup, multiple=False, workspace=None, conf
         except ValueError:
             continue
 
+        conditions = {field: spec}
+
+        if workspace is not None:
+            conditions['workspace'] = workspace
+
         if multiple:
-            entities = cls.objects.filter(config=config, workspace=workspace, **{field: spec})
+            entities = cls.objects.filter(config=config, **conditions)
             if entities:
                 return entities
         else:
-            entities = cls.objects.get(config=config, workspace=workspace, **{field: spec})
+            entities = cls.objects.get(config=config, **conditions)
             if entities is not None:
                 return entities
 

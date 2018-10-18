@@ -508,6 +508,8 @@ class MappingField(TogglField):
                 instance.__dict__[self.mapped_field] = None
                 return
 
+            # TODO: When passed entity is not saved (does not have ID) reject it with ValueError
+
             try:
                 instance.__dict__[self.mapped_field] = value.id
 

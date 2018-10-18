@@ -113,7 +113,7 @@ class ResourceType(click.ParamType):
             if field_name == 'id':
                 try:
                     value = int(value)
-                except ValueError:
+                except ValueError as e:
                     continue  # If the value is not Integer, no point to try send it to API
 
             try:

@@ -1,6 +1,7 @@
 import configparser
 from collections import namedtuple
 from datetime import datetime, timedelta
+from unittest.mock import call
 
 import pendulum
 import click
@@ -115,28 +116,35 @@ class TestDurationType:
 
 class TestResourceType:
 
-    def test_by_id(self, mocker, config):
+    def test_default_lookup(self, mocker, config):
         instance_mock = mocker.Mock()
         instance_mock.objects.get.return_value = 'placeholder'
 
         resource_type = types.ResourceType(instance_mock)
         assert resource_type.convert(10, None, Context({'config': config})) == 'placeholder'
-        instance_mock.objects.get.assert_called_with(10)
+        instance_mock.objects.get.assert_called_once_with(id=10)
+        instance_mock.reset_mock()
 
         # When nothing is found BadParameter is raised
         instance_mock.objects.get.return_value = None
         with pytest.raises(click.BadParameter):
             resource_type.convert(10, None, Context({'config': config}))
 
-    def test_by_name(self, mocker, config):
+        # Default lookup is ID and Name
+        instance_mock.objects.get.assert_has_calls([call(id=10), call(name=10)])
+
+    def test_custom_lookup(self, mocker, config):
         instance_mock = mocker.Mock()
         instance_mock.objects.get.return_value = 'placeholder'
 
-        resource_type = types.ResourceType(instance_mock)
+        resource_type = types.ResourceType(instance_mock, fields=('id', 'email', 'test'))
         assert resource_type.convert('asdf', None, Context({'config': config})) == 'placeholder'
-        instance_mock.objects.get.assert_called_with(name='asdf')
+        instance_mock.objects.get.assert_called_once_with(email='asdf')
+        instance_mock.reset_mock()
 
         # When nothing is found BadParameter is raised
         instance_mock.objects.get.return_value = None
         with pytest.raises(click.BadParameter):
-            resource_type.convert('asdf', None, Context({'config': config}))
+            resource_type.convert(123, None, Context({'config': config}))
+
+        instance_mock.objects.get.assert_has_calls([call(id=123), call(email=123), call(test=123)])

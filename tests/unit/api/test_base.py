@@ -52,6 +52,10 @@ class EvaluateConditionsEntity(base.TogglEntity):
     boolean = fields.BooleanField()
 
 
+class EvaluateConditionsEntityMapping(EvaluateConditionsEntity):
+    mapping = fields.MappingField(RandomEntity, 'rid')
+
+
 evaluate_conditions_testset = (
     ({'string': 'asd'}, EvaluateConditionsEntity(string='asd'), True),
     ({'string': 'something'}, EvaluateConditionsEntity(string='else'), False),
@@ -85,6 +89,20 @@ class TestEvaluateConditions:
     @pytest.mark.parametrize(('condition', 'entity', 'expected'), evaluate_conditions_contain_testset)
     def test_contain(self, condition, entity, expected):
         assert base.evaluate_conditions(condition, entity, contain=True) == expected
+
+    def test_mapping(self):
+        mapped_obj = RandomEntity()
+        mapped_obj.id = 111
+
+        obj = EvaluateConditionsEntityMapping(integer=123, mapping=mapped_obj)
+
+        assert base.evaluate_conditions({'integer': 123}, obj) is True
+        assert base.evaluate_conditions({'mapping': mapped_obj}, obj) is True
+        assert base.evaluate_conditions({'mapping': None}, obj) is False
+        assert base.evaluate_conditions({'rid': 111}, obj) is True
+
+        obj = EvaluateConditionsEntityMapping(integer=123)
+        assert base.evaluate_conditions({'mapping': None}, obj) is True
 
 
 #######################################################################################################

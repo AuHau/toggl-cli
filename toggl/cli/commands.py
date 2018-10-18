@@ -428,7 +428,7 @@ def projects(ctx, workspace):
 @click.option('--rate', '-r', type=click.FLOAT, help='Hourly rate of the project (Premium only)')
 @click.option('--color', type=click.INT, help='ID of color used for the project')
 @click.pass_context
-def projects_add(ctx, name, client, workspace, public, billable, auto_estimates, rate, color):
+def projects_add(ctx, name, client, public, billable, auto_estimates, rate, color):
     """
     Creates a new project.
     """
