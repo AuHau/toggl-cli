@@ -3,6 +3,7 @@ import logging
 import os
 import typing
 from collections import namedtuple
+from pprint import pprint
 
 import requests
 
@@ -150,15 +151,17 @@ class IniConfigMixin:
         if self._config_path is None or items is None:
             return
 
-        for item in items:
+        for item, value in items.items():
             if item in self.INI_MAPPING:
-                value = getattr(self, item)
                 section = self.INI_MAPPING[item].section
 
                 if not self._store.has_section(section):
                     self._store.add_section(section)
 
-                self._store.set(section, item, value)
+                if value is None:
+                    self._store.remove_option(section, item)
+                else:
+                    self._store.set(section, item, str(value))
 
         with open(self._config_path, 'w') as config_file:
             self._store.write(config_file)
@@ -324,18 +327,34 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
 
         return self.user.default_workspace
 
+    # noinspection PyAttributeOutsideInit
+    @default_workspace.setter
+    def default_workspace(self, value):
+        from ..api import Workspace
+
+        self._default_workspace = None
+
+        if value is None:
+            self.default_wid = None
+            return
+
+        if not isinstance(value, Workspace):
+            raise TypeError('You have to pass instance of a Workspace!')
+
+        self.default_wid = value.id
+
     # TODO: Decide if default values should be also persisted for backwards compatibility
     def persist(self, items=None):  # type: (typing.Sequence) -> None
         """
         Method that enables persist the config and its parent's parts (eq. IniConfigMixin saves a file).
         """
         if items is None:
-            items = []
+            items = {}
             for item, value in vars(self).items():
-                if item.isupper() or item[0] == '_' or self._get_class_attribute(item) == value:
+                if item.isupper() or item[0] == '_' or (self._get_class_attribute(item) == value and value is not None):
                     continue
 
-                items.append(item)
+                items[item] = value
 
         super().persist(items)
 
