@@ -8,7 +8,7 @@ import click
 import pytest
 
 from toggl.cli import types
-from toggl import utils
+from toggl import utils, api
 from toggl.exceptions import TogglCliException
 
 
@@ -43,7 +43,13 @@ def duration_type():
 
 @pytest.fixture()
 def config():
-    return utils.Config.factory(None)
+    config = utils.Config.factory(None)
+
+    user = api.User()
+    user.timezone = 'UTC'
+    config._user = user
+
+    return config
 
 
 Context = namedtuple('Context', ['obj', 'command'])

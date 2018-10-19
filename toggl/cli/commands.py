@@ -14,7 +14,6 @@ DEFAULT_CONFIG_PATH = '~/.togglrc'
 logger = logging.getLogger('toggl.cli.commands')
 
 
-# TODO: Support for manipulating the user's settings
 # TODO: Implement support for ProjectUsers
 
 def entrypoint(args, obj):
@@ -26,7 +25,7 @@ def entrypoint(args, obj):
         cli(args, obj=obj)
     except Exception as e:
         logger.error(str(e).strip())
-        logger.debug(traceback.format_exc())
+        logger.error(traceback.format_exc())
 
 
 @click.group(cls=utils.SubCommandsGroup)
@@ -786,3 +785,89 @@ def workspace_users_update(ctx, spec, **kwargs):
     Updates a workspace user specified by SPEC which is either ID or Email.
     """
     helpers.entity_update(api.WorkspaceUser, spec, ('id', 'email'), workspace=ctx.obj['workspace'], config=ctx.obj['config'], **kwargs)
+
+
+# ----------------------------------------------------------------------------
+# Configuration manipulation
+# ----------------------------------------------------------------------------
+@cli.group('config', short_help='management of configuration')
+def config():
+    """
+    Subcommand for managing your configuration.
+    """
+    pass
+
+
+@config.command('workspace', short_help='retrieves/sets default workspace')
+@click.argument('spec', required=False)
+@click.option('-t', '--toggl-default', 'default', is_flag=True,
+              help='Sets your default workspace to match the Toggl\'s setting. SPEC is ignored.', )
+@click.pass_context
+def default_workspace(ctx, spec, default):
+    """
+    Updates your default workspace to one defined by SPEC, which can be either ID or Name of the workspace.
+    If you want to set the default workspace to match your Toggl's setting use --toggl-default flag.
+
+    If SPEC is left empty, it prints the current default workspace.
+    """
+    config = ctx.obj['config']
+
+    if default is True:
+        config.default_workspace = None
+        config.persist()
+        click.echo('Successfully restored the default workspace to Toggl\'s setting')
+        exit()
+
+    if spec:
+        workspace = helpers.get_entity(api.Workspace, spec, ('id', 'name'), config=config)
+
+        if workspace is None:
+            click.echo('Workspace not found!', color='red')
+            exit(1)
+
+        config.default_workspace = workspace
+        config.persist()
+        click.echo('Default workspace successfully set to \'{}\''.format(workspace.name))
+        exit()
+
+    if not hasattr(config, 'default_wid'):
+        click.echo('Current default workspace: ==Toggl\'s default setting==')
+    else:
+        click.echo('Current default workspace: {}'.format(config.default_workspace.name))
+
+
+@config.command('timezone', short_help='retrieves/sets timezone')
+@click.argument('spec', required=False)
+@click.option('-d', '--toggl-default', 'default', is_flag=True,
+              help='Sets your timezone to match the Toggl\'s setting. SPEC is ignored.', )
+@click.pass_context
+def timezone(ctx, spec, default):
+    """
+    Updates your timezone to one defined by SPEC.
+    If you want to set the timezone to match your Toggl's setting use --toggl-default flag.
+
+    If SPEC is left empty, it prints the current timezone.
+    """
+    config = ctx.obj['config']
+
+    if default is True:
+        config.timezone = None
+        config.persist()
+        click.echo('Successfully restored the timezone to Toggl\'s setting')
+        exit()
+
+    if spec:
+        if spec not in pendulum.timezones and spec != 'local':
+            click.echo('Invalid timezone!', color='red')
+            exit(1)
+
+        config.timezone = spec
+        config.persist()
+        click.echo('Timezone successfully set to \'{}\''.format(spec))
+        exit()
+
+    if not hasattr(config, 'tz'):
+        click.echo('Current timezone: ==Toggl\'s default setting==')
+    else:
+        click.echo('Current timezone: {}'.format(config.timezone))
+
