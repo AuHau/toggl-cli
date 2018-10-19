@@ -33,7 +33,7 @@ def get_entity(cls, org_spec, field_lookup, multiple=False, workspace=None, conf
 
         # If the passed SPEC is not valid value for the field --> skip
         try:
-            spec = cls.__fields__[field].parse(org_spec)
+            spec = cls.__fields__[field].parse(org_spec, None)
         except ValueError:
             continue
 

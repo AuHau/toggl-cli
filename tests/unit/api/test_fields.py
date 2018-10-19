@@ -196,7 +196,6 @@ class TestMappingField:
         stub.assert_called_once_with(config)
 
 
-
 #########################################################################################
 # PropertyField
 
@@ -221,11 +220,11 @@ def setter(name, instance, value, init=False):
 
 
 class PropertyEntity(base.TogglEntity):
-        field = fields.PropertyField(getter, setter)
+    field = fields.PropertyField(getter, setter)
 
 
 class ReadOnlyPropertyEntity(base.TogglEntity):
-        field = fields.PropertyField(fields.PropertyField.default_getter)
+    field = fields.PropertyField(fields.PropertyField.default_getter)
 
 
 class TestPropertyField:
@@ -352,15 +351,20 @@ class TestListField:
         assert formatted_value == ''
 
     def test_init(self):
-        instance = ListEntity(field=[1,2,3])
+        instance = ListEntity(field=[1, 2, 3])
 
         assert len(instance.field) == 3
-        assert isinstance(instance.field, list)
+        assert isinstance(instance.field, fields.ListContainer)
 
     def test_update(self):
-        instance = ListEntity(field=[1,2,3])
+        instance = ListEntity(field=[1, 2, 3])
 
         assert len(instance.field) == 3
         instance.field.append(4)
         assert len(instance.field) == 4
 
+    def test_change_detection(self):
+        instance = ListEntity(field=[1, 2, 3])
+        instance.field.append(4)
+
+        assert len(instance.__change_dict__) == 1

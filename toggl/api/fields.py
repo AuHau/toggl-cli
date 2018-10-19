@@ -1,6 +1,8 @@
+import collections
 import datetime
 import logging
 from builtins import int
+from copy import copy
 from enum import Enum
 import typing
 
@@ -79,7 +81,7 @@ class TogglField:
         """
         return value
 
-    def parse(self, value, config=None):  # type: (typing.Optional[str], utils.Config) -> typing.Optional[str]
+    def parse(self, value, instance):  # type: (typing.Optional[str], base.Entity) -> typing.Optional[str]
         """
         Parses value from string into value type of the field.
 
@@ -113,7 +115,7 @@ class TogglField:
                                             .format(instance.__class__.__name__, self.name))
 
         try:
-            value = self.parse(value, getattr(instance, '_config', None))
+            value = self.parse(value, instance)
         except ValueError:
             raise TypeError(
                 'Expected for field \'{}\' type {} got {}'.format(self.name, self._field_type, type(value)))
@@ -188,7 +190,7 @@ class TogglField:
                 raise TypeError('Field \'{}\' is required! None value is not allowed!'.format(self.name))
 
         try:
-            value = self.parse(value, getattr(instance, '_config', None))
+            value = self.parse(value, instance)
         except ValueError:
             raise TypeError(
                 'Expected for field \'{}\' type {} got {}'.format(self.name, self._field_type, type(value)))
@@ -255,8 +257,8 @@ class DateTimeField(StringField):
 
         super().__set__(instance, value)
 
-    def parse(self, value, config=None):
-        config = config or utils.Config.factory()
+    def parse(self, value, instance):
+        config = getattr(instance, '_config', None) or utils.Config.factory()
 
         if isinstance(value, datetime.datetime):
             if self._is_naive(value):
@@ -435,7 +437,39 @@ class ChoiceField(StringField):
         return self.choices[value]
 
 
-# TODO: [Bug/High] If in-place operations are made, TogglEntity won't detect changes so for updates ListFields will be never sent.
+class ListContainer(collections.MutableSequence):
+    def __init__(self, entity_instance, field_name, existing_list=None):
+        if existing_list is not None:
+            self._inner_list = copy(existing_list)
+        else:
+            self._inner_list = list()
+
+        self._instance = entity_instance
+        self._field_name = field_name
+
+    def __len__(self):
+        return len(self._inner_list)
+
+    def __delitem__(self, index):
+        self._instance.__change_dict__[self._field_name] = self
+        self._inner_list.__delitem__(index)
+
+    def insert(self, index, value):
+        self._instance.__change_dict__[self._field_name] = self
+        self._inner_list.insert(index, value)
+
+    def __setitem__(self, index, value):
+        self._instance.__change_dict__[self._field_name] = self
+        self._inner_list.__setitem__(index, value)
+
+    def __getitem__(self, index):
+        return self._inner_list.__getitem__(index)
+
+    def append(self, value):
+        self._instance.__change_dict__[self._field_name] = self
+        self._inner_list.append(value)
+
+
 class ListField(TogglField):
     """
     Field that represents list of values.
@@ -448,12 +482,21 @@ class ListField(TogglField):
 
         return ', '.join(value)
 
-    def parse(self, value, config=None):
-        return value
+    def parse(self, value, instance):
+        return ListContainer(instance, self.name, value)
+
+    def serialize(self, value):
+        if not isinstance(value, ListContainer):
+            raise TypeError('Serialized value is not ListContainer!')
+
+        return value._inner_list
 
     def __set__(self, instance, value):
-        if not isinstance(value, list):
+        if not isinstance(value, list) and not isinstance(value, ListContainer):
             raise TypeError('ListField expects list instance when setting a value to the field.')
+
+        if isinstance(value, list):
+            value = ListContainer(instance, self.name, value)
 
         super().__set__(instance, value)
 
