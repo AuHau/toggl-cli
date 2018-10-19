@@ -6,12 +6,11 @@ import click
 import inquirer
 import pendulum
 
-from .. import exceptions
+from .. import exceptions, get_version
 
 logger = logging.getLogger('toggl.utils.bootstrap')
 
 
-# TODO: Toggl keeps user's timezone --> allow user to keep the Toggl's default
 # TODO: As `inquirer` package is not compatible with Windows, provide dummy bootstrap on Windows
 class ConfigBootstrap:
     """
@@ -20,6 +19,7 @@ class ConfigBootstrap:
 
     KEEP_TOGGLS_DEFAULT_WORKSPACE = '-- Keep Toggl\'s default --'
     SYSTEM_TIMEZONE = '-- Use system\'s timezone --'
+    TOGGL_TIMEZONE = 'toggl'
     API_TOKEN_OPTION = 'API token'
     CREDENTIALS_OPTION = 'Credentials'
 
@@ -60,13 +60,17 @@ class ConfigBootstrap:
         Creates dict which follows the ConfigParser convention from the provided user's answers.
         """
         output = {
+            'version': get_version(),
             'api_token': answers['api_token'],
-
             'file_logging': answers['file_logging'],
         }
 
         if answers['timezone'] == self.SYSTEM_TIMEZONE:
-            output['timezone'] = 'local'
+            output['tz'] = 'local'
+        elif answers['timezone'] == self.TOGGL_TIMEZONE:
+            pass
+        else:
+            output['tz'] = answers['timezone']
 
         if output['file_logging']:
             output['file_logging_path'] = os.path.expanduser(answers.get('file_logging_path'))
@@ -154,9 +158,11 @@ class ConfigBootstrap:
                                                        "setting?",
                           choices=lambda answers: self._get_workspaces(api_token)),
 
-            inquirer.Text('timezone', 'Used timezone', default=self.SYSTEM_TIMEZONE,
+            inquirer.Text('timezone', 'Timezone to use (value \'{}\', will keep Toggl\'s setting)'.format(self.TOGGL_TIMEZONE),
+                          default=self.SYSTEM_TIMEZONE,
                           validate=lambda answers, current: current in pendulum.timezones
-                                                            or current == self.SYSTEM_TIMEZONE),
+                                                            or current == self.SYSTEM_TIMEZONE
+                                                            or current == self.TOGGL_TIMEZONE),
 
             inquirer.Confirm('file_logging', message="Enable logging of togglCli actions into file?", default=False),
             inquirer.Path('file_logging_path', message="Path to the log file", ignore=lambda x: not x['file_logging'],

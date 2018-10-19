@@ -79,7 +79,7 @@ class Migration200:
             new_tz = inquirer.shortcuts.text(
                 'Please enter valid timezone. Default is your system\'s timezone.',
                 default='local', validate=lambda _, i: i in pendulum.timezones or i == 'local')
-            parser.set('options', 'timezone', new_tz)
+            parser.set('options', 'tz', new_tz)
 
     @classmethod
     def migrate(cls, parser):  # type: (configparser.ConfigParser) -> configparser.ConfigParser

@@ -68,6 +68,7 @@ class IniConfigMixin:
 
         if self._config_path is not None:
             self._loaded = self._store.read(self._config_path)
+
             if self._need_migrate():
                 migrator = migrations.IniConfigMigrator(self._store, self._config_path)
                 migrator.migrate(self._get_version(raw=True))
@@ -78,7 +79,7 @@ class IniConfigMixin:
         """
         Method checks whether the current config needs to migrate.
         """
-        return self._get_version() != get_version()
+        return self._loaded and self._get_version() != get_version()
 
     def _get_version(self, raw=False):  # type: (bool) -> typing.Union[str, tuple]
         """
@@ -229,7 +230,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     year_first = False
     file_logging = False
     file_logging_path = None
-    timezone = None
+    tz = None
 
     ENV_MAPPING = {
         'api_token': EnvEntry('TOGGL_API_TOKEN', str),
@@ -245,7 +246,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         'file_logging': IniEntry('logging', bool),
         'file_logging_path': IniEntry('logging', str),
 
-        'timezone': IniEntry('options', 'tz'),
+        'tz': IniEntry('options', 'tz'),
         'continue_creates': IniEntry('options', bool),
         'year_first': IniEntry('options', bool),
         'day_first': IniEntry('options', bool),
@@ -309,6 +310,14 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
             self._user = User.objects.current_user(config=self)
 
         return self._user
+
+    @property
+    def timezone(self):
+        return self.tz or self.user.timezone
+
+    @timezone.setter
+    def timezone(self, value):
+        self.tz = value
 
     @property
     def default_workspace(self):  # type: () -> '..api.Workspace'
