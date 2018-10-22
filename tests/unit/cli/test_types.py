@@ -9,7 +9,6 @@ import pytest
 
 from toggl.cli import types
 from toggl import utils, api
-from toggl.exceptions import TogglCliException
 
 
 def remove_tz_helper(datetime_object):

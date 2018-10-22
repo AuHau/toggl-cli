@@ -30,7 +30,6 @@ def entity_listing(cls, fields=('id', 'name',), workspace=None, config=None):  #
 
 def get_entity(cls, org_spec, field_lookup, multiple=False, workspace=None, config=None):
     for field in field_lookup:
-
         # If the passed SPEC is not valid value for the field --> skip
         try:
             spec = cls.__fields__[field].parse(org_spec, None)
@@ -104,7 +103,7 @@ def entity_remove(cls, spec, field_lookup=('id', 'name',), workspace=None, confi
 
 
 def entity_update(cls, spec, field_lookup=('id', 'name',), workspace=None, config=None, **kwargs):
-    entity = get_entity(cls, spec, field_lookup, workspace=workspace, config=config)
+    entity = spec if isinstance(spec, base.TogglEntity) else get_entity(cls, spec, field_lookup, workspace=workspace, config=config)
 
     if entity is None:
         click.echo('{} not found!'.format(cls.get_name(verbose=True)), color='red')

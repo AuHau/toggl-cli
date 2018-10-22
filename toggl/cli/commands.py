@@ -14,7 +14,7 @@ DEFAULT_CONFIG_PATH = '~/.togglrc'
 logger = logging.getLogger('toggl.cli.commands')
 
 
-# TODO: Implement support for ProjectUsers
+# TODO: Improve better User's management. Hide all the Project's users/Workspace's users and work only with User object ==> for that support for mapping filter needs to be written (eq. user.email == 'test@test.org')
 
 def entrypoint(args, obj):
     """
@@ -25,7 +25,8 @@ def entrypoint(args, obj):
         cli(args, obj=obj)
     except Exception as e:
         logger.error(str(e).strip())
-        logger.error(traceback.format_exc())
+        logger.debug(traceback.format_exc())
+        exit(1)
 
 
 @click.group(cls=utils.SubCommandsGroup)
@@ -503,6 +504,74 @@ def projects_rm(ctx, spec):
     helpers.entity_remove(api.Project, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
 
 
+@projects.group('users', short_help='user management for projects')
+@click.argument('project', type=types.ResourceType(api.Project))
+@click.pass_context
+def project_users(ctx, project):
+    """
+    Manages assigned users to a specific project specified by PROJECT, which can be either ID or Name of the project.
+    """
+    ctx.obj['project'] = project
+
+
+@project_users.command('ls', short_help='list project\'s users')
+@click.option('--fields', '-f', type=types.FieldsType(api.ProjectUser), default='user,manager,rate,id',
+              help='Defines a set of fields of which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(
+                  api.ProjectUser))
+@click.pass_context
+def project_users_ls(ctx, fields):
+    """
+    Lists all project's users.
+    """
+    project = ctx.obj['project']
+    src = api.ProjectUser.objects.filter(project=project, config=ctx.obj['config'])
+
+    helpers.entity_listing(src, fields)
+
+
+@project_users.command('add', short_help='add a user into the project')
+@click.option('--user', '-u', prompt='Enter ID or Email of the user to add to project', help='User to be added. Can be ID or email of the user',
+              type=types.ResourceType(api.User, fields=('id', 'email')))
+@click.option('--rate', '-f', default=None, type=click.FLOAT, help='Hourly rate for the project user')
+@click.option('--manager/--no-manager', default=False, help='Admin rights for the project', )
+@click.pass_context
+def project_users_add(ctx, user, **kwargs):
+    """
+    Adds new user to the project.
+    """
+    client = api.ProjectUser(
+        project=ctx.obj['project'],
+        config=ctx.obj['config'],
+        user=user,
+        **kwargs
+    )
+
+    client.save()
+    click.echo("User '{}' added to the project.".format(user.email))
+
+
+@project_users.command('update', short_help='update a project\'s user')
+@click.argument('spec')
+@click.option('--rate', '-f', type=click.FLOAT, default=None, help='Hourly rate for the project user')
+@click.option('--manager/--no-manager', default=None, help='Admin rights for the project', )
+@click.pass_context
+def project_users_update(ctx, spec, **kwargs):
+    """
+    Updates project's user specified by SPEC, which can be only ID of the project's user (not user itself).
+    """
+    helpers.entity_update(api.ProjectUser, spec, field_lookup=('id',), workspace=ctx.obj['workspace'], config=ctx.obj['config'], **kwargs)
+
+
+@project_users.command('rm', short_help='remove a project\'s user')
+@click.argument('spec')
+@click.pass_context
+def project_users_remove(ctx, spec):
+    """
+    Removes project's user specified by SPEC, which can be only ID of the project's user (not user itself).
+    """
+    helpers.entity_remove(api.ProjectUser, spec, field_lookup=('id',), workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+
+
 # ----------------------------------------------------------------------------
 # Workspaces
 # ----------------------------------------------------------------------------
@@ -785,6 +854,24 @@ def workspace_users_update(ctx, spec, **kwargs):
     Updates a workspace user specified by SPEC which is either ID or Email.
     """
     helpers.entity_update(api.WorkspaceUser, spec, ('id', 'email'), workspace=ctx.obj['workspace'], config=ctx.obj['config'], **kwargs)
+
+
+# ----------------------------------------------------------------------------
+# Project users
+# ----------------------------------------------------------------------------
+@cli.command('project_users', short_help='list all project users in workspace')
+@click.option('--fields', '-f', type=types.FieldsType(api.ProjectUser), default='user,project,manager,id',
+              help='Defines a set of fields which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(
+                  api.ProjectUser))
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
+              help='Specifies a workspace in which the project\'s users will be managed in. Can be ID or Name of the workspace '
+                   '(ENV: TOGGL_WORKSPACE)')
+@click.pass_context
+def project_users_listing(ctx, fields, workspace):
+    """
+    List all project's users inside workspace
+    """
+    helpers.entity_listing(api.ProjectUser, fields, workspace=workspace, config=ctx.obj['config'])
 
 
 # ----------------------------------------------------------------------------

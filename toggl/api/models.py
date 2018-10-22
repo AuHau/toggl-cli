@@ -53,7 +53,7 @@ class Workspace(base.TogglEntity):
 
 
 class WorkspaceEntity(base.TogglEntity):
-    workspace = fields.MappingField(Workspace, 'wid', default=lambda config: config.default_workspace)  # type: Workspace
+    workspace = fields.MappingField(Workspace, 'wid', is_read_only=True, default=lambda config: config.default_workspace)  # type: Workspace
 
 
 # Premium Entity
@@ -86,6 +86,12 @@ class Project(WorkspaceEntity):
     estimated_hours = fields.IntegerField()
     color = fields.IntegerField()
     rate = fields.FloatField()
+
+    def add_user(self, user, manager=False, rate=None):  # type: (User, bool, typing.Optional[float]) -> ProjectUser
+        project_user = ProjectUser(project=self, user=user, workspace=self.workspace, manager=manager, rate=rate)
+        project_user.save()
+
+        return project_user
 
 
 class UserSet(base.WorkspaceToggleSet):
@@ -177,6 +183,18 @@ class WorkspaceUser(WorkspaceEntity):
 
     def __str__(self):
         return '{} (#{})'.format(self.email, self.id)
+
+
+class ProjectUser(WorkspaceEntity):
+    _can_get_detail = False
+
+    rate = fields.FloatField(admin_only=True)
+    manager = fields.BooleanField(default=False)
+    project = fields.MappingField(Project, 'pid', is_read_only=True)  # type: Project
+    user = fields.MappingField(User, 'uid', is_read_only=True)  # type: User
+
+    def __str__(self):
+        return '{}/{} (#{})'.format(self.project.name, self.user.email, self.id)
 
 
 class Task(PremiumEntity):

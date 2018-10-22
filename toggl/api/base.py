@@ -225,6 +225,8 @@ class TogglSet(object):
         :param contain: Specify how evaluation of conditions is performed. If True condition is evaluated using 'in' operator, otherwise hard equality (==) is enforced.
         :param conditions: Dict of conditions to filter the results. It has structure 'name of property' => 'value'
         """
+        config = config or utils.Config.factory()
+
         if self.entity_cls is None:
             raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
 
