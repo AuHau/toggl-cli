@@ -3,7 +3,11 @@
 *.pyc
 *.pyproj
 .idea
+
+# Direnv
 .direnv
+.envrc
+
 .pytest_cache/
 __pycache__/
 .tox
