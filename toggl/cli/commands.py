@@ -16,13 +16,13 @@ logger = logging.getLogger('toggl.cli.commands')
 
 # TODO: Improve better User's management. Hide all the Project's users/Workspace's users and work only with User object ==> for that support for mapping filter needs to be written (eq. user.email == 'test@test.org')
 
-def entrypoint(args, obj):
+def entrypoint(args, obj=None):
     """
     CLI entry point, where exceptions are handled.
     """
 
     try:
-        cli(args, obj=obj)
+        cli(args, obj=obj or {})
     except Exception as e:
         logger.error(str(e).strip())
         logger.debug(traceback.format_exc())
@@ -52,16 +52,19 @@ def cli(ctx, quiet, verbose, debug, config=None):
      - For every non-ID (using names, emails etc.) resource lookup the lookup is done
        in the default workspace, unless there is option to specify workspace in the command.
     """
-    if config is None:
-        config = utils.Config.factory()
+    if ctx.obj.get('config') is None:
+        if config is None:
+            config = utils.Config.factory()
+        else:
+            config = utils.Config.factory(config)
+
+        if not config.is_loaded:
+            config.cli_bootstrap()
+            config.persist()
+
+        ctx.obj['config'] = config
     else:
-        config = utils.Config.factory(config)
-
-    if not config.is_loaded:
-        config.cli_bootstrap()
-        config.persist()
-
-    ctx.obj['config'] = config
+        config = ctx.obj['config']
 
     main_logger = logging.getLogger('toggl')
     main_logger.setLevel(logging.DEBUG)
@@ -106,7 +109,7 @@ def visit_www():
 @click.argument('end', type=types.DurationType())
 @click.argument('descr')
 @click.option('--tags', '-a', help='List of tags delimited with \',\'')
-@click.option('--project', '-p', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
+@click.option('--project', '-p', envvar="f", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
 @click.option('--task', '-t', envvar="TOGGL_TASK", type=types.ResourceType(api.Task),
               help='Link the entry with specific task. Can be ID or name of the task (ENV: TOGGL_TASK)', )

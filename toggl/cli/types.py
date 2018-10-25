@@ -94,7 +94,6 @@ class DurationType(DateTimeType):
         return base
 
 
-# TODO: Add 'fields' parameter that will specify the lookup fields
 class ResourceType(click.ParamType):
     """
     Takes an Entity class and then perform lookup of the resource based on the fields specified.
