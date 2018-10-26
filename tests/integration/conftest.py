@@ -4,13 +4,14 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+from tests.integration.helpers import ParsingResult
 from toggl.cli.commands import cli
 from toggl import utils
 
 
 @pytest.fixture()
 def cmd():
-    def inner_cmd(cmd, config='default.config'):
+    def inner_cmd(cmd, config='default.config', simple=True, *args):
         config_path = Path(__file__).parent
         config_path = config_path.joinpath('configs/' + config)
 
@@ -20,8 +21,13 @@ def cmd():
         config = utils.Config.factory(str(config_path))
 
         parsed = re.findall(r"([\"]([^\"]+)\")|([']([^']+)')|(\S+)", cmd)  # Simulates quoting of strings with spaces (eq. filter -n "some important task")
-        args = [i[1] or i[3] or i[4] for i in parsed]
+        args = list(args) + [i[1] or i[3] or i[4] for i in parsed]
 
-        return CliRunner().invoke(cli, args, obj={'config': config})
+        if simple:
+            args.insert(0, '--simple')
+
+        result = CliRunner().invoke(cli, args, obj={'config': config})
+
+        return ParsingResult(result)
 
     return inner_cmd

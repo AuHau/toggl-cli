@@ -53,6 +53,12 @@ def cli(ctx, quiet, verbose, debug, simple, header, config=None):
     Currently known limitations:
      - For every non-ID (using names, emails etc.) resource lookup the lookup is done
        in the default workspace, unless there is option to specify workspace in the command.
+
+    \b
+    Known exit codes:
+     * 0 - Successful execution
+     * 1 - Unknown error
+     * 101 - Resource(s) not found
     """
     if ctx.obj.get('config') is None:
         if config is None:
