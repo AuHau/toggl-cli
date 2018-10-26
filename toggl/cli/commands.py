@@ -30,14 +30,16 @@ def entrypoint(args, obj=None):
 
 
 @click.group(cls=utils.SubCommandsGroup)
-@click.option('--quiet', '-q', is_flag=True, help="don't print anything")
-@click.option('--verbose', '-v', is_flag=True, help="print additional info")
-@click.option('--debug', '-d', is_flag=True, help="print debugging output")
+@click.option('--quiet', '-q', is_flag=True, help="Don't print anything")
+@click.option('--verbose', '-v', is_flag=True, help="Prints additional info")
+@click.option('--debug', '-d', is_flag=True, help="Prints debugging output")
+@click.option('--header/--no-header', default=True, help="Specifies if header/labels of data should be displayed")
+@click.option('--simple', '-s', is_flag=True, help="Instead of pretty aligned tables prints only data separated by tabulator")
 @click.option('--config', type=click.Path(exists=True), envvar='TOGGL_CONFIG',
               help="sets specific Config file to be used (ENV: TOGGL_CONFIG)")
 @click.version_option(__version__)
 @click.pass_context
-def cli(ctx, quiet, verbose, debug, config=None):
+def cli(ctx, quiet, verbose, debug, simple, header, config=None):
     """
     CLI interface to interact with Toggl tracking application.
 
@@ -73,6 +75,9 @@ def cli(ctx, quiet, verbose, debug, config=None):
     default = logging.StreamHandler()
     default_formatter = logging.Formatter('%(levelname)s: %(message)s')
     default.setFormatter(default_formatter)
+
+    ctx.obj['simple'] = simple
+    ctx.obj['header'] = header
 
     if verbose:
         default.setLevel(logging.INFO)
@@ -141,7 +146,7 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
 
     # Create a time entry.
     entry = api.TimeEntry(
-        config=ctx.obj['config'],
+        obj=ctx.obj,
         description=descr,
         start=start,
         stop=end,
@@ -172,9 +177,9 @@ def entry_ls(ctx, start, stop, fields):
     """
     # Limit the list of TimeEntries based on start/stop dates.
     if start is not None or stop is not None:
-        entities = api.TimeEntry.objects.filter(start=start, stop=stop, config=ctx.obj['config'])
+        entities = api.TimeEntry.objects.filter(start=start, stop=stop, obj=ctx.obj)
     else:
-        entities = api.TimeEntry.objects.all(config=ctx.obj['config'])
+        entities = api.TimeEntry.objects.all(obj=ctx.obj)
 
     if not entities:
         click.echo('No entries were found!')
@@ -217,7 +222,7 @@ def entry_rm(ctx, spec):
     SPEC argument can be either ID or Description of the Time Entry.
     In case multiple time entries are found, you will be prompted to confirm your deletion.
     """
-    helpers.entity_remove(api.TimeEntry, spec, ('id', 'description'), config=ctx.obj['config'])
+    helpers.entity_remove(api.TimeEntry, spec, ('id', 'description'), obj=ctx.obj)
 
 
 @cli.command('start', short_help='starts new time entry')
@@ -235,7 +240,7 @@ def entry_start(ctx, descr, start, project, workspace):
     the entry will be stopped and new entry started.
     """
     api.TimeEntry.start_and_save(
-        config=ctx.obj['config'],
+        obj=ctx.obj,
         start=start,
         description=descr,
         project=project,
@@ -258,7 +263,7 @@ def entry_now(ctx, **kwargs):
     Without any options the command fetches the current time entry and displays it. But it also supports modification
     of the current time entry through the options listed below.
     """
-    current = api.TimeEntry.objects.current(config=ctx.obj['config'])
+    current = api.TimeEntry.objects.current(obj=ctx.obj)
 
     if current is None:
         click.echo('There is no time entry running!')
@@ -273,7 +278,7 @@ def entry_now(ctx, **kwargs):
     if updated:
         current.save()
 
-    helpers.entity_detail(api.TimeEntry, current, primary_field='description', config=ctx.obj['config'])
+    helpers.entity_detail(api.TimeEntry, current, primary_field='description', obj=ctx.obj)
 
 
 @cli.command('stop', short_help='stops current time entry')
@@ -283,7 +288,7 @@ def entry_stop(ctx, stop):
     """
     Stops the current time entry.
     """
-    current = api.TimeEntry.objects.current(config=ctx.obj['config'])
+    current = api.TimeEntry.objects.current(obj=ctx.obj)
 
     if current is None:
         click.echo('There is no time entry running!')
@@ -304,6 +309,7 @@ def entry_continue(ctx, descr, start):
 
     The underhood behaviour of Toggl is that it actually creates a new entry with the same description.
     """
+    entry = None
     try:
         if descr is None:
             entry = api.TimeEntry.objects.all(config=ctx.obj['config'])[0]
@@ -345,7 +351,7 @@ def clients_add(ctx, **kwargs):
     """
     client = api.Client(
         workspace=ctx.obj['workspace'],
-        config=ctx.obj['config'],
+        obj=ctx.obj,
         **kwargs
     )
 
@@ -364,7 +370,7 @@ def clients_update(ctx, spec, **kwargs):
 
     In case using Name of the Client, the Client will be looked up in the default workspace.
     """
-    helpers.entity_update(api.Client, spec, config=ctx.obj['config'], **kwargs)
+    helpers.entity_update(api.Client, spec, obj=ctx.obj, **kwargs)
 
 
 @clients.command('ls', short_help='list clients')
@@ -373,7 +379,7 @@ def clients_ls(ctx):
     """
     Lists all clients in the workspace.
     """
-    helpers.entity_listing(api.Client, fields=('name', 'id', 'notes'), workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_listing(api.Client, fields=('name', 'id', 'notes'), obj=ctx.obj)
 
 
 @clients.command('get', short_help='retrieve details of a client')
@@ -385,7 +391,7 @@ def clients_get(ctx, spec):
 
     If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
     """
-    helpers.entity_detail(api.Client, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_detail(api.Client, spec, obj=ctx.obj)
 
 
 @clients.command('rm', short_help='delete a client')
@@ -398,7 +404,7 @@ def clients_rm(ctx, spec):
 
     If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
     """
-    helpers.entity_remove(api.Client, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_remove(api.Client, spec, obj=ctx.obj)
 
 
 # ----------------------------------------------------------------------------
@@ -444,7 +450,7 @@ def projects_add(ctx, name, client, public, billable, auto_estimates, rate, colo
         color=color,
         rate=rate,
         workspace=ctx.obj['workspace'],
-        config=ctx.obj['config']
+        obj=ctx.obj
     )
 
     project.save()
@@ -471,7 +477,7 @@ def projects_update(ctx, spec, **kwargs):
     """
     Updates a project specified by SPEC which is either ID or Name of the project.
     """
-    helpers.entity_update(api.Project, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'], **kwargs)
+    helpers.entity_update(api.Project, spec, obj=ctx.obj, **kwargs)
 
 
 @projects.command('ls', short_help='list projects')
@@ -483,7 +489,7 @@ def projects_ls(ctx, fields):
     """
     Lists all projects for the workspace.
     """
-    helpers.entity_listing(api.Project, fields, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_listing(api.Project, fields, obj=ctx.obj)
 
 
 @projects.command('get', short_help='retrieve details of a project')
@@ -493,7 +499,7 @@ def projects_get(ctx, spec):
     """
     Retrieves details of project specified by SPEC which is either ID or Name of the project.
     """
-    helpers.entity_detail(api.Project, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_detail(api.Project, spec, obj=ctx.obj)
 
 
 @projects.command('rm', short_help='delete a project')
@@ -504,7 +510,7 @@ def projects_rm(ctx, spec):
     """
     Removes a project specified by SPEC which is either ID or Name of the project.
     """
-    helpers.entity_remove(api.Project, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_remove(api.Project, spec, obj=ctx.obj)
 
 
 @projects.group('users', short_help='user management for projects')
@@ -544,7 +550,7 @@ def project_users_add(ctx, user, **kwargs):
     """
     client = api.ProjectUser(
         project=ctx.obj['project'],
-        config=ctx.obj['config'],
+        obj=ctx.obj,
         user=user,
         **kwargs
     )
@@ -562,7 +568,7 @@ def project_users_update(ctx, spec, **kwargs):
     """
     Updates project's user specified by SPEC, which can be only ID of the project's user (not user itself).
     """
-    helpers.entity_update(api.ProjectUser, spec, field_lookup=('id',), workspace=ctx.obj['workspace'], config=ctx.obj['config'], **kwargs)
+    helpers.entity_update(api.ProjectUser, spec, field_lookup=('id',), obj=ctx.obj, **kwargs)
 
 
 @project_users.command('rm', short_help='remove a project\'s user')
@@ -572,7 +578,7 @@ def project_users_remove(ctx, spec):
     """
     Removes project's user specified by SPEC, which can be only ID of the project's user (not user itself).
     """
-    helpers.entity_remove(api.ProjectUser, spec, field_lookup=('id',), workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_remove(api.ProjectUser, spec, field_lookup=('id',), obj=ctx.obj)
 
 
 # ----------------------------------------------------------------------------
@@ -583,7 +589,7 @@ def project_users_remove(ctx, spec):
 
 @cli.group('workspaces', short_help='workspaces management')
 @click.pass_context
-def workspaces(ctx):
+def workspaces(_):
     """
     Subcommand for management of workspaces.
     """
@@ -599,7 +605,7 @@ def workspaces_ls(ctx, fields):
     """
     Lists all workspaces available to the current user.
     """
-    helpers.entity_listing(api.Workspace, fields, config=ctx.obj['config'])
+    helpers.entity_listing(api.Workspace, fields, obj=ctx.obj)
 
 
 @workspaces.command('get', short_help='retrieve details of a workspace')
@@ -615,7 +621,7 @@ def workspaces_get(ctx, spec):
     if spec is None:
         spec = config.default_workspace
 
-    helpers.entity_detail(api.Workspace, spec, config=config)
+    helpers.entity_detail(api.Workspace, spec, obj=ctx.obj)
 
 
 @workspaces.command('invite', short_help='invite new user into workspace')
@@ -682,7 +688,7 @@ def tasks_add(ctx, **kwargs):
     """
     Creates a new task.
     """
-    task = api.Task(config=ctx.obj['config'], workspace=ctx.obj['workspace'], **kwargs)
+    task = api.Task(obj=ctx.obj, workspace=ctx.obj['workspace'], **kwargs)
 
     try:
         task.save()
@@ -707,7 +713,7 @@ def tasks_update(ctx, spec, **kwargs):
     """
     Updates a task specified by SPEC which is either ID or Name of the task.
     """
-    helpers.entity_update(api.Task, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'], **kwargs)
+    helpers.entity_update(api.Task, spec, obj=ctx.obj, **kwargs)
 
 
 @tasks.command('ls', short_help='list tasks')
@@ -719,7 +725,7 @@ def tasks_ls(ctx, fields):
     """
     Lists tasks for current workspace.
     """
-    helpers.entity_listing(api.Task, fields, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_listing(api.Task, fields, obj=ctx.obj)
 
 
 @tasks.command('get', short_help='retrieve details of a task')
@@ -729,7 +735,7 @@ def tasks_get(ctx, spec):
     """
     Retrieves details of a task specified by SPEC which is either ID or Name of the task.
     """
-    helpers.entity_detail(api.Task, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_detail(api.Task, spec, obj=ctx.obj)
 
 
 @tasks.command('rm', short_help='delete a task')
@@ -740,7 +746,7 @@ def tasks_rm(ctx, spec):
     """
     Removes a task specified by SPEC which is either ID or Name of the task.
     """
-    helpers.entity_remove(api.Task, spec, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_remove(api.Task, spec, obj=ctx.obj)
 
 
 # ----------------------------------------------------------------------------
@@ -767,7 +773,7 @@ def users_ls(ctx, fields):
     """
     List users for current workspace.
     """
-    helpers.entity_listing(api.User, fields, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_listing(api.User, fields, obj=ctx.obj)
 
 
 @users.command('get', short_help='retrieve details of a user')
@@ -777,7 +783,7 @@ def users_get(ctx, spec):
     """
     Retrieves details of a user specified by SPEC which is either ID, Email or Fullname.
     """
-    helpers.entity_detail(api.User, spec, ('id', 'email', 'fullname'), 'email', workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_detail(api.User, spec, ('id', 'email', 'fullname'), 'email', obj=ctx.obj)
 
 
 @users.command('signup', short_help='sign up a new user')
@@ -785,16 +791,16 @@ def users_get(ctx, spec):
               prompt='Email of the user to sign up')
 @click.option('--password', '-p', help='Password for the new user\'s account', hide_input=True,
               confirmation_prompt=True, prompt='Password of a user to sign up')
-@click.option('--timezone', '-t', help='Timezone which will be used for all date/time operations')
+@click.option('--timezone', '-t', 'tz', help='Timezone which will be used for all date/time operations')
 @click.option('--created-with', '-c', help='Information about which application created the user\' account')
 @click.pass_context
-def users_signup(ctx, email, password, timezone=None, created_with=None):
+def users_signup(ctx, email, password, tz=None, created_with=None):
     """
     Creates a new user.
 
     After running the command the user will receive confirmation email.
     """
-    user = api.User.signup(email, password, timezone, created_with, config=ctx.obj['config'])
+    user = api.User.signup(email, password, tz, created_with, config=ctx.obj['config'])
 
     click.echo("User '{}' was successfully created with ID #{}.".format(email, user.id))
 
@@ -823,7 +829,7 @@ def workspace_users_ls(ctx, fields):
     """
     Lists all users in current workspace and some related information.
     """
-    helpers.entity_listing(api.WorkspaceUser, fields, workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_listing(api.WorkspaceUser, fields, obj=ctx.obj)
 
 
 @workspace_users.command('get', short_help='retrieve details of a user')
@@ -833,7 +839,7 @@ def workspace_users_get(ctx, spec):
     """
     Retrieves detail of a workspace's user specified by SPEC which is either ID or Email.
     """
-    helpers.entity_detail(api.WorkspaceUser, spec, ('id', 'email'), 'email', workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_detail(api.WorkspaceUser, spec, ('id', 'email'), 'email', obj=ctx.obj)
 
 
 @workspace_users.command('rm', short_help='delete a workspace\'s user')
@@ -844,7 +850,7 @@ def workspace_users_rm(ctx, spec):
     """
     Removes a user from the current workspace. User is specified by SPEC which is either ID or Email.
     """
-    helpers.entity_remove(api.WorkspaceUser, spec, ('id', 'email'), workspace=ctx.obj['workspace'], config=ctx.obj['config'])
+    helpers.entity_remove(api.WorkspaceUser, spec, ('id', 'email'), obj=ctx.obj)
 
 
 @workspace_users.command('update', short_help='update a specific workspace\'s user')
@@ -856,7 +862,7 @@ def workspace_users_update(ctx, spec, **kwargs):
     """
     Updates a workspace user specified by SPEC which is either ID or Email.
     """
-    helpers.entity_update(api.WorkspaceUser, spec, ('id', 'email'), workspace=ctx.obj['workspace'], config=ctx.obj['config'], **kwargs)
+    helpers.entity_update(api.WorkspaceUser, spec, ('id', 'email'), obj=ctx.obj, **kwargs)
 
 
 # ----------------------------------------------------------------------------
@@ -874,21 +880,22 @@ def project_users_listing(ctx, fields, workspace):
     """
     List all project's users inside workspace
     """
-    helpers.entity_listing(api.ProjectUser, fields, workspace=workspace, config=ctx.obj['config'])
+    ctx.obj['workspace'] = workspace
+    helpers.entity_listing(api.ProjectUser, fields, obj=ctx.obj)
 
 
 # ----------------------------------------------------------------------------
 # Configuration manipulation
 # ----------------------------------------------------------------------------
 @cli.group('config', short_help='management of configuration')
-def config():
+def user_config():
     """
     Subcommand for managing your configuration.
     """
     pass
 
 
-@config.command('workspace', short_help='retrieves/sets default workspace')
+@user_config.command('workspace', short_help='retrieves/sets default workspace')
 @click.argument('spec', required=False)
 @click.option('-t', '--toggl-default', 'default', is_flag=True,
               help='Sets your default workspace to match the Toggl\'s setting. SPEC is ignored.', )
@@ -926,7 +933,7 @@ def default_workspace(ctx, spec, default):
         click.echo('Current default workspace: {}'.format(config.default_workspace.name))
 
 
-@config.command('timezone', short_help='retrieves/sets timezone')
+@user_config.command('timezone', short_help='retrieves/sets timezone')
 @click.argument('spec', required=False)
 @click.option('-d', '--toggl-default', 'default', is_flag=True,
               help='Sets your timezone to match the Toggl\'s setting. SPEC is ignored.', )
@@ -960,4 +967,3 @@ def timezone(ctx, spec, default):
         click.echo('Current timezone: ==Toggl\'s default setting==')
     else:
         click.echo('Current timezone: {}'.format(config.timezone))
-
