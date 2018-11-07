@@ -1,33 +1,38 @@
-import re
-from pathlib import Path
-
 import pytest
-from click.testing import CliRunner
+from faker import Faker
 
-from tests.integration.helpers import ParsingResult
-from toggl.cli.commands import cli
-from toggl import utils
+from . import helpers
+
+
+@pytest.fixture()
+def fake():
+    return Faker()
+
+
+@pytest.fixture()
+def cleanup():
+    return helpers.Cleanup
+
+
+@pytest.fixture(scope='class')
+def post_cleanup(request):
+    yield  # Do the cleanup after the tests run!
+
+    cls = request.cls
+    cls_name = cls.__name__.replace('Test', '').lower()
+    cleanup_fnc = getattr(helpers.Cleanup, cls_name)
+
+    if cleanup_fnc is None:
+        raise RuntimeError('Unknown class to be cleaned up!')
+
+    cleanup_fnc()
 
 
 @pytest.fixture()
 def cmd():
-    def inner_cmd(cmd, config='default.config', simple=True, *args):
-        config_path = Path(__file__).parent
-        config_path = config_path.joinpath('configs/' + config)
+    return helpers.inner_cmd
 
-        if not config_path.exists():
-            raise ValueError('Unknown config path: ' + str(config_path))
 
-        config = utils.Config.factory(str(config_path))
-
-        parsed = re.findall(r"([\"]([^\"]+)\")|([']([^']+)')|(\S+)", cmd)  # Simulates quoting of strings with spaces (eq. filter -n "some important task")
-        args = list(args) + [i[1] or i[3] or i[4] for i in parsed]
-
-        if simple:
-            args.insert(0, '--simple')
-
-        result = CliRunner().invoke(cli, args, obj={'config': config})
-
-        return ParsingResult(result)
-
-    return inner_cmd
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_all():
+    helpers.Cleanup.all()
