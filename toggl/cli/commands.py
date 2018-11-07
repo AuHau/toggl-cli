@@ -23,6 +23,10 @@ def entrypoint(args, obj=None):
 
     try:
         cli(args, obj=obj or {})
+    except exceptions.TogglException as e:
+        logger.error(str(e).strip())
+        logger.debug(traceback.format_exc())
+        exit(e.exit_code)
     except Exception as e:
         logger.error(str(e).strip())
         logger.debug(traceback.format_exc())
@@ -58,7 +62,11 @@ def cli(ctx, quiet, verbose, debug, simple, header, config=None):
     Known exit codes:
      * 0 - Successful execution
      * 1 - Unknown error
-     * 101 - Resource(s) not found
+     * 10 - Command failed because of API throttling
+     * 40 - The passed data are not valid
+     * 42 - Tries to use Premium features on Non-premium workspace
+     * 43 - Authentication failed
+     * 44 - Resource defined by SPEC not found
     """
     if ctx.obj.get('config') is None:
         if config is None:
@@ -374,7 +382,7 @@ def clients_update(ctx, spec, **kwargs):
     """
     Updates a client specified by SPEC argument. SPEC can be either ID or Name of the client.
 
-    In case using Name of the Client, the Client will be looked up in the default workspace.
+    If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
     """
     helpers.entity_update(api.Client, spec, obj=ctx.obj, **kwargs)
 
@@ -590,7 +598,7 @@ def project_users_remove(ctx, spec):
 # ----------------------------------------------------------------------------
 # Workspaces
 # ----------------------------------------------------------------------------
-# TODO: Leave workspace
+# TODO: Leave workspace: DELETE to /v8/workspaces/XXX/leave
 # TODO: Create workspace
 
 @cli.group('workspaces', short_help='workspaces management')

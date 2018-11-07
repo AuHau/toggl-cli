@@ -72,7 +72,7 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name',
 
     if entity is None:
         click.echo('{} not found!'.format(cls.get_name(verbose=True)), color='red')
-        exit(1)
+        exit(44)
 
     entity_dict = {}
     for field in entity.__fields__.values():
@@ -106,7 +106,7 @@ def entity_remove(cls, spec, field_lookup=('id', 'name',), obj=None):
 
     if not entities:
         click.echo('{} not found!'.format(cls.get_name(verbose=True)), color='red')
-        exit(1)
+        exit(44)
     elif len(entities) == 1:
         entity = entities[0]
         entity.delete()
@@ -130,7 +130,7 @@ def entity_update(cls, spec, field_lookup=('id', 'name',), obj=None, **kwargs):
 
     if entity is None:
         click.echo('{} not found!'.format(cls.get_name(verbose=True)), color='red')
-        exit(1)
+        exit(44)
 
     updated = False
     for key, value in kwargs.items():

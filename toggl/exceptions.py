@@ -5,14 +5,14 @@ class TogglException(Exception):
     """
     General top-level Exception for TogglCLI related issues
     """
-    pass
+    exit_code = 1
 
 
 class TogglValidationException(TogglException):
     """
     Exception raised during validations of TogglEntity before saving the entity or by calling validate() method.
     """
-    pass
+    exit_code = 40
 
 
 class TogglMultipleResultsException(TogglException):
@@ -49,7 +49,7 @@ class TogglPremiumException(TogglException):
     Exception raised when user tries to use a Toggl's functionality which is limited only to Premium (Paid) workspaces
     and his current workspace does not support that.
     """
-    pass
+    exit_code = 42
 
 
 class TogglNotAllowedException(TogglException):
@@ -90,18 +90,18 @@ class TogglAuthenticationException(TogglApiException):
     """
     Exception raised when Toggl does not recognize the authentication credentials provided by the user.
     """
-    pass
+    exit_code = 43
 
 
 class TogglThrottlingException(TogglApiException):
     """
     Exception raised when Toggl refuse API call because the call was too soon from last call.
     """
-    pass
+    exit_code = 10
 
 
 class TogglNotFoundException(TogglApiException):
     """
     Exception raised when requested resource was not found.
     """
-    pass
+    exit_code = 44
