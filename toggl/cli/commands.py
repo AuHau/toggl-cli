@@ -38,7 +38,8 @@ def entrypoint(args, obj=None):
 @click.option('--verbose', '-v', is_flag=True, help="Prints additional info")
 @click.option('--debug', '-d', is_flag=True, help="Prints debugging output")
 @click.option('--header/--no-header', default=True, help="Specifies if header/labels of data should be displayed")
-@click.option('--simple', '-s', is_flag=True, help="Instead of pretty aligned tables prints only data separated by tabulator")
+@click.option('--simple', '-s', is_flag=True,
+              help="Instead of pretty aligned tables prints only data separated by tabulator")
 @click.option('--config', type=click.Path(exists=True), envvar='TOGGL_CONFIG',
               help="sets specific Config file to be used (ENV: TOGGL_CONFIG)")
 @click.version_option(__version__)
@@ -442,29 +443,24 @@ def projects(ctx, workspace):
 @click.option('--client', '-c', envvar="TOGGL_CLIENT", type=types.ResourceType(api.Client),
               help='Specifies a client to which the project will be assigned to. Can be ID or name of the client ('
                    'ENV: TOGGL_CLIENT)')
-@click.option('--public', '-p', is_flag=True, help='Specifies whether project is accessible for all workspace users ('
-                                                   '=public) or just only project\'s users.')
-@click.option('--billable/--no-billable', default=True, help='Specifies whether project is billable or not. '
-                                                             '(Premium only)')
-@click.option('--auto-estimates/--no-auto-estimates', default=False,
-              help='Specifies whether the estimated hours are automatically calculated based on task estimations or manually fixed based on the value of \'estimated_hours\' ')
+@click.option('--private', '-p', is_flag=True, help='Specifies whether project is accessible for all workspace users ('
+                                                    '=public) or just only project\'s users (=private). By default it is public.')
+@click.option('--billable', '-b', is_flag=True, default=False, help='Specifies whether project is billable or not. '
+                                                                    '(Premium only)')
+@click.option('--auto-estimates', is_flag=True, default=False,
+              help='Specifies whether the estimated hours should be automatically calculated based on task estimations (Premium only)')
 @click.option('--rate', '-r', type=click.FLOAT, help='Hourly rate of the project (Premium only)')
 @click.option('--color', type=click.INT, help='ID of color used for the project')
 @click.pass_context
-def projects_add(ctx, name, client, public, billable, auto_estimates, rate, color):
+def projects_add(ctx, public=None, **kwargs):
     """
     Creates a new project.
     """
     project = api.Project(
-        name=name,
-        customer=client,
         is_private=not public,
-        billable=billable,
-        auto_estimates=auto_estimates,
-        color=color,
-        rate=rate,
         workspace=ctx.obj['workspace'],
-        obj=ctx.obj
+        config=ctx.obj['config'],
+        **kwargs
     )
 
     project.save()
@@ -474,7 +470,7 @@ def projects_add(ctx, name, client, public, billable, auto_estimates, rate, colo
 @projects.command('update', short_help='update a project')
 @click.argument('spec')
 @click.option('--name', '-n', help='Specifies the name of the project', )
-@click.option('--customer', '-c', type=types.ResourceType(api.Client),
+@click.option('--client', '-c', type=types.ResourceType(api.Client),
               help='Specifies a client to which the project will be assigned to. Can be ID or name of the client')
 @click.option('--private/--public', 'is_private', default=None,
               help='Specifies whether project is accessible for all workspace'
@@ -483,7 +479,7 @@ def projects_add(ctx, name, client, public, billable, auto_estimates, rate, colo
                                                              ' (Premium only)')
 @click.option('--auto-estimates/--no-auto-estimates', default=None,
               help='Specifies whether the estimated hours are automatically calculated based on task estimations or'
-                   ' manually fixed based on the value of \'estimated_hours\'')
+                   ' manually fixed based on the value of \'estimated_hours\' (Premium only)')
 @click.option('--rate', '-r', type=click.FLOAT, help='Hourly rate of the project (Premium only)')
 @click.option('--color', type=click.INT, help='ID of color used for the project')
 @click.pass_context
@@ -495,7 +491,7 @@ def projects_update(ctx, spec, **kwargs):
 
 
 @projects.command('ls', short_help='list projects')
-@click.option('--fields', '-f', type=types.FieldsType(api.Project), default='name,customer,active,id',
+@click.option('--fields', '-f', type=types.FieldsType(api.Project), default='name,client,active,id',
               help='Defines a set of fields of which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(
                   api.Project))
 @click.pass_context
@@ -553,7 +549,8 @@ def project_users_ls(ctx, fields):
 
 
 @project_users.command('add', short_help='add a user into the project')
-@click.option('--user', '-u', prompt='Enter ID or Email of the user to add to project', help='User to be added. Can be ID or email of the user',
+@click.option('--user', '-u', prompt='Enter ID or Email of the user to add to project',
+              help='User to be added. Can be ID or email of the user',
               type=types.ResourceType(api.User, fields=('id', 'email')))
 @click.option('--rate', '-f', default=None, type=click.FLOAT, help='Hourly rate for the project user')
 @click.option('--manager/--no-manager', default=False, help='Admin rights for the project', )

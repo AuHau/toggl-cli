@@ -1,11 +1,19 @@
+import pytest
+
 from toggl.api import Client
+from toggl import exceptions
 
 
 class TestClients:
 
     def test_add(self, cmd, fake):
-        result = cmd('clients add --name \'{}\' --notes \'{}\''.format(fake.name(), fake.sentence()))
+        name = fake.name()
+        result = cmd('clients add --name \'{}\' --notes \'{}\''.format(name, fake.sentence()))
         assert result.obj.exit_code == 0
+
+        # Duplicated names not allowed
+        with pytest.raises(exceptions.TogglApiException):
+            cmd('clients add --name \'{}\''.format(name))
 
         result = cmd('clients add --name \'{}\' --notes \'{}\''.format(fake.name(), fake.sentence()))
         assert result.obj.exit_code == 0

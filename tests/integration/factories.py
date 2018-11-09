@@ -26,3 +26,13 @@ class ClientFactory(TogglFactory):
     name = factory.Faker('name')
     notes = factory.Faker('sentence')
 
+
+class ProjectFactory(TogglFactory):
+    class Meta:
+        model = api.Project
+
+    name = factory.Faker('name')
+    client = factory.SubFactory(ClientFactory)
+    active = True
+    is_private = True
+

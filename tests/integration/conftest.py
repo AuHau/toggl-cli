@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from faker import Faker
 
@@ -14,18 +16,25 @@ def cleanup():
     return helpers.Cleanup
 
 
-@pytest.fixture(scope='class')
-def post_cleanup(request):
-    yield  # Do the cleanup after the tests run!
-
-    cls = request.cls
-    cls_name = cls.__name__.replace('Test', '').lower()
-    cleanup_fnc = getattr(helpers.Cleanup, cls_name)
-
-    if cleanup_fnc is None:
-        raise RuntimeError('Unknown class to be cleaned up!')
-
-    cleanup_fnc()
+# NOT SURE IF NEEDED - FULL CLEANUP IN BEGINNING MIGHT BE ENOUGH
+#
+# @pytest.fixture(scope='class')
+# def post_cleanup(request):
+#     yield  # Do the cleanup after the tests run!
+#
+#     cls = request.cls
+#     cls_name = cls.__name__.replace('Test', '')
+#
+#     # Converting Camel case to Snake case
+#     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', cls_name)
+#     cls_name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+#
+#     cleanup_fnc = getattr(helpers.Cleanup, cls_name)
+#
+#     if cleanup_fnc is None:
+#         raise RuntimeError('Unknown class to be cleaned up!')
+#
+#     cleanup_fnc()
 
 
 @pytest.fixture()

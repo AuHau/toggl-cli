@@ -20,12 +20,15 @@ def inner_cmd(cmd, config='default.config', simple=True, *args):  # type: (str, 
     if simple:
         args.insert(0, '--simple')
 
-    result = CliRunner().invoke(cli, args, obj={'config': config})
+    result = CliRunner().invoke(cli, args, obj={'config': config}, catch_exceptions=False)
 
     return ParsingResult(result)
 
 
 def get_config(config='default.config'):
+    if isinstance(config, utils.Config):
+        return config
+
     config_path = Path(__file__).parent
     config_path = config_path.joinpath('configs/' + config)
 
@@ -83,10 +86,14 @@ class ParsingResult:
 
 class Cleanup:
     @staticmethod
-    def _ids_cleanup(base, config='default.config', *ids):
+    def _ids_cleanup(base, config='default.config', batch=False, *ids):
         config = get_config(config)
-        for entity_id in ids:
-            utils.toggl('/{}/{}'.format(base, entity_id), 'DELETE', config=config)
+
+        if batch:
+            utils.toggl('/{}/{}'.format(base, ','.join([str(id) for id in ids])), 'delete', config=config)
+        else:
+            for entity_id in ids:
+                utils.toggl('/{}/{}'.format(base, entity_id), 'delete', config=config)
 
     @staticmethod
     def _all_cleanup(cls, config='default.config'):
@@ -119,35 +126,45 @@ class Cleanup:
         if not ids:
             Cleanup._all_cleanup(api.Client, config=config)
         else:
-            Cleanup._ids_cleanup('clients', config='default.config', *ids)
+            Cleanup._ids_cleanup('clients', config, False, *ids)
 
     @staticmethod
     def time_entries(config='default.config', *ids):
         if not ids:
-            Cleanup._all_cleanup(api.TimeEntry, config=config)
-        else:
-            Cleanup._ids_cleanup('time_entries', config='default.config', *ids)
+            config = get_config(config)
+            entities = api.TimeEntry.objects.all(config=config)
+            ids = [entity.id for entity in entities]
+
+        if not ids:
+            return
+
+        Cleanup._ids_cleanup('time_entries', config=config, batch=True, *ids)
 
     @staticmethod
     def project_users(config='default.config', *ids):
         if not ids:
             Cleanup._all_cleanup(api.ProjectUser, config=config)
         else:
-            Cleanup._ids_cleanup('project_users', config='default.config', *ids)
+            Cleanup._ids_cleanup('project_users', config, False, *ids)
 
     @staticmethod
     def projects(config='default.config', *ids):
         if not ids:
-            Cleanup._all_cleanup(api.Project, config=config)
-        else:
-            Cleanup._ids_cleanup('projects', config='default.config', *ids)
+            config = get_config(config)
+            entities = api.Project.objects.all(config=config)
+            ids = [entity.id for entity in entities]
+
+        if not ids:
+            return
+
+        Cleanup._ids_cleanup('projects', config, True, *ids)
 
     @staticmethod
     def tasks(config='default.config', *ids):
         if not ids:
             Cleanup._all_cleanup(api.Task, config=config)
         else:
-            Cleanup._ids_cleanup('tasks', config='default.config', *ids)
+            Cleanup._ids_cleanup('tasks', config, False, *ids)
 
     @staticmethod
     def workspace_users(config='default.config', *ids):
@@ -157,4 +174,4 @@ class Cleanup:
             entities = filter(lambda wu: wu.__dict__.get('uid') != config.user.id, api.WorkspaceUser.objects.all(config=config))
             Cleanup.cleanup(entities)
         else:
-            Cleanup._ids_cleanup('workspace_users', config='default.config', *ids)
+            Cleanup._ids_cleanup('workspace_users', config, False, *ids)
