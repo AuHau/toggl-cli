@@ -474,9 +474,9 @@ class TogglEntity(metaclass=TogglEntityMeta):
         """
         for field in self.__fields__.values():
             if isinstance(field, model_fields.MappingField):
-                field.validate(getattr(self, field.mapped_field, None))
+                field.validate(getattr(self, field.mapped_field, None), self)
             else:
-                field.validate(getattr(self, field.name, None))
+                field.validate(getattr(self, field.name, None), self)
 
     def to_dict(self, serialized=False, changes_only=False):  # type: (bool, bool) -> typing.Dict
         """
@@ -505,9 +505,9 @@ class TogglEntity(metaclass=TogglEntityMeta):
 
         return entity_dict
 
-    def __cmp__(self, other):  # type: (typing.Generic[Entity]) -> bool
+    def __eq__(self, other):  # type: (typing.Generic[Entity]) -> bool
         if not isinstance(other, self.__class__):
-            raise RuntimeError('You are trying to compare instances of different classes!')
+            return False
 
         if self.id is None or other.id is None:
             raise RuntimeError('One of the instances was not yet saved! We can\'t compere unsaved instances!')

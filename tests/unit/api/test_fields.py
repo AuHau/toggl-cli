@@ -156,6 +156,31 @@ class TestTogglField:
         with pytest.raises(exceptions.TogglNotAllowedException):
             field.__set__(obj, 'asd')
 
+    def test_premium(self):
+        class WorkspaceMock:
+            premium = False
+            name = 'WorkspaceMock'
+
+        class WorkspaceEntityMock(models.WorkspaceEntity):
+            workspace = WorkspaceMock
+            premium_field = fields.StringField(premium=True)
+
+        with pytest.raises(exceptions.TogglPremiumException):
+            obj = WorkspaceEntityMock(premium_field='something')
+            obj.save()
+
+        obj = WorkspaceEntityMock()
+
+        field = fields.StringField(premium=True)
+        field.name = 'field'
+
+        with pytest.raises(exceptions.TogglPremiumException):
+            field.__set__(obj, 'asd')
+
+        WorkspaceMock.premium = True
+        field.__set__(obj, 'asd')
+        assert obj.__dict__['field'] == 'asd'
+
 
 #########################################################################################
 # MappingField

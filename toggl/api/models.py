@@ -78,14 +78,14 @@ class Client(WorkspaceEntity):
 
 class Project(WorkspaceEntity):
     name = fields.StringField(required=True)
-    customer = fields.MappingField(Client, 'cid')  # type: Client
+    client = fields.MappingField(Client, 'cid')  # type: Client
     active = fields.BooleanField(default=True)
     is_private = fields.BooleanField(default=True)
-    billable = fields.BooleanField(default=True)
-    auto_estimates = fields.BooleanField(default=False)
-    estimated_hours = fields.IntegerField()
+    billable = fields.BooleanField(premium=True)
+    auto_estimates = fields.BooleanField(default=False, premium=True)
+    estimated_hours = fields.IntegerField(premium=True)
     color = fields.IntegerField()
-    rate = fields.FloatField()
+    rate = fields.FloatField(premium=True)
 
     def add_user(self, user, manager=False, rate=None):  # type: (User, bool, typing.Optional[float]) -> ProjectUser
         project_user = ProjectUser(project=self, user=user, workspace=self.workspace, manager=manager, rate=rate)

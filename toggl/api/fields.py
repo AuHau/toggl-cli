@@ -43,6 +43,8 @@ class TogglField:
     (meaningful for WorkspaceEntity and its subclasses).
 
     Attribute 'is_read_only' specifies if user can set value to the field.
+
+    Attribute 'premium' specifies if the field can be used only for premium workspaces.
     """
 
     # Represents Python's primitive type for easy implementation of basic Fields like String, Integer etc. using Python builtins (eq. bool, str, etc.).
@@ -54,16 +56,18 @@ class TogglField:
     default = None
     admin_only = False
     is_read_only = False
+    premium = False
 
-    def __init__(self, verbose_name=None, required=False, default=NOTSET, admin_only=False, is_read_only=False):
+    def __init__(self, verbose_name=None, required=False, default=NOTSET, admin_only=False, is_read_only=False, premium=False):
         self.name = None
         self.verbose_name = verbose_name
         self.required = required
         self.default = default
         self.admin_only = admin_only
         self.is_read_only = is_read_only
+        self.premium = premium
 
-    def validate(self, value):  # type: (typing.Any) -> None
+    def validate(self, value, instance):  # type: (typing.Any, base.Entity) -> None
         """
         Validates if the passed value is valid from the perspective of the data type that the field represents.
 
@@ -74,6 +78,16 @@ class TogglField:
         """
         if self.required and self.default is NOTSET and not value:
             raise exceptions.TogglValidationException('The field \'{}\' is required!'.format(self.name))
+
+        if self.premium:
+            from .models import WorkspaceEntity, Workspace
+            workspace = instance.workspace if isinstance(instance, WorkspaceEntity) else instance  # type: Workspace
+
+            if getattr(instance, self.name, False) and not workspace.premium:
+                raise exceptions.TogglPremiumException('You are trying to save object with premium field \'{}.{}\''.format(
+                    instance.__class__.__name__,
+                    self.name
+                ))
 
     def serialize(self, value):  # type: (typing.Any) -> typing.Any
         """
@@ -173,12 +187,19 @@ class TogglField:
         if self.is_read_only:
             raise exceptions.TogglNotAllowedException('Attribute \'{}\' is read only!'.format(self.name))
 
-        if self.admin_only:
+        if self.admin_only or self.premium:
             from .models import WorkspaceEntity, Workspace
             workspace = instance.workspace if isinstance(instance, WorkspaceEntity) else instance  # type: Workspace
-            if not workspace.admin:
+
+            if self.admin_only and not workspace.admin:
                 raise exceptions.TogglNotAllowedException(
                     'You are trying edit field \'{}.{}\' which is admin only field, but you are not an admin in workspace \'{}\'!'
+                        .format(instance.__class__.__name__, self.name, workspace.name)
+                )
+
+            if self.premium and not workspace.premium:
+                raise exceptions.TogglPremiumException(
+                    'You are trying to edit field \'{}.{}\' which is premium only field, but the associated workspace \'{}\' is not premium!'
                         .format(instance.__class__.__name__, self.name, workspace.name)
                 )
 
@@ -300,8 +321,8 @@ class EmailField(StringField):
     Field that performs validation for valid email address.
     """
 
-    def validate(self, value):
-        super().validate(value)
+    def validate(self, value, instance):
+        super().validate(value, instance)
 
         if not validate_email(value):
             raise exceptions.TogglValidationException('Email \'{}\' is not valid email address!'.format(value))
@@ -424,8 +445,8 @@ class ChoiceField(StringField):
 
         super().__set__(instance, value)
 
-    def validate(self, value):
-        super().validate(value)
+    def validate(self, value, instance):
+        super().validate(value, instance)
 
         if value not in self.choices and value not in self.choices.values():
             raise exceptions.TogglValidationException('Value \'{}\' is not valid choice!'.format(value))
@@ -568,15 +589,28 @@ class MappingField(TogglField):
         else:
             raise NotImplementedError('Field with MANY cardinality is not supported for attribute assignment')
 
-    def validate(self, value):
-        super().validate(value)
+    def validate(self, value, instance):
+        try:
+            super().validate(value, instance)
+        except AttributeError:
+            pass  # Ignoring because of caused by the getattr(self.name) in TogglField.validate()
 
-        # TODO: By default turn off this validation as it is rather expensive, until Caching is introduced
-        if value is not None:
-            obj = self.mapped_cls.objects.get(value)
+        if self.premium:
+            from .models import WorkspaceEntity, Workspace
+            workspace = instance.workspace if isinstance(instance, WorkspaceEntity) else instance  # type: Workspace
 
-            if obj is None:
-                raise exceptions.TogglValidationException('Mapped object does not exist!')
+            if getattr(instance, self.mapped_field, False) and not workspace.premium:
+                raise exceptions.TogglPremiumException('You are trying to save object with premium field \'{}.{}\''.format(
+                    instance.__class__.__name__,
+                    self.name
+                ))
+
+        ## Commented out because of it is expensive validation, which should be ignored until introducing caching.
+        # if value is not None:
+        #     obj = self.mapped_cls.objects.get(value)
+        #
+        #     if obj is None:
+        #         raise exceptions.TogglValidationException('Mapped object does not exist!')
 
     def serialize(self, value):
         if value is None:
