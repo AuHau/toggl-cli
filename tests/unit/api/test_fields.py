@@ -347,15 +347,24 @@ class ListEntity(base.TogglEntity):
     field = fields.ListField()  # type: list
 
 
+class RequiredListEntity(base.TogglEntity):
+    field = fields.ListField(required=True)  # type: list
+
+
 class TestListField:
 
     def test_type_check(self):
         instance = ListEntity()
+        required_instance = RequiredListEntity(field=[1, 2, 3])
 
         with pytest.raises(TypeError):
             instance.field = 'some value not list'
 
+        with pytest.raises(TypeError):
+            required_instance.field = None
+
         try:
+            instance.field = None
             instance.field = ['some', 'list']
         except TypeError:
             pytest.fail('ListField does not accept valid list object!')

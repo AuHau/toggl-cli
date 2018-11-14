@@ -507,12 +507,19 @@ class ListField(TogglField):
         return ListContainer(instance, self.name, value)
 
     def serialize(self, value):
+        if value is None:
+            return None
+
         if not isinstance(value, ListContainer):
             raise TypeError('Serialized value is not ListContainer!')
 
         return value._inner_list
 
     def __set__(self, instance, value):
+        if value is None:
+            super().__set__(instance, None)
+            return
+
         if not isinstance(value, list) and not isinstance(value, ListContainer):
             raise TypeError('ListField expects list instance when setting a value to the field.')
 
