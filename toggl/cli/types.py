@@ -48,7 +48,7 @@ class DateTimeType(click.ParamType):
         self.fail("Unknown datetime format!", param, ctx)
 
 
-class DurationType(DateTimeType):
+class DateTimeDurationType(DateTimeType):
     """
     Parse a duration string. If the provided string does not follow duration syntax
     it fallback to DateTimeType parsing.
@@ -59,7 +59,7 @@ class DurationType(DateTimeType):
     """
     Supported units: d = days, h = hours, m = minutes, s = seconds.
 
-    Regex matches unique counts per unit (always the last one, so for '1h 1m 2h', it will parse 2 hours).
+    Regex matches unique counts per unit (always the last one, so for '1h1m2h', it will parse 2 hours).
     Examples of successful matches:
     1d 1h 1m 1s
     1h 1d 1s

@@ -37,7 +37,7 @@ def datetime_type():
 
 @pytest.fixture()
 def duration_type():
-    return types.DurationType()
+    return types.DateTimeDurationType()
 
 
 @pytest.fixture()

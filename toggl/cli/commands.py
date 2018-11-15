@@ -126,7 +126,7 @@ def visit_www():
 # ----------------------------------------------------------------------------
 @cli.command('add', short_help='adds finished time entry')
 @click.argument('start', type=types.DateTimeType(allow_now=True))
-@click.argument('end', type=types.DurationType())
+@click.argument('end', type=types.DateTimeDurationType())
 @click.argument('descr')
 @click.option('--tags', '-a', help='List of tags delimited with \',\'')
 @click.option('--project', '-p', envvar="f", type=types.ResourceType(api.Project),
@@ -150,7 +150,7 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
      - 'm' : minutes
      - 's' : seconds
 
-    Example: 5h 2m 10s - 5 hours 2 minutes 10 seconds from the start time
+    Example: 5h2m10s - 5 hours 2 minutes 10 seconds from the start time
     """
     if isinstance(end, pendulum.Duration):
         end = start + end
@@ -161,7 +161,7 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
 
     # Create a time entry.
     entry = api.TimeEntry(
-        obj=ctx.obj,
+        config=ctx.obj['config'],
         description=descr,
         start=start,
         stop=end,
@@ -176,6 +176,7 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
 
 
 # TODO: [Feature/Medium] Make possible to list really all time-entries, not first 1000 in last 9 days
+# TODO: [Feature/High] Filter entries by projects/tags
 @cli.command('ls', short_help='list a time entries')
 @click.option('--start', '-s', type=types.DateTimeType(),
               help='Defines start of a date range to filter the entries by.')
@@ -188,17 +189,28 @@ def entry_ls(ctx, start, stop, fields):
     """
     Lists time entries the user has access to.
 
-    The list is limited with 1000 entries in last 9 days.
+    The list is limited with 1000 entries in last 9 days. The list visible
+    through this utility and on toggl's web client might differ in the range
+    as they developing new version of API and they are able to see in the future
+    and also longer into past.
     """
     # Limit the list of TimeEntries based on start/stop dates.
     if start is not None or stop is not None:
-        entities = api.TimeEntry.objects.filter(start=start, stop=stop, obj=ctx.obj)
+        entities = api.TimeEntry.objects.filter(start=start, stop=stop, config=ctx.obj['config'])
     else:
-        entities = api.TimeEntry.objects.all(obj=ctx.obj)
+        entities = api.TimeEntry.objects.all(config=ctx.obj['config'])
 
     if not entities:
         click.echo('No entries were found!')
         exit(0)
+
+    if ctx.obj.get('simple'):
+        if ctx.obj.get('header'):
+            click.echo('\t'.join([click.style(field.capitalize(), fg='white', dim=1) for field in fields]))
+
+        for entity in entities:
+            click.echo('\t'.join([str(entity.__fields__[field].format(getattr(entity, field, ''))) for field in fields]))
+        return
 
     table = PrettyTable()
     table.field_names = [click.style(field.capitalize(), fg='white', dim=1) for field in fields]
@@ -217,7 +229,7 @@ def entry_ls(ctx, start, stop, fields):
                                                             display_running=True))
             elif field == 'start':
                 value = str(entity.__fields__[field].format(getattr(entity, field), instance=entity,
-                                                            only_time_for_same_day=True))
+                                                            only_time_for_same_day=entity.stop))
             else:
                 value = str(entity.__fields__[field].format(getattr(entity, field)))
             row.append(value)
@@ -255,7 +267,7 @@ def entry_start(ctx, descr, start, project, workspace):
     the entry will be stopped and new entry started.
     """
     api.TimeEntry.start_and_save(
-        obj=ctx.obj,
+        config=ctx.obj['config'],
         start=start,
         description=descr,
         project=project,
@@ -278,7 +290,7 @@ def entry_now(ctx, **kwargs):
     Without any options the command fetches the current time entry and displays it. But it also supports modification
     of the current time entry through the options listed below.
     """
-    current = api.TimeEntry.objects.current(obj=ctx.obj)
+    current = api.TimeEntry.objects.current(config=ctx.obj['config'])
 
     if current is None:
         click.echo('There is no time entry running!')
@@ -293,7 +305,7 @@ def entry_now(ctx, **kwargs):
     if updated:
         current.save()
 
-    helpers.entity_detail(api.TimeEntry, current, primary_field='description', obj=ctx.obj)
+    helpers.entity_detail(api.TimeEntry, current, primary_field='description', config=ctx.obj['config'])
 
 
 @cli.command('stop', short_help='stops current time entry')
@@ -303,7 +315,7 @@ def entry_stop(ctx, stop):
     """
     Stops the current time entry.
     """
-    current = api.TimeEntry.objects.current(obj=ctx.obj)
+    current = api.TimeEntry.objects.current(config=ctx.obj['config'])
 
     if current is None:
         click.echo('There is no time entry running!')
@@ -320,7 +332,7 @@ def entry_stop(ctx, stop):
 @click.pass_context
 def entry_continue(ctx, descr, start):
     """
-    Takes the last time entry and continue its logging.
+    If DESCR is specified then it will search this entry and continue it, otherwise it continues the last time entry.
 
     The underhood behaviour of Toggl is that it actually creates a new entry with the same description.
     """
@@ -366,7 +378,7 @@ def clients_add(ctx, **kwargs):
     """
     client = api.Client(
         workspace=ctx.obj['workspace'],
-        obj=ctx.obj,
+        config=ctx.obj['config'],
         **kwargs
     )
 
@@ -561,7 +573,7 @@ def project_users_add(ctx, user, **kwargs):
     """
     client = api.ProjectUser(
         project=ctx.obj['project'],
-        obj=ctx.obj,
+        config=ctx.obj['config'],
         user=user,
         **kwargs
     )
@@ -699,7 +711,7 @@ def tasks_add(ctx, **kwargs):
     """
     Creates a new task.
     """
-    task = api.Task(obj=ctx.obj, workspace=ctx.obj['workspace'], **kwargs)
+    task = api.Task(config=ctx.obj['config'], workspace=ctx.obj['workspace'], **kwargs)
 
     try:
         task.save()
