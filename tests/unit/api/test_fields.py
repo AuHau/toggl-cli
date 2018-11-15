@@ -18,20 +18,21 @@ class TestTogglField:
 
     def test_validate(self):
         field = fields.TogglField()
+        instance = object()
 
         try:
-            field.validate(None)
-            field.validate('asd')
+            field.validate(None, instance)
+            field.validate('asd', instance)
         except exceptions.TogglValidationException:
             pytest.fail('Validation exception raised!')
 
         field = fields.TogglField(required=True)
         with pytest.raises(exceptions.TogglValidationException):
-            field.validate(None)
+            field.validate(None, instance)
 
         field = fields.TogglField(required=True, default=None)
         try:
-            field.validate(None)
+            field.validate(None, instance)
         except exceptions.TogglValidationException:
             pytest.fail('Validation exception raised!')
 
@@ -402,3 +403,76 @@ class TestListField:
         instance.field.append(4)
 
         assert len(instance.__change_dict__) == 1
+
+
+#########################################################################################
+# SetField
+
+class SetEntity(base.TogglEntity):
+    field = fields.SetField()  # type: set
+
+
+class SetListEntity(base.TogglEntity):
+    field = fields.SetField(required=True)  # type: set
+
+
+class TestSetField:
+
+    def test_type_check(self):
+        instance = SetEntity()
+        required_instance = SetListEntity(field=[1, 2, 3])
+
+        with pytest.raises(TypeError):
+            instance.field = 'some value not list'
+
+        with pytest.raises(TypeError):
+            required_instance.field = None
+
+        try:
+            instance.field = None
+            instance.field = ['some', 'list']
+            instance.field = {'some', 'list'}
+        except TypeError:
+            pytest.fail('ListField does not accept valid list object!')
+
+    def test_format(self):
+        instance = SetEntity()
+
+        value = {'some', 'list'}
+        formatted_value = instance.__fields__['field'].format(value)
+        assert len(value) == len(formatted_value.split(','))
+
+        value = {'some'}
+        formatted_value = instance.__fields__['field'].format(value)
+        assert ',' not in formatted_value
+
+        value = None
+        formatted_value = instance.__fields__['field'].format(value)
+        assert formatted_value == ''
+
+    def test_init(self):
+        instance = SetEntity(field=[1, 2, 3, 3])
+
+        assert len(instance.field) == 3
+        assert isinstance(instance.field, fields.SetContainer)
+
+    def test_update(self):
+        instance = SetEntity(field=[1, 2, 3])
+
+        assert len(instance.field) == 3
+        instance.field.add(4)
+        assert len(instance.field) == 4
+        instance.field.add(4)
+        assert len(instance.field) == 4
+
+    def test_change_detection(self):
+        instance = SetEntity(field=[1, 2, 3])
+        assert len(instance.__change_dict__) == 0
+
+        instance.field.add(4)
+        assert 'field' in instance.__change_dict__
+
+        instance.__change_dict__ = {}
+        instance.field.remove(4)
+        assert 'field' in instance.__change_dict__
+

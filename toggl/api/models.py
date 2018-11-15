@@ -321,7 +321,7 @@ class TimeEntry(WorkspaceEntity):
     stop = TimeEntryDateTimeField()
     duration = fields.PropertyField(get_duration, set_duration, formatter=format_duration)
     created_with = fields.StringField(required=True, default='TogglCLI')
-    tags = fields.ListField()
+    tags = fields.SetField()
 
     objects = TimeEntrySet()
 

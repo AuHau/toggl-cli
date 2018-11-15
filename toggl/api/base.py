@@ -51,16 +51,36 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dic
 
             continue
 
-        if not getattr(entity, key, False):
-            return False
+        entity_value = getattr(entity, key, None)
 
-        if isinstance(field, model_fields.StringField) and contain:
-            if str(value) not in str(getattr(entity, key)):
+        if isinstance(field, model_fields.SetField):
+            if value is None and entity_value is None:
+                continue
+
+            if value is None or entity_value is None:
+                return False
+
+            if not isinstance(value, set) and not isinstance(value, model_fields.SetContainer):
+                return False
+
+            if isinstance(value, set) and not entity_value._inner_set.issuperset(value):
+                return False
+
+            if isinstance(value, model_fields.SetContainer) and not entity_value._inner_set.issuperset(value._inner_set):
                 return False
 
             continue
 
-        if str(getattr(entity, key)) != str(value):
+        if not entity_value:
+            return False
+
+        if isinstance(field, model_fields.StringField) and contain:
+            if str(value) not in str(entity_value):
+                return False
+
+            continue
+
+        if str(entity_value) != str(value):
             return False
 
     return True

@@ -128,7 +128,7 @@ def visit_www():
 @click.argument('start', type=types.DateTimeType(allow_now=True))
 @click.argument('end', type=types.DateTimeDurationType())
 @click.argument('descr')
-@click.option('--tags', '-a', type=types.ListType(), help='List of tags delimited with \',\'')
+@click.option('--tags', '-a', type=types.SetType(), help='List of tags delimited with \',\'')
 @click.option('--project', '-o', envvar="f", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
 @click.option('--task', '-t', envvar="TOGGL_TASK", type=types.ResourceType(api.Task),
@@ -179,7 +179,7 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
 @click.option('--stop', '-p', type=types.DateTimeType(), help='Defines stop of a date range to filter the entries by.')
 @click.option('--project', '-o', type=types.ResourceType(api.Project),
               help='Filters the entries by project. Can be ID or name of the project.', )
-@click.option('--tags', '-a', type=types.ListType(), help='Filters the entries by list of tags delimited with \',\'')
+@click.option('--tags', '-a', type=types.SetType(), help='Filters the entries by list of tags delimited with \',\'')
 @click.option('--fields', '-f', type=types.FieldsType(api.TimeEntry), default='description,duration,start,stop',
               help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(
                   api.TimeEntry))

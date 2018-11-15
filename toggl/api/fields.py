@@ -73,6 +73,7 @@ class TogglField:
 
         Basic implementation validate only 'required' attribute.
 
+        :param instance: Instance of the TogglEntity which we are validating the value against
         :param value: Any value
         :raises exceptions.TogglValidationException: When the passed value is not valid.
         """
@@ -525,6 +526,81 @@ class ListField(TogglField):
 
         if isinstance(value, list):
             value = ListContainer(instance, self.name, value)
+
+        super().__set__(instance, value)
+
+
+class SetContainer(collections.MutableSet):
+    def __init__(self, entity_instance, field_name, existing_set=None):
+        if existing_set is not None:
+            if isinstance(existing_set, list):
+                self._inner_set = set(existing_set)
+            else:
+                self._inner_set = copy(existing_set)
+        else:
+            self._inner_set = set()
+
+        self._instance = entity_instance
+        self._field_name = field_name
+
+    def add(self, x):
+        self._instance.__change_dict__[self._field_name] = self
+        self._inner_set.add(x)
+
+    def discard(self, x):
+        self._instance.__change_dict__[self._field_name] = self
+        self._inner_set.discard(x)
+
+    def __contains__(self, x):
+        return x in self._inner_set
+
+    def __iter__(self):
+        return self._inner_set.__iter__()
+
+    def __len__(self):
+        return len(self._inner_set)
+
+
+class SetField(TogglField):
+    """
+    Field that represents set of values.
+
+    It only accept list (list is converted to set)/set value's. As set is mutable object the in-place operators can be used to modify the object.
+    """
+    def format(self, value, config=None):
+        if value is None:
+            return ''
+
+        return ', '.join(value)
+
+    def parse(self, value, instance):
+        if value is None:
+            return SetContainer(instance, self.name)
+
+        if not isinstance(value, list) and not isinstance(value, SetContainer) and not isinstance(value, set):
+            raise TypeError('ListField expects list/set/SetContainer instance when setting a value to the field.')
+
+        return SetContainer(instance, self.name, value)
+
+    def serialize(self, value):
+        if value is None:
+            return None
+
+        if not isinstance(value, SetContainer):
+            raise TypeError('Serialized value is not SetContainer!')
+
+        return list(value._inner_set)
+
+    def __set__(self, instance, value):
+        if value is None:
+            super().__set__(instance, None)
+            return
+
+        if not isinstance(value, list) and not isinstance(value, SetContainer) and not isinstance(value, set):
+            raise TypeError('ListField expects list/set/SetContainer instance when setting a value to the field.')
+
+        if not isinstance(value, SetContainer):
+            value = SetContainer(instance, self.name, value)
 
         super().__set__(instance, value)
 

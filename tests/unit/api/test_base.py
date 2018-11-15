@@ -50,6 +50,7 @@ class EvaluateConditionsEntity(base.TogglEntity):
     string = fields.StringField()
     integer = fields.IntegerField()
     boolean = fields.BooleanField()
+    set = fields.SetField()
 
 
 class EvaluateConditionsEntityMapping(EvaluateConditionsEntity):
@@ -65,9 +66,21 @@ evaluate_conditions_testset = (
      EvaluateConditionsEntity(string='asd', integer=123, boolean=True),
      True),
 
-    ({'string': 'asd', 'integer': 123, 'boolean': True},
+    ({'string': 'asd', 'integer': 123},
      EvaluateConditionsEntity(string='asd', integer=123, boolean=True),
      True),
+
+    ({'integer': 123, 'boolean': True, 'set': {1, 2}},
+     EvaluateConditionsEntity(string='asd', integer=123, boolean=True, set={1, 2, 3, 4}),
+     True),
+
+    ({'integer': 123, 'boolean': True, 'set': {1, 2, 3, 4}},
+     EvaluateConditionsEntity(string='asd', integer=123, boolean=True, set={1, 2, 3, 4}),
+     True),
+
+    ({'integer': 123, 'boolean': True, 'set': {5, 6}},
+     EvaluateConditionsEntity(string='asd', integer=123, boolean=True, set={1, 2, 3, 4}),
+     False),
 )
 
 evaluate_conditions_contain_testset = (
@@ -370,6 +383,7 @@ class TestTogglSet:
         with pytest.raises(exceptions.TogglException):
             tset.all()
 
+
 #######################################################################################################
 ## TogglEntityMeta
 
@@ -384,7 +398,6 @@ class MetaTestEntity(metaclass=base.TogglEntityMeta):
 class ExtendedMetaTestEntity(MetaTestEntity):
     another_string = fields.StringField()
     another_mapped = fields.MappingField(RandomEntity, 'another_mapping_field')
-
 
 
 class TestTogglEntityMeta:
@@ -568,7 +581,6 @@ class TestTogglEntity:
         base.TogglSet.get.assert_called_with(124)
 
     def test_to_dict_changes(self):
-
         obj = Entity(string='asd', integer=123, boolean=True)
         obj.boolean = False
         obj.integer = 321
@@ -657,6 +669,3 @@ class TestTogglEntity:
         obj._can_update = False
         with pytest.raises(exceptions.TogglException):
             obj.save()
-
-
-

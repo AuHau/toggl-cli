@@ -126,14 +126,14 @@ class ResourceType(click.ParamType):
         self.fail("Unknown {} under specification \'{}\'!".format(self._resource_cls.get_name(verbose=True), value), param, ctx)
 
 
-class ListType(click.ParamType):
-    name = 'list'
+class SetType(click.ParamType):
+    name = 'set'
 
     def convert(self, value, param, ctx):
         if value is None:
             return None
 
-        return value.split(',')
+        return {x.strip() for x in value.split(',')}
 
 
 class FieldsType(click.ParamType):
