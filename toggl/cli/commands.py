@@ -128,8 +128,8 @@ def visit_www():
 @click.argument('start', type=types.DateTimeType(allow_now=True))
 @click.argument('end', type=types.DateTimeDurationType())
 @click.argument('descr')
-@click.option('--tags', '-a', help='List of tags delimited with \',\'')
-@click.option('--project', '-p', envvar="f", type=types.ResourceType(api.Project),
+@click.option('--tags', '-a', type=types.ListType(), help='List of tags delimited with \',\'')
+@click.option('--project', '-o', envvar="f", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
 @click.option('--task', '-t', envvar="TOGGL_TASK", type=types.ResourceType(api.Task),
               help='Link the entry with specific task. Can be ID or name of the task (ENV: TOGGL_TASK)', )
@@ -155,10 +155,6 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
     if isinstance(end, pendulum.Duration):
         end = start + end
 
-    # TODO: Add click's type to handle directly
-    if tags is not None:
-        tags = tags.split(',')
-
     # Create a time entry.
     entry = api.TimeEntry(
         config=ctx.obj['config'],
@@ -181,11 +177,14 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
 @click.option('--start', '-s', type=types.DateTimeType(),
               help='Defines start of a date range to filter the entries by.')
 @click.option('--stop', '-p', type=types.DateTimeType(), help='Defines stop of a date range to filter the entries by.')
+@click.option('--project', '-o', type=types.ResourceType(api.Project),
+              help='Filters the entries by project. Can be ID or name of the project.', )
+@click.option('--tags', '-a', type=types.ListType(), help='Filters the entries by list of tags delimited with \',\'')
 @click.option('--fields', '-f', type=types.FieldsType(api.TimeEntry), default='description,duration,start,stop',
               help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(
                   api.TimeEntry))
 @click.pass_context
-def entry_ls(ctx, start, stop, fields):
+def entry_ls(ctx, start, stop, project, tags, fields):
     """
     Lists time entries the user has access to.
 
@@ -195,8 +194,8 @@ def entry_ls(ctx, start, stop, fields):
     and also longer into past.
     """
     # Limit the list of TimeEntries based on start/stop dates.
-    if start is not None or stop is not None:
-        entities = api.TimeEntry.objects.filter(start=start, stop=stop, config=ctx.obj['config'])
+    if start is not None or stop is not None or project is not None or tags:
+        entities = api.TimeEntry.objects.filter(start=start, stop=stop, project=project, tags=tags, config=ctx.obj['config'])
     else:
         entities = api.TimeEntry.objects.all(config=ctx.obj['config'])
 
@@ -256,7 +255,7 @@ def entry_rm(ctx, spec):
 @click.argument('descr', required=False)
 @click.option('--start', '-s', type=types.DateTimeType(allow_now=True), help='Specifies start of the time entry. '
                                                                              'If left empty \'now\' is assumed.')
-@click.option('--project', '-p', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
+@click.option('--project', '-o', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
@@ -278,7 +277,7 @@ def entry_start(ctx, descr, start, project, workspace):
 @cli.command('now', short_help='manage current time entry')
 @click.option('--description', '-d', help='Sets description')
 @click.option('--start', '-s', type=types.DateTimeType(allow_now=True), help='Sets starts time.')
-@click.option('--project', '-p', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
+@click.option('--project', '-o', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
@@ -699,7 +698,7 @@ def tasks(ctx, workspace):
               help='Specifies the name of the task', )
 @click.option('--estimated_seconds', '-e', type=click.INT, help='Specifies estimated duration for the task in seconds')
 @click.option('--active/--no-active', default=True, help='Specifies whether the task is active', )
-@click.option('--project', '-p', prompt='Name or ID of project to have the task assigned to', envvar="TOGGL_PROJECT",
+@click.option('--project', '-o', prompt='Name or ID of project to have the task assigned to', envvar="TOGGL_PROJECT",
               type=types.ResourceType(api.Project),
               help='Specifies a project to which the task will be linked to. Can be ID or name of the project '
                    '(ENV: TOGGL_PROJECT)')

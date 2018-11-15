@@ -126,6 +126,16 @@ class ResourceType(click.ParamType):
         self.fail("Unknown {} under specification \'{}\'!".format(self._resource_cls.get_name(verbose=True), value), param, ctx)
 
 
+class ListType(click.ParamType):
+    name = 'list'
+
+    def convert(self, value, param, ctx):
+        if value is None:
+            return None
+
+        return value.split(',')
+
+
 class FieldsType(click.ParamType):
     """
     Type used for defining list of fields for certain TogglEntity (resources_cls).

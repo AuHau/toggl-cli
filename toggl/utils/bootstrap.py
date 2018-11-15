@@ -11,6 +11,7 @@ from .. import exceptions, get_version
 logger = logging.getLogger('toggl.utils.bootstrap')
 
 
+# TODO: Bootstrap the day_first/year_first value
 # TODO: As `inquirer` package is not compatible with Windows, provide dummy bootstrap on Windows
 class ConfigBootstrap:
     """
