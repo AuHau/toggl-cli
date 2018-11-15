@@ -2,7 +2,7 @@ import json
 import logging
 import typing
 from copy import copy
-from urllib.parse import urlencode
+from urllib.parse import quote_plus
 from validate_email import validate_email
 
 import pendulum
@@ -53,7 +53,8 @@ class Workspace(base.TogglEntity):
 
 
 class WorkspaceEntity(base.TogglEntity):
-    workspace = fields.MappingField(Workspace, 'wid', is_read_only=True, default=lambda config: config.default_workspace)  # type: Workspace
+    workspace = fields.MappingField(Workspace, 'wid', is_read_only=True,
+                                    default=lambda config: config.default_workspace)  # type: Workspace
 
 
 # Premium Entity
@@ -61,6 +62,7 @@ class PremiumEntity(WorkspaceEntity):
     """
     Abstract entity that enforces that linked Workspace is premium (paid).
     """
+
     def save(self, config=None):  # type: (utils.Config) -> None
         if not self.workspace.premium:
             raise exceptions.TogglPremiumException('The entity {} requires to be associated with Premium workspace!')
@@ -133,7 +135,8 @@ class User(WorkspaceEntity):
     objects = UserSet()
 
     @classmethod
-    def signup(cls, email, password, timezone=None, created_with='TogglCLI', config=None):  # type: (str, str, str, str, utils.Config) -> User
+    def signup(cls, email, password, timezone=None, created_with='TogglCLI',
+               config=None):  # type: (str, str, str, str, utils.Config) -> User
         """
         Creates brand new user. After creation confirmation email is sent to him.
 
@@ -214,20 +217,20 @@ class TimeEntryDateTimeField(fields.DateTimeField):
     Special extension of DateTimeField which handles better way of formatting the datetime for CLI use-case.
     """
 
-    def format(self, value, config=None, instance=None, display_running=False, only_time_for_same_day=False):  # type: (typing.Any, utils.Config, base.Entity, bool, bool) -> typing.Any
+    def format(self, value, config=None, instance=None, display_running=False,
+               only_time_for_same_day=None):  # type: (typing.Any, utils.Config, base.Entity, bool, pendulum.DateTime) -> typing.Any
         if not display_running and not only_time_for_same_day:
             return super().format(value, config)
 
         if value is None and display_running:
             return 'running'
 
-        if instance is not None \
-            and only_time_for_same_day \
-            and (value - instance.start).in_days() == 0:
-
+        if instance is not None and only_time_for_same_day:
             config = config or utils.Config.factory()
 
-            return value.in_timezone(config.timezone).format('LTS')
+            if value.in_timezone(config.timezone).to_date_string() == only_time_for_same_day.in_timezone(
+                    config.timezone).to_date_string():
+                return value.in_timezone(config.timezone).format('LTS')
 
         return super().format(value, config)
 
@@ -281,18 +284,21 @@ class TimeEntrySet(base.TogglSet):
     Moreover it extends the filtrating mechanism by native filtering according start and/or stop time.
     """
 
-    def build_list_url(self, caller, config, **kwargs):  # type: (str, utils.Config, **typing.Any) -> str
+    def build_list_url(self, caller, config, conditions):  # type: (str, utils.Config, typing.Dict) -> str
         url = '/{}'.format(self.base_url)
 
         if caller == 'filter':
-            start = kwargs.get('start')
-            stop = kwargs.get('stop')
+            start = conditions.pop('start', None)
+            stop = conditions.pop('stop', None)
+
+            if start is not None or stop is not None:
+                url += '?'
 
             if start is not None:
-                url += 'start_date={}&'.format(urlencode(start.isoformat()))
+                url += 'start_date={}&'.format(quote_plus(start.isoformat()))
 
             if stop is not None:
-                url += 'stop_date={}&'.format(urlencode(stop.isoformat()))
+                url += 'end_date={}&'.format(quote_plus(stop.isoformat()))
 
         return url
 
@@ -309,8 +315,8 @@ class TimeEntrySet(base.TogglSet):
 class TimeEntry(WorkspaceEntity):
     description = fields.StringField()
     project = fields.MappingField(Project, 'pid')  # type: Project
-    task = fields.MappingField(Task, 'tid')  # type: Task
-    billable = fields.BooleanField(default=False, admin_only=True)
+    task = fields.MappingField(Task, 'tid', premium=True)  # type: Task
+    billable = fields.BooleanField(default=False, premium=True)
     start = TimeEntryDateTimeField(required=True)
     stop = TimeEntryDateTimeField()
     duration = fields.PropertyField(get_duration, set_duration, formatter=format_duration)
@@ -342,7 +348,8 @@ class TimeEntry(WorkspaceEntity):
         return super().to_dict(serialized=serialized, changes_only=changes_only)
 
     @classmethod
-    def start_and_save(cls, start=None, config=None, **kwargs):  # type: (pendulum.DateTime, utils.Config, **typing.Any) -> TimeEntry
+    def start_and_save(cls, start=None, config=None,
+                       **kwargs):  # type: (pendulum.DateTime, utils.Config, **typing.Any) -> TimeEntry
         """
         Creates a new running entry.
 
@@ -404,7 +411,8 @@ class TimeEntry(WorkspaceEntity):
         :return: The new TimeEntry.
         """
         if self.is_running:
-            logger.warning('Trying to continue time entry #{} - \'{}\' which is already running!'.format(self.id, self.description))
+            logger.warning('Trying to continue time entry #{} - \'{}\' which is already running!'.format(self.id,
+                                                                                                         self.description))
 
         config = self._config or utils.Config.factory()
 

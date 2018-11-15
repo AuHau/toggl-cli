@@ -106,13 +106,13 @@ class TogglSet(object):
 
         return self.entity_cls.get_url()
 
-    def build_list_url(self, caller, config, **kwargs):  # type: (str, utils.Config, **typing.Any) -> str
+    def build_list_url(self, caller, config, conditions):  # type: (str, utils.Config, typing.Dict) -> str
         """
         Build the listing URL.
 
         :param caller: Defines which method called this method, it can be either 'filter' or 'all'.
         :param config: Config
-        :param kwargs: If caller == 'filter' then kwargs contain conditions for filtering.
+        :param conditions: If caller == 'filter' then contain conditions for filtering. Passed as reference, therefore any modifications will result modifications
         """
         return '/{}'.format(self.base_url)
 
@@ -234,7 +234,7 @@ class TogglSet(object):
             raise exceptions.TogglNotAllowedException('Entity {} is not allowed to fetch list from the API!'
                                             .format(self.entity_cls))
 
-        url = self.build_list_url('filter', config, **conditions)
+        url = self.build_list_url('filter', config, conditions)
         fetched_entities = self._fetch_all(url, order, config)
 
         if fetched_entities is None:
@@ -262,7 +262,7 @@ class TogglSet(object):
                                             .format(self.entity_cls))
 
         config = config or utils.Config.factory()
-        url = self.build_list_url('all', config, **kwargs)
+        url = self.build_list_url('all', config, kwargs)
 
         return self._fetch_all(url, order, config)
 
@@ -275,11 +275,11 @@ class WorkspaceToggleSet(TogglSet):
     Specialized TogglSet for Workspaced entities.
     """
 
-    def build_list_url(self, caller, config, **kwargs):  # type: (str, utils.Config, **typing.Any) -> str
-        if 'workspace' in kwargs and kwargs['workspace'] is not None:
-            wid = kwargs['workspace'].id
+    def build_list_url(self, caller, config, conditions):  # type: (str, utils.Config, typing.Dict) -> str
+        if 'workspace' in conditions and conditions['workspace'] is not None:
+            wid = conditions['workspace'].id
         else:
-            wid = kwargs.get('wid') or config.default_workspace.id
+            wid = conditions.get('wid') or config.default_workspace.id
 
         return '/workspaces/{}/{}'.format(wid, self.base_url)
 
