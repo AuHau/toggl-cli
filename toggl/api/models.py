@@ -29,7 +29,7 @@ class Workspace(base.TogglEntity):
     rounding_minutes = fields.IntegerField()
     default_hourly_rate = fields.FloatField()
 
-    # As TogglEntityMeta is by default adding WorkspaceToggleSet to TogglEntity,
+    # As TogglEntityMeta is by default adding WorkspaceTogglSet to TogglEntity,
     # but we want vanilla TogglSet so defining it here explicitly.
     objects = base.TogglSet()
 
@@ -96,7 +96,7 @@ class Project(WorkspaceEntity):
         return project_user
 
 
-class UserSet(base.WorkspaceToggleSet):
+class UserSet(base.WorkspaceTogglSet):
 
     def current_user(self, config=None):  # type: (utils.Config) -> User
         """

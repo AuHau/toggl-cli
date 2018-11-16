@@ -353,7 +353,7 @@ class PropertyField(TogglField):
     @staticmethod
     def default_setter(name, instance, value, init=False):
         """
-        Default setter which behaves like normal ToggleField, that stores the value inside of the instance's dict under
+        Default setter which behaves like normal TogglField, that stores the value inside of the instance's dict under
         the field's name.
 
         :param name: Field's name

@@ -7,5 +7,5 @@ WEB_CLIENT_ADDRESS = "https://www.toggl.com/app/"
 
 
 def main(args=None):
-    """Main entry point for Toggle CLI application"""
+    """Main entry point for Toggl CLI application"""
     cli.entrypoint(args or sys.argv[1:])

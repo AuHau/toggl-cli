@@ -287,10 +287,10 @@ class TogglSet(object):
         return self._fetch_all(url, order, config)
 
     def __str__(self):
-        return 'ToggleSet<{}>'.format(self.entity_cls.__name__)
+        return 'TogglSet<{}>'.format(self.entity_cls.__name__)
 
 
-class WorkspaceToggleSet(TogglSet):
+class WorkspaceTogglSet(TogglSet):
     """
     Specialized TogglSet for Workspaced entities.
     """
@@ -366,9 +366,9 @@ class TogglEntityMeta(ABCMeta):
         setattr(new_class, '__mapped_fields__', mcs._make_mapped_fields(fields))
         setattr(new_class, '__signature__', mcs._make_signature(fields))
 
-        # Add objects only if they are not defined to allow custom ToggleSet implementations
+        # Add objects only if they are not defined to allow custom TogglSet implementations
         if 'objects' not in new_class.__dict__:
-            setattr(new_class, 'objects', WorkspaceToggleSet(new_class))
+            setattr(new_class, 'objects', WorkspaceTogglSet(new_class))
         else:
             try:
                 new_class.objects.bind_to_class(new_class)
