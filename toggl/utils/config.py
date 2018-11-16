@@ -286,7 +286,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         'file_logging': IniEntry('logging', bool),
         'file_logging_path': IniEntry('logging', str),
 
-        'tz': IniEntry('options', 'tz'),
+        'tz': IniEntry('options', str),
         'year_first': IniEntry('options', bool),
         'day_first': IniEntry('options', bool),
         'datetime_format': IniEntry('options', str),
