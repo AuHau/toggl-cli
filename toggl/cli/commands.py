@@ -129,7 +129,7 @@ def visit_www():
 @click.argument('stop', type=types.DateTimeDurationType())
 @click.argument('descr')
 @click.option('--tags', '-a', type=types.SetType(), help='List of tags delimited with \',\'')
-@click.option('--project', '-o', envvar="f", type=types.ResourceType(api.Project),
+@click.option('--project', '-o', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
 @click.option('--task', '-t', envvar="TOGGL_TASK", type=types.ResourceType(api.Task),
               help='Link the entry with specific task. Can be ID or name of the task (ENV: TOGGL_TASK)', )
@@ -276,10 +276,10 @@ def entry_start(ctx, descr, **kwargs):
 @click.option('--description', '-d', help='Sets description')
 @click.option('--start', '-s', type=types.DateTimeType(allow_now=True), help='Sets starts time.')
 @click.option('--tags', '-a', type=types.ModifierSetType(), help='Modifies the tags. List of values delimited by \',\'. Support either modification or specification mode. More info above.')
-@click.option('--project', '-o', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
-              help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
-@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
-              help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
+@click.option('--project', '-o', type=types.ResourceType(api.Project),
+              help='Link the entry with specific project. Can be ID or name of the project', )
+@click.option('--workspace', '-w', type=types.ResourceType(api.Workspace),
+              help='Link the entry with specific workspace. Can be ID or name of the workspace')
 @click.pass_context
 def entry_now(ctx, tags, **kwargs):
     """
@@ -738,9 +738,8 @@ def tasks_add(ctx, **kwargs):
 @click.option('--name', '-n', help='Specifies the name of the task', )
 @click.option('--estimated_seconds', '-e', type=click.INT, help='Specifies estimated duration for the task in seconds')
 @click.option('--active/--no-active', default=None, help='Specifies whether the task is active', )
-@click.option('--user', '-u', envvar="TOGGL_USER", type=types.ResourceType(api.User, fields=('id', 'email')),
-              help='Specifies a user to whom the task will be assigned. Can be ID or email of the user '
-                   '(ENV: TOGGL_USER)')
+@click.option('--user', '-u', type=types.ResourceType(api.User, fields=('id', 'email')),
+              help='Specifies a user to whom the task will be assigned. Can be ID or email of the user')
 @click.pass_context
 def tasks_update(ctx, spec, **kwargs):
     """
