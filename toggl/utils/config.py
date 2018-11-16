@@ -261,6 +261,11 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     file_logging_path = None
 
     """
+    In case when the HTTP API call is interrupted or the API rejects it because of throttling reasons, the tool will use exponential back-off with number of retries specified by this value. 
+    """
+    retries = 2
+
+    """
     Timezone setting. 
     If 'local' value is used then timezone from system's settings is used.
     If None, then timezone from Toggl's setting is used.
@@ -287,6 +292,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         'datetime_format': IniEntry('options', str),
         'time_format': IniEntry('options', str),
         'default_wid': IniEntry('options', int),
+        'retries': IniEntry('options', int),
     }
 
     def __init__(self, config_path=sentinel, read_env=True, **kwargs):  # type: (str, bool, **typing.Any) -> None

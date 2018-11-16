@@ -114,13 +114,33 @@ def handle_error(response):
         )
 
     if 500 <= response.status_code < 600:
-        raise exceptions.TogglServerException(response.status_code, response.text, 'Toggl\'s API is currently unavailable!')
+        raise exceptions.TogglServerException(response.status_code, response.text,
+                                              'Toggl\'s API is currently unavailable!')
 
     raise exceptions.TogglApiException(
         response.status_code, response.text,
         "Toggl's API server returned {} code with message: {}"
             .format(response.status_code, response.text)
     )
+
+
+def _toggl_request(url, method, data, headers, auth):
+    logger.info('Sending {} to \'{}\' data: {}'.format(method.upper(), url, json.dumps(data)))
+    if method == 'delete':
+        response = requests.delete(url, auth=auth, data=data, headers=headers)
+    elif method == 'get':
+        response = requests.get(url, auth=auth, data=data, headers=headers)
+    elif method == 'post':
+        response = requests.post(url, auth=auth, data=data, headers=headers)
+    elif method == 'put':
+        response = requests.put(url, auth=auth, data=data, headers=headers)
+    else:
+        raise NotImplementedError('HTTP method "{}" not implemented.'.format(method))
+
+    if response.status_code >= 300:
+        handle_error(response)
+
+    return response
 
 
 def toggl(url, method, data=None, headers=None, config=None):
@@ -136,21 +156,18 @@ def toggl(url, method, data=None, headers=None, config=None):
         config = Config.factory()
 
     url = "{}{}".format(TOGGL_URL, url)
-    logger.info('Sending {} to \'{}\' data: {}'.format(method.upper(), url, json.dumps(data)))
-    if method == 'delete':
-        response = requests.delete(url, auth=config.get_auth(), data=data, headers=headers)
-    elif method == 'get':
-        response = requests.get(url, auth=config.get_auth(), data=data, headers=headers)
-    elif method == 'post':
-        response = requests.post(url, auth=config.get_auth(), data=data, headers=headers)
-    elif method == 'put':
-        response = requests.put(url, auth=config.get_auth(), data=data, headers=headers)
-    else:
-        raise NotImplementedError('HTTP method "{}" not implemented.'.format(method))
 
-    if response.status_code >= 300:
-        handle_error(response)
+    tries = config.retries if config.retries and config.retries > 1 else 1  # There needs to be at least one try!
 
-    response_json = response.json()
-    logger.debug('Response {}:\n{}'.format(response.status_code, pformat(response_json)))
-    return response_json
+    e = None
+    for _ in range(tries):
+        try:
+            response = _toggl_request(url, method, data, headers, config.get_auth())
+            response_json = response.json()
+            logger.debug('Response {}:\n{}'.format(response.status_code, pformat(response_json)))
+            return response_json
+        except (exceptions.TogglThrottlingException, requests.exceptions.ConnectionError) as e:
+            pass
+
+    # If retries failed then 'e' contains the last Exception/Error, lets re-raise it!
+    raise e
