@@ -1,101 +1,77 @@
-Overview
---------
+# Toggl CLI
 
-toggl-cli is a command-line interface for toggl.com.
+> Command line tool and set of wrappers for interacting with whole toggl's API
 
-It certainly does not implement the full toggl API, but rather some core
-functions. The goal is to make using toggl quicker and more efficient for those
-already familiar with command-line tools.
+## Install
 
-toggl-cli is written in Python and uses version 8 of the [toggl
-API](https://github.com/toggl/toggl_api_docs) (thanks to beauraines for the
-help).
+Easiest way to install this package is through PyPi:
 
-Latest Update
--------------
+```shell
+$ pip install togglCli
+```
 
-**15 Dec 2014**: Thanks to [FedericoVaga](https://github.com/FedericoVaga)
-`.togglrc` now supports API token authentication. You will need to add
-`api_token` to the `auth` section, and `prefer_token` to the `options` section.
+## Usage
 
-**11 Nov 2014**: Major refactoring into a more MVC OO structure.
+For full overview of Toggl CLI capabilities please see [full documentation](https://TODO).
 
-**30 Oct 2014**: Added a feature that starting, stopping, and continuing an
-entry prints out the time it started or stopped. This requires a new option in
-~/.togglrc: `time_format = %I:%M%p` is the default.  See
-[strftime()](https://docs.python.org/2/library/datetime.html#strftime-and-strptime-behavior)
-for more options.
+### CLI tool
 
-Requirements
-------------
+With first run of the command you will be asked several questions to bootstrap default config file 
+(only UNIX-like system are supported; for Window's users there is created dummy config file, which you have to setup manually).
 
-* iso8601 module
-* pytz module
-* requests
-* python-dateutil
+To get overview of all commands and options please use `--help` option. Check out also help pages of the subcommands!
 
-Configuration
--------------
+Several examples of commands:
 
-Upon first running the program, a configuration file `~/.togglrc` will be
-automatically created. 
+```shell
+# Starts tracking new time entry
+$ toggl start
 
-1. Update that file with your toggl username and password.
-2. Update the timezone entry (e.g. US/Pacific).
+# Displays/enable modifications of currently running time entry
+$ toggl now
 
-#### Continue Behaviour ####
+# Lists all projects
+$ toggl projects ls
+```
 
-Setting `continue_creates` to false will cause `continue` to continue already existing same-day entries as a duration continuation, rather than create a new entry.  `continue_creates` defaults to false for toggl-cli users where `.togglrc` already exists, and to true for new users as per the default of the toggl web UI.
+### API wrappers
 
-Limitations
------------
+Toggl CLI comes with set of Python's class wrappers which follow similar pattern like Django ORM. 
 
-* When creating a time entry for a given project, the project must already
-  exist.
-* Project users, tasks, tags, and users aren't supported.
-* Only the default workspace is supported.
+The wrappers depends on config object which if not provided, the default config file (eq. '~/.togglrc') is used. 
 
-Roadmap
--------
+Toggl CLI uses `pendulum` for datetime management, but it is compatible with Python's native datetime, so you can use that if you want to.
 
-See the [issues tracker](https://github.com/drobertadams/toggl-cli/issues)
+```python
+from toggl import api, utils
+import pendulum
 
-Usage
------
-    Usage: toggl.py [OPTIONS] [ACTION]
-    
-    Options:
-      -h, --help     show this help message and exit
-      -q, --quiet    don't print anything
-      -v, --verbose  print additional info
-      -d, --debug    print debugging output
-    
-    Actions:
-      add DESCR [:WORKSPACE] [@PROJECT | #PROJECT_ID] START_DATETIME ('d'DURATION | END_DATETIME)
-            creates a completed time entry
-      add DESCR [:WORKSPACE] [@PROJECT | #PROJECT_ID] 'd'DURATION
-            creates a completed time entry, with start time DURATION ago
-      clients
-            lists all clients
-      continue [from DATETIME | 'd'DURATION]
-            restarts the last entry
-      continue DESCR [from DATETIME | 'd'DURATION]
-            restarts the last entry matching DESCR
-      ls
-            list recent time entries
-      now
-            print what you're working on now
-      workspaces
-            lists all workspaces
-      projects [:WORKSPACE]
-            lists all projects
-      rm ID
-            delete a time entry by id
-      start DESCR [:WORKSPACE] [@PROJECT | #PROJECT_ID] ['d'DURATION | DATETIME]
-            starts a new entry
-      stop [DATETIME]
-            stops the current entry
-      www
-            visits toggl.com
-    
-      DURATION = [[Hours:]Minutes:]Seconds
+new_entry = api.TimeEntry(description='Some new time entry', start=pendulum.now() - pendulum.duration(minutes=15), stop=pendulum.now())
+new_entry.save()
+
+list_of_all_entries = api.TimeEntry.objects.all()
+
+current_time_entry = api.TimeEntry.objects.current()
+
+# Custom config from existing file
+config = utils.Config.factory('./some.config')
+
+# Custom config without relying on any existing config file 
+config = utils.Config.factory()
+config.api_token = 'your token'
+config.timezone = 'utc'  # Custom timezone
+
+project = api.Project.object.get(config=config)
+project.name = 'Some new name'
+project.save()
+```
+
+## Contributing
+
+Feel free to dive in, contributions are welcomed! [Open an issue](https://github.com/drobertadams/toggl-cli/issues/new) or submit PRs.
+
+For PRs please see [contributing guideline](./CONTRIBUTING.md).
+
+## License
+
+[MIT ©  D. Robert Adams & Adam Uhlir](./LICENSE)
