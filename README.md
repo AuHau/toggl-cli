@@ -1,6 +1,6 @@
 # Toggl CLI
 
-> Command line tool and set of wrappers for interacting with whole toggl's API
+> Command line tool and set of Python wrapper classes for interacting with toggl's API
 
 ## Install
 
@@ -70,8 +70,8 @@ project.save()
 
 Feel free to dive in, contributions are welcomed! [Open an issue](https://github.com/drobertadams/toggl-cli/issues/new) or submit PRs.
 
-For PRs please see [contributing guideline](./CONTRIBUTING.md).
+For PRs please see [contribution guideline](./CONTRIBUTING.md).
 
 ## License
 
-[MIT ©  D. Robert Adams & Adam Uhlir](./LICENSE)
+[MIT ©  Adam Uhlir & D. Robert Adams](./LICENSE)

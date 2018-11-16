@@ -1,0 +1,31 @@
+site_name: 'Toggl CLI - Documentation'
+site_description: 'Command line tool and set of Python wrapper classes for interacting with toggl''s API'
+site_author: 'Adam Uhlíř'
+
+copyright: 'Copyright &copy; 2018 Adam Uhlíř'
+
+repo_name: 'auhau/toggl-cli'
+repo_url: 'https://github.com/auhau/toggl-cli'
+theme:
+  name: 'material'
+  palette:
+    primary: 'orange'
+    accent: 'orange'
+  logo:
+    icon: 'power_settings_new'
+  feature:
+    tabs: true
+
+markdown_extensions:
+  - admonition
+  - codehilite:
+      guess_lang: false
+  - toc:
+      permalink: true
+
+nav:
+  - Toggl CLI: 'index.md'
+  - Command Line Interface:
+      - 'cli.md'
+  - Wrappers:
+      - 'api.md'
