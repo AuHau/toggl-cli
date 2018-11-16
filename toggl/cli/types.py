@@ -123,10 +123,15 @@ class ResourceType(click.ParamType):
             except exceptions.TogglMultipleResultsException:
                 pass
 
-        self.fail("Unknown {} under specification \'{}\'!".format(self._resource_cls.get_name(verbose=True), value), param, ctx)
+        self.fail("Unknown {} under specification \'{}\'!".format(self._resource_cls.get_name(verbose=True), value),
+                  param, ctx)
 
 
 class SetType(click.ParamType):
+    """
+    Type used for parsing list of values delimited with ',' character into set.
+    """
+
     name = 'set'
 
     def convert(self, value, param, ctx):
@@ -136,12 +141,56 @@ class SetType(click.ParamType):
         return {x.strip() for x in value.split(',')}
 
 
+class Modifier:
+    def __init__(self):
+        self.add_set = set()
+        self.remove_set = set()
+
+    def add(self, value):
+        self.add_set.add(value)
+
+    def remove(self, value):
+        self.remove_set.add(value)
+
+
+class ModifierSetType(SetType):
+    """
+    Type used to specify either set of values (eq. SetType) or to parse modifications
+    using '+' (add new value) or '-' (remove value) characters.
+    """
+
+    name = 'modifier-type'
+
+    def convert(self, value, param, ctx):
+        parsed = super().convert(value, param, ctx)
+
+        if '-' not in value and '+' not in value:
+            return parsed
+
+        mod = Modifier()
+        for modifier_value in parsed:
+            modifier = modifier_value[0]
+
+            if modifier != '+' and modifier != '-':
+                self.fail('Modifiers must start with either \'+\' or \'-\' character!')
+
+            # Add value
+            if modifier == '+':
+                mod.add(modifier_value[1:])
+
+            # Remove field
+            if modifier == '-':
+                mod.remove(modifier_value[1:])
+
+        return mod
+
+
 class FieldsType(click.ParamType):
     """
     Type used for defining list of fields for certain TogglEntity (resources_cls).
     The passed fields are validated according the entity's fields.
     Moreover the type supports diff mode, where it is possible to add or remove fields from
-    the default list of the fields, using +/- signs.
+    the default list of the fields, using +/- characters.
     """
     name = 'fields-type'
 

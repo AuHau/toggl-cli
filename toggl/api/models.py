@@ -382,13 +382,19 @@ class TimeEntry(WorkspaceEntity):
 
         return instance
 
-    def stop_and_save(self, stop=None):
+    def stop_and_save(self=None, stop=None):
         """
         Stops running the entry. It has to be running entry.
 
         :param stop: DateTime which should be set as stop time. If None, then current time is used.
         :return: Self
         """
+        if self is None:
+            # noinspection PyMethodFirstArgAssignment
+            self = TimeEntry.objects.current()
+            if self is None:
+                raise exceptions.TogglValidationException('There is no running entry to be stoped!')
+
         if not self.is_running:
             raise exceptions.TogglValidationException('You can\'t stop not running entry!')
 
@@ -411,8 +417,7 @@ class TimeEntry(WorkspaceEntity):
         :return: The new TimeEntry.
         """
         if self.is_running:
-            logger.warning('Trying to continue time entry #{} - \'{}\' which is already running!'.format(self.id,
-                                                                                                         self.description))
+            logger.warning('Trying to continue time entry {} which is already running!'.format(self))
 
         config = self._config or utils.Config.factory()
 
@@ -429,4 +434,4 @@ class TimeEntry(WorkspaceEntity):
         return new_entry
 
     def __str__(self):
-        return '{} (#{})'.format(self.description, self.id)
+        return '{} (#{})'.format(getattr(self, 'description', ''), self.id)

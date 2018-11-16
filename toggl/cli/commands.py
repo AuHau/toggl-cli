@@ -40,7 +40,7 @@ def entrypoint(args, obj=None):
 @click.option('--header/--no-header', default=True, help="Specifies if header/labels of data should be displayed")
 @click.option('--simple', '-s', is_flag=True,
               help="Instead of pretty aligned tables prints only data separated by tabulator")
-@click.option('--config', type=click.Path(exists=True), envvar='TOGGL_CONFIG',
+@click.option('--config', type=click.Path(), envvar='TOGGL_CONFIG',
               help="sets specific Config file to be used (ENV: TOGGL_CONFIG)")
 @click.version_option(__version__)
 @click.pass_context
@@ -126,7 +126,7 @@ def visit_www():
 # ----------------------------------------------------------------------------
 @cli.command('add', short_help='adds finished time entry')
 @click.argument('start', type=types.DateTimeType(allow_now=True))
-@click.argument('end', type=types.DateTimeDurationType())
+@click.argument('stop', type=types.DateTimeDurationType())
 @click.argument('descr')
 @click.option('--tags', '-a', type=types.SetType(), help='List of tags delimited with \',\'')
 @click.option('--project', '-o', envvar="f", type=types.ResourceType(api.Project),
@@ -136,11 +136,11 @@ def visit_www():
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
-def entry_add(ctx, start, end, descr, tags, project, task, workspace):
+def entry_add(ctx, start, stop, descr, **kwargs):
     """
     Adds finished time entry to Toggl with DESCR description and start
     datetime START which can also be a special string 'now' that denotes current
-    datetime. The entry also has END argument which is either specific
+    datetime. The entry also has STOP argument which is either specific
     datetime or duration.
 
     \b
@@ -152,19 +152,16 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
 
     Example: 5h2m10s - 5 hours 2 minutes 10 seconds from the start time
     """
-    if isinstance(end, pendulum.Duration):
-        end = start + end
+    if isinstance(stop, pendulum.Duration):
+        stop = start + stop
 
     # Create a time entry.
     entry = api.TimeEntry(
         config=ctx.obj['config'],
         description=descr,
         start=start,
-        stop=end,
-        task=task,
-        tags=tags,
-        project=project,
-        workspace=workspace
+        stop=stop,
+        **kwargs
     )
 
     entry.save()
@@ -172,7 +169,6 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
 
 
 # TODO: [Feature/Medium] Make possible to list really all time-entries, not first 1000 in last 9 days
-# TODO: [Feature/High] Filter entries by projects/tags
 @cli.command('ls', short_help='list a time entries')
 @click.option('--start', '-s', type=types.DateTimeType(),
               help='Defines start of a date range to filter the entries by.')
@@ -184,7 +180,7 @@ def entry_add(ctx, start, end, descr, tags, project, task, workspace):
               help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify default set of fields using \'+\' and/or \'-\' characters. Supported values: ' + types.FieldsType.format_fields_for_help(
                   api.TimeEntry))
 @click.pass_context
-def entry_ls(ctx, start, stop, project, tags, fields):
+def entry_ls(ctx, fields, **conditions):
     """
     Lists time entries the user has access to.
 
@@ -193,11 +189,12 @@ def entry_ls(ctx, start, stop, project, tags, fields):
     as they developing new version of API and they are able to see in the future
     and also longer into past.
     """
-    # Limit the list of TimeEntries based on start/stop dates.
-    if start is not None or stop is not None or project is not None or tags:
-        entities = api.TimeEntry.objects.filter(start=start, stop=stop, project=project, tags=tags, config=ctx.obj['config'])
+
+    conditions = {key:condition for key, condition in conditions.items() if condition is not None}
+    if conditions:
+        entities = api.TimeEntry.objects.filter(order='desc', config=ctx.obj['config'], **conditions)
     else:
-        entities = api.TimeEntry.objects.all(config=ctx.obj['config'])
+        entities = api.TimeEntry.objects.all(order='desc', config=ctx.obj['config'])
 
     if not entities:
         click.echo('No entries were found!')
@@ -224,13 +221,13 @@ def entry_ls(ctx, start, stop, project, tags, fields):
         row = []
         for field in fields:
             if field == 'stop':
-                value = str(entity.__fields__[field].format(getattr(entity, field), instance=entity,
+                value = str(entity.__fields__[field].format(getattr(entity, field, ''), instance=entity,
                                                             display_running=True))
             elif field == 'start':
-                value = str(entity.__fields__[field].format(getattr(entity, field), instance=entity,
+                value = str(entity.__fields__[field].format(getattr(entity, field, ''), instance=entity,
                                                             only_time_for_same_day=entity.stop))
             else:
-                value = str(entity.__fields__[field].format(getattr(entity, field)))
+                value = str(entity.__fields__[field].format(getattr(entity, field, '')))
             row.append(value)
 
         table.add_row(row)
@@ -255,39 +252,43 @@ def entry_rm(ctx, spec):
 @click.argument('descr', required=False)
 @click.option('--start', '-s', type=types.DateTimeType(allow_now=True), help='Specifies start of the time entry. '
                                                                              'If left empty \'now\' is assumed.')
+@click.option('--tags', '-a', type=types.SetType(), help='List of tags delimited with \',\'')
 @click.option('--project', '-o', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
-def entry_start(ctx, descr, start, project, workspace):
+def entry_start(ctx, descr, **kwargs):
     """
     Starts a new time entry with description DESCR (it can be left out). If there is another currently running entry,
     the entry will be stopped and new entry started.
     """
     api.TimeEntry.start_and_save(
         config=ctx.obj['config'],
-        start=start,
         description=descr,
-        project=project,
-        workspace=workspace
+        **kwargs
     )
 
 
 @cli.command('now', short_help='manage current time entry')
 @click.option('--description', '-d', help='Sets description')
 @click.option('--start', '-s', type=types.DateTimeType(allow_now=True), help='Sets starts time.')
+@click.option('--tags', '-a', type=types.ModifierSetType(), help='Modifies the tags. List of values delimited by \',\'. Support either modification or specification mode. More info above.')
 @click.option('--project', '-o', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
               help='Link the entry with specific workspace. Can be ID or name of the workspace (ENV: TOGGL_WORKSPACE)')
 @click.pass_context
-def entry_now(ctx, **kwargs):
+def entry_now(ctx, tags, **kwargs):
     """
     Manages currently running entry.
 
     Without any options the command fetches the current time entry and displays it. But it also supports modification
     of the current time entry through the options listed below.
+
+    Tags can be modified either in a way of specifing new set of tags delimited with \',\' character,
+    or add/remove tags using +/- characters. Examples: 'a,b,c,d' will remove all previous tags and add a,b,c,d tags.
+    '+z,-a' will remove tag 'a' and add tag 'z' to the already existing tag list.
     """
     current = api.TimeEntry.objects.current(config=ctx.obj['config'])
 
@@ -301,10 +302,18 @@ def entry_now(ctx, **kwargs):
             updated = True
             setattr(current, key, value)
 
+    if tags is not None:
+        if isinstance(tags, types.Modifier):
+            current.tags = current.tags - tags.remove_set | tags.add_set
+        else:
+            current.tags = tags
+
+        updated = True
+
     if updated:
         current.save()
 
-    helpers.entity_detail(api.TimeEntry, current, primary_field='description', config=ctx.obj['config'])
+    helpers.entity_detail(api.TimeEntry, current, primary_field='description', obj=ctx.obj)
 
 
 @cli.command('stop', short_help='stops current time entry')
@@ -322,7 +331,7 @@ def entry_stop(ctx, stop):
 
     current.stop_and_save(stop)
 
-    click.echo('\'{}\' was stopped'.format(current.description))
+    click.echo('\'{}\' was stopped'.format(getattr(current,'description', '<Entry without description>')))
 
 
 @cli.command('continue', short_help='continue a time entry')
@@ -338,7 +347,7 @@ def entry_continue(ctx, descr, start):
     entry = None
     try:
         if descr is None:
-            entry = api.TimeEntry.objects.all(config=ctx.obj['config'])[0]
+            entry = api.TimeEntry.objects.all(order='desc', config=ctx.obj['config'])[0]
         else:
             entry = api.TimeEntry.objects.filter(contain=True, description=descr, config=ctx.obj['config'])[0]
     except IndexError:
@@ -347,7 +356,7 @@ def entry_continue(ctx, descr, start):
 
     entry.continue_and_save(start=start)
 
-    click.echo('Time entry \'{}\' continue!'.format(entry.description))
+    click.echo('Time entry \'{}\' continue!'.format(getattr(entry,'description', '<Entry without description>')))
 
 
 # ----------------------------------------------------------------------------
@@ -956,16 +965,18 @@ def default_workspace(ctx, spec, default):
 
 
 @user_config.command('timezone', short_help='retrieves/sets timezone')
-@click.argument('spec', required=False)
+@click.argument('tz', required=False)
 @click.option('-d', '--toggl-default', 'default', is_flag=True,
-              help='Sets your timezone to match the Toggl\'s setting. SPEC is ignored.', )
+              help='Sets your timezone to match the Toggl\'s setting. TZ is ignored.', )
 @click.pass_context
-def timezone(ctx, spec, default):
+def timezone(ctx, tz, default):
     """
-    Updates your timezone to one defined by SPEC.
-    If you want to set the timezone to match your Toggl's setting use --toggl-default flag.
+    Updates your timezone to one defined by TZ.
 
-    If SPEC is left empty, it prints the current timezone.
+    If you want to set the timezone to match your Toggl's setting use --toggl-default flag.
+    To use your system's timezone set TZ with value 'local'
+
+    If TZ is left empty, it prints the current timezone.
     """
     config = ctx.obj['config']
 
@@ -975,14 +986,14 @@ def timezone(ctx, spec, default):
         click.echo('Successfully restored the timezone to Toggl\'s setting')
         exit()
 
-    if spec:
-        if spec not in pendulum.timezones and spec != 'local':
+    if tz:
+        if tz not in pendulum.timezones and tz != 'local':
             click.echo('Invalid timezone!', color='red')
             exit(1)
 
-        config.timezone = spec
+        config.timezone = tz
         config.persist()
-        click.echo('Timezone successfully set to \'{}\''.format(spec))
+        click.echo('Timezone successfully set to \'{}\''.format(tz))
         exit()
 
     if not hasattr(config, 'tz'):

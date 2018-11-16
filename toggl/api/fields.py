@@ -171,7 +171,7 @@ class TogglField:
                 # TODO: [Q/Design] Should be callable evaluated every time on only during the initialization?
                 return self.default(getattr(instance, '_config', None)) if callable(self.default) else self.default
 
-            raise AttributeError('Instance {} has not set \'{}\''.format(instance, self.name))
+            raise AttributeError('Instance of {} has not set \'{}\''.format(instance.__class__.__name__, self.name))
 
     def __set__(self, instance, value):
         """
@@ -559,6 +559,12 @@ class SetContainer(collections.MutableSet):
 
     def __len__(self):
         return len(self._inner_set)
+
+    def __or__(self, other):
+        return self._inner_set | other
+
+    def __sub__(self, other):
+        return self._inner_set - other
 
 
 class SetField(TogglField):

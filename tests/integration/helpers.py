@@ -10,8 +10,8 @@ from toggl.cli.commands import cli
 from toggl import utils, api
 
 
-def inner_cmd(cmd, config='default.config', simple=True, *args):  # type: (str, str, bool, typing.List[str]) -> ParsingResult
-    config = get_config(config)
+def inner_cmd(cmd, config=None, simple=True, *args):  # type: (str, str, bool, typing.List[str]) -> ParsingResult
+    config = config or get_config()
 
     parsed = re.findall(r"([\"]([^\"]+)\")|([']([^']+)')|(\S+)",
                         cmd)  # Simulates quoting of strings with spaces (eq. filter -n "some important task")
@@ -67,16 +67,19 @@ class ParsingResult:
         output = self.obj.output.strip().split('\n')
         parsed = {}
 
-        regex = re.search(r'([\w ]+) #(\d+)$', output[0])
+        regex = re.search(r'(?P<name>[\w ]+)?#(?P<id>\d+)$', output[0])
 
         if not regex:
-            raise RuntimeError('Unknown structure of detail string!')
+            raise RuntimeError('Unknown structure of detail string! >> ' + output[0])
 
-        parsed['name'] = regex.group(1)
-        parsed['id'] = regex.group(2)
+        name = regex.group('name')
+        parsed['name'] = name.strip() if name is not None else None
+        parsed['id'] = regex.group('id')
 
         for line in output[1:]:
-            key, value = line.split(':')
+            regex = re.search(r'([\w ]+):(.*)', line)
+            key = regex.group(1)
+            value = regex.group(2)
 
             key = key.strip().replace(' ', '_')
             parsed[key.lower()] = value.strip()
@@ -86,8 +89,8 @@ class ParsingResult:
 
 class Cleanup:
     @staticmethod
-    def _ids_cleanup(base, config='default.config', batch=False, *ids):
-        config = get_config(config)
+    def _ids_cleanup(base, config=None, batch=False, *ids):
+        config = config or get_config()
 
         if batch:
             utils.toggl('/{}/{}'.format(base, ','.join([str(id) for id in ids])), 'delete', config=config)
@@ -96,8 +99,8 @@ class Cleanup:
                 utils.toggl('/{}/{}'.format(base, entity_id), 'delete', config=config)
 
     @staticmethod
-    def _all_cleanup(cls, config='default.config'):
-        config = get_config(config)
+    def _all_cleanup(cls, config=None):
+        config = config or get_config()
         entities = cls.objects.all(config=config)
         Cleanup.cleanup(entities)
 
@@ -110,7 +113,7 @@ class Cleanup:
             instance.delete()
 
     @staticmethod
-    def all(config='default.config'):
+    def all(config=None):
         """
         Expensive operation as it goes over all resources in Toggl.
         """
@@ -122,35 +125,35 @@ class Cleanup:
         Cleanup.projects(config=config)
 
     @staticmethod
-    def clients(config='default.config', *ids):
+    def clients(config=None, *ids):
         if not ids:
             Cleanup._all_cleanup(api.Client, config=config)
         else:
             Cleanup._ids_cleanup('clients', config, False, *ids)
 
     @staticmethod
-    def time_entries(config='default.config', *ids):
+    def time_entries(config=None, *ids):
         if not ids:
-            config = get_config(config)
+            config = config or get_config()
             entities = api.TimeEntry.objects.all(config=config)
             ids = [entity.id for entity in entities]
 
         if not ids:
             return
 
-        Cleanup._ids_cleanup('time_entries', config=config, batch=True, *ids)
+        Cleanup._ids_cleanup('time_entries', config, True, *ids)
 
     @staticmethod
-    def project_users(config='default.config', *ids):
+    def project_users(config=None, *ids):
         if not ids:
             Cleanup._all_cleanup(api.ProjectUser, config=config)
         else:
             Cleanup._ids_cleanup('project_users', config, False, *ids)
 
     @staticmethod
-    def projects(config='default.config', *ids):
+    def projects(config=None, *ids):
         if not ids:
-            config = get_config(config)
+            config = config or get_config()
             entities = api.Project.objects.all(config=config)
             ids = [entity.id for entity in entities]
 
@@ -160,16 +163,16 @@ class Cleanup:
         Cleanup._ids_cleanup('projects', config, True, *ids)
 
     @staticmethod
-    def tasks(config='default.config', *ids):
+    def tasks(config=None, *ids):
         if not ids:
             Cleanup._all_cleanup(api.Task, config=config)
         else:
             Cleanup._ids_cleanup('tasks', config, False, *ids)
 
     @staticmethod
-    def workspace_users(config='default.config', *ids):
+    def workspace_users(config=None, *ids):
         if not ids:
-            config = get_config(config)
+            config = config or get_config()
             # Making sure not to delete myself from the Workspace
             entities = filter(lambda wu: wu.__dict__.get('uid') != config.user.id, api.WorkspaceUser.objects.all(config=config))
             Cleanup.cleanup(entities)

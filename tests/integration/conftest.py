@@ -42,6 +42,14 @@ def cmd():
     return helpers.inner_cmd
 
 
+@pytest.fixture()
+def config():
+    if not hasattr(config, 'default_config'):
+        config.default_config = helpers.get_config()
+
+    return config.default_config
+
+
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_all():
     helpers.Cleanup.all()
