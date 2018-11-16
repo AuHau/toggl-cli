@@ -661,9 +661,10 @@ class MappingField(TogglField):
                 instance.__dict__[self.mapped_field] = None
                 return
 
-            # TODO: When passed entity is not saved (does not have ID) reject it with ValueError
-
             try:
+                if value.id is None:
+                    raise RuntimeError('You are trying to assign mapped entity which was yet not saved! (Does not have ID)')
+
                 instance.__dict__[self.mapped_field] = value.id
 
                 if not isinstance(value, self.mapped_cls):
@@ -755,6 +756,8 @@ class MappingField(TogglField):
                 if not isinstance(value, self.mapped_cls):
                     logger.warning('Assigning class {} to MappedField with class {}.'.format(type(value),
                                                                                              self.mapped_cls))
+                if value.id is None:
+                    raise RuntimeError('You are trying to assign mapped entity which was yet not saved! (Does not have ID)')
 
                 self._set_value(instance, value.id)
             except AttributeError:
