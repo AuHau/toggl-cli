@@ -1,10 +1,12 @@
 import configparser
 import logging
 import os
+import platform
 import typing
 from collections import namedtuple
 from pprint import pprint
 
+import click
 import requests
 
 from . import metas, bootstrap, migrations
@@ -334,6 +336,11 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         values_dict = bootstrap.ConfigBootstrap().start()
         for key, value in values_dict.items():
             setattr(self, key, value)
+
+        if platform.system() == 'Windows':
+            self.persist()
+            click.echo('Config file created at: {}'.format(self._config_path))
+            exit(1)
 
     @property
     def user(self):  # type: () -> '..api.User'

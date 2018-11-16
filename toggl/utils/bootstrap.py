@@ -1,5 +1,6 @@
 import logging
 import os
+import platform
 import typing
 
 import click
@@ -11,8 +12,6 @@ from .. import exceptions, get_version
 logger = logging.getLogger('toggl.utils.bootstrap')
 
 
-# TODO: Bootstrap the day_first/year_first value
-# TODO: As `inquirer` package is not compatible with Windows, provide dummy bootstrap on Windows
 class ConfigBootstrap:
     """
     Class for facilitation of bootstraping the TogglCLI application with user's configuration.
@@ -125,12 +124,34 @@ class ConfigBootstrap:
                     "proceed without it.", bg="white", fg="red")
         exit(-1)
 
+    def _bootstrap_windows(self):
+        click.secho(""" _____                 _   _____  _     _____ 
+|_   _|               | | /  __ \| |   |_   _|
+  | | ___   __ _  __ _| | | /  \/| |     | |  
+  | |/ _ \ / _` |/ _` | | | |    | |     | |  
+  | | (_) | (_| | (_| | | | \__/\| |_____| |_ 
+  \_/\___/ \__, |\__, |_|  \____/\_____/\___/ 
+            __/ | __/ |                       
+           |___/ |___/                        
+""", fg="red")
+
+        click.echo("Welcome to Toggl CLI!\n"
+                   "Unfortunately for Windows users we don't have interactive initialization of TogglCLI. We have created"
+                   "dummy configuration file which you should configure before using this tool.\n")
+
+        return {
+            'version': get_version(),
+            'api_token': 'YOUR API KEY',
+        }
+
     def start(self):  # type: () -> dict
         """
         Entry point for the bootstrap process.
         The process will gather required information for configuration and then return those information in dict which
         follows the utils.config.Config attribute's naming.
         """
+        if platform.system() == 'Windows':
+            return self._bootstrap_windows()
 
         click.secho(""" _____                 _   _____  _     _____ 
 |_   _|               | | /  __ \| |   |_   _|
@@ -178,4 +199,7 @@ class ConfigBootstrap:
         click.echo("\nConfiguration successfully finished!\nNow continuing with your command:\n\n")
 
         return self._map_answers(api_token=api_token, **answers)
+
+    def start_windows(self):
+        pass
 
