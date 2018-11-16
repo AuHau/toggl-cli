@@ -223,12 +223,46 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     """
 
     # Default values
-    continue_creates = True
+
+    """
+    Setting which specifies the format in which all the datetimes will be printed. 
+    For syntax see: https://pendulum.eustace.io/docs/#tokens
+    """
     datetime_format = 'LTS L'
+
+    """
+    Setting which specifies the format in which all the times will be printed. 
+    For syntax see: https://pendulum.eustace.io/docs/#tokens
+    """
+    time_format = 'LTS'
+
+    """
+    Setting which specifies behaviour for dateutils.parse() behaviour.
+    Whether to interpret the first value in an ambiguous 3-integer date (e.g. 01/05/09) as the day (True) or month (False).
+    """
     day_first = False
+
+    """
+    Setting which specifies behaviour for dateutils.parse() behaviour.
+    Whether to interpret the first value in an ambiguous 3-integer date (e.g. 01/05/09) as the year. If True, the first number is taken to be the year, otherwise the last number is taken to be the year. 
+    """
     year_first = False
+
+    """
+    Turns on/off logging into file specified by file_logging_path variable
+    """
     file_logging = False
+
+    """
+    Specifies path where the logs will be stored.
+    """
     file_logging_path = None
+
+    """
+    Timezone setting. 
+    If 'local' value is used then timezone from system's settings is used.
+    If None, then timezone from Toggl's setting is used.
+    """
     tz = None
 
     ENV_MAPPING = {
@@ -246,10 +280,10 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         'file_logging_path': IniEntry('logging', str),
 
         'tz': IniEntry('options', 'tz'),
-        'continue_creates': IniEntry('options', bool),
         'year_first': IniEntry('options', bool),
         'day_first': IniEntry('options', bool),
         'datetime_format': IniEntry('options', str),
+        'time_format': IniEntry('options', str),
         'default_wid': IniEntry('options', int),
     }
 

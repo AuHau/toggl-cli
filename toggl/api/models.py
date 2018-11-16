@@ -230,7 +230,7 @@ class TimeEntryDateTimeField(fields.DateTimeField):
 
             if value.in_timezone(config.timezone).to_date_string() == only_time_for_same_day.in_timezone(
                     config.timezone).to_date_string():
-                return value.in_timezone(config.timezone).format('LTS')
+                return value.in_timezone(config.timezone).format(config.time_format)
 
         return super().format(value, config)
 

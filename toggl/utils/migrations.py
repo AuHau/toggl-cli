@@ -57,11 +57,12 @@ class Migration200:
     def migrate_datetime(parser):  # type: (configparser.ConfigParser) -> None
         if parser.get('options', 'time_format') == '%I:%M%p':
             parser.set('options', 'datetime_format', 'LTS L')
+            parser.set('options', 'time_format', 'LTS')
             return
 
         while True:
             value = inquirer.shortcuts.text('What datetime format we should use? Type \'doc\' to display format help. Default is based on system\'s locale.',
-                                            default='LTS L', validate=lambda _, i: Migration200.validate_datetime_format(i))
+                                            default='LTS L', validate=lambda _, i: i == 'doc' or Migration200.validate_datetime_format(i))
 
             if value == 'doc':
                 webbrowser.open('https://pendulum.eustace.io/docs/#tokens')
@@ -69,7 +70,15 @@ class Migration200:
                 parser.set('options', 'datetime_format', value)
                 break
 
-        parser.remove_option('options', 'time_format')
+        while True:
+            value = inquirer.shortcuts.text('What time format we should use? Type \'doc\' to display format help. Default is based on system\'s locale.',
+                                            default='L', validate=lambda _, i: i == 'doc' or Migration200.validate_datetime_format(i))
+
+            if value == 'doc':
+                webbrowser.open('https://pendulum.eustace.io/docs/#tokens')
+            else:
+                parser.set('options', 'datetime_format', value)
+                break
 
     @staticmethod
     def migrate_timezone(parser):  # type: (configparser.ConfigParser) -> None
