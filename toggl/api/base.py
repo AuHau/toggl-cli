@@ -270,7 +270,7 @@ class TogglSet(object):
         """
         Method that fetches all entries and deserialize them into instances of the binded entity.
 
-        :param order: Strings 'asc' or 'desc' which specifies how the results will be sorted (
+        :param order: Strings 'asc' or 'desc' which specifies how the results will be sorted.
         :param config: Config instance
         :raises exceptions.TogglNotAllowedException: When retrieving a list of objects is not allowed.
         """

@@ -200,6 +200,8 @@ def entry_ls(ctx, fields, **conditions):
         click.echo('No entries were found!')
         exit(0)
 
+    entities = sorted(entities, key=lambda x: x.start, reverse=True)
+
     if ctx.obj.get('simple'):
         if ctx.obj.get('header'):
             click.echo('\t'.join([click.style(field.capitalize(), fg='white', dim=1) for field in fields]))
