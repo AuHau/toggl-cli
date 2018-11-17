@@ -7,7 +7,7 @@ import webbrowser
 import click
 import inquirer
 
-from .. import exceptions, get_version
+from .. import exceptions, VERSION
 
 logger = logging.getLogger('toggl.utils.config')
 
@@ -165,7 +165,7 @@ class IniConfigMigrator:
                 migration.migrate(self.store)
                 something_migrated = True
 
-        new_version = get_version(raw=True)
+        new_version = VERSION
         self._set_version(new_version)
 
         if isinstance(self.config_file, str):

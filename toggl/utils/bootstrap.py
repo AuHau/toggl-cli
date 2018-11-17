@@ -7,7 +7,7 @@ import click
 import inquirer
 import pendulum
 
-from .. import exceptions, get_version
+from .. import exceptions, __version__
 
 logger = logging.getLogger('toggl.utils.bootstrap')
 
@@ -60,7 +60,7 @@ class ConfigBootstrap:
         Creates dict which follows the ConfigParser convention from the provided user's answers.
         """
         output = {
-            'version': get_version(),
+            'version': __version__,
             'api_token': answers['api_token'],
             'file_logging': answers['file_logging'],
         }
@@ -140,7 +140,7 @@ class ConfigBootstrap:
                    "dummy configuration file which you should configure before using this tool.\n")
 
         return {
-            'version': get_version(),
+            'version': __version__,
             'api_token': 'YOUR API KEY',
         }
 

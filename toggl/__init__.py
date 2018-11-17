@@ -1,11 +1,5 @@
-VERSION = (2, 0, 0)
+from pbr.version import VersionInfo
 
-
-def get_version(raw=False):
-    if raw:
-        return VERSION
-
-    return '.'.join(map(str, VERSION))
-
-
-__version__ = get_version()
+_v = VersionInfo('toggl').semantic_version()
+__version__ = _v.release_string()
+VERSION = _v.version_tuple()

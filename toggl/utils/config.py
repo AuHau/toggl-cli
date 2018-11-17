@@ -10,7 +10,7 @@ import click
 import requests
 
 from . import metas, bootstrap, migrations
-from .. import exceptions, get_version
+from .. import exceptions, __version__
 
 logger = logging.getLogger('toggl.utils.config')
 
@@ -81,7 +81,7 @@ class IniConfigMixin:
         """
         Method checks whether the current config needs to migrate.
         """
-        return self._loaded and self._get_version() != get_version()
+        return self._loaded and self._get_version() != __version__
 
     def _get_version(self, raw=False):  # type: (bool) -> typing.Union[str, tuple]
         """

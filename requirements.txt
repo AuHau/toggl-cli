@@ -1,0 +1,7 @@
+pendulum==2.*
+requests==2.*
+click==7.*
+inquirer==2.*
+PTable==0.*
+validate_email==1.*
+pbr
