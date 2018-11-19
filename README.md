@@ -57,7 +57,7 @@ current_time_entry = api.TimeEntry.objects.current()
 config = utils.Config.factory('./some.config')
 
 # Custom config without relying on any existing config file 
-config = utils.Config.factory()
+config = utils.Config.factory(None)  # Without None it will load the default config file
 config.api_token = 'your token'
 config.timezone = 'utc'  # Custom timezone
 

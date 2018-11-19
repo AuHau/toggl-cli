@@ -4,7 +4,7 @@ import os
 import platform
 import typing
 from collections import namedtuple
-from pprint import pprint
+from pbr import version
 
 import click
 import requests
@@ -65,42 +65,28 @@ class IniConfigMixin:
 
     def __init__(self, config_path=sentinel, **kwargs):  # type: (str, **typing.Any) -> None
         self._config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path
+        print(self._config_path)
         self._store = configparser.ConfigParser(interpolation=None)
         self._loaded = False
 
         if self._config_path is not None:
             self._loaded = self._store.read(self._config_path)
 
-            if self._need_migrate():
+            config_version = self._get_version()
+            if migrations.IniConfigMigrator.is_migration_needed(config_version):
                 migrator = migrations.IniConfigMigrator(self._store, self._config_path)
-                migrator.migrate(self._get_version(raw=True))
+                migrator.migrate(config_version)
 
         super().__init__(**kwargs)
 
-    def _need_migrate(self):  # type: () -> bool
-        """
-        Method checks whether the current config needs to migrate.
-        """
-        return self._loaded and self._get_version() != __version__
-
-    def _get_version(self, raw=False):  # type: (bool) -> typing.Union[str, tuple]
+    def _get_version(self):  # type: () -> version.SemanticVersion
         """
         Method get version of the current config.
         It can return the version as semver string or parsed tuple.
         """
-        version = self._get('version')
+        config_version = self._get('version') or '1.0.0'
 
-        # Version 1.0 of TogglCLI
-        if version is None:
-            if raw:
-                return 1, 0, 0
-
-            return '1.0.0'
-
-        if raw:
-            return version.split('.')
-
-        return version
+        return version.SemanticVersion.from_pip_string(config_version)
 
     def _resolve_type(self, entry, item):  # type: (IniEntry, str) -> typing.Any
         """

@@ -3,7 +3,9 @@ import io
 
 import pytest
 import pytest_mock
+from pbr import version
 
+import toggl
 from toggl.utils import migrations
 from toggl.utils import others
 
@@ -55,7 +57,10 @@ class TestIniConfigMigrator:
 
         parser = self._config_parser_factory('1.0.0')
         migrator = migrations.IniConfigMigrator(parser, file)
-        migrator.migrate((1, 0, 0))
+        migrator.migrate(version.SemanticVersion.from_pip_string('1.0.0'))
 
         validation_parser = file.get_configparser()
-        assert validation_parser.get('version', 'version') == '2.0.0'
+        assert validation_parser.get('version', 'version') == '2.0.0.0b1'
+        assert not validation_parser.has_option('options', 'continue_creates')
+        assert not validation_parser.has_option('options', 'prefer_token')
+        assert not validation_parser.has_option('options', 'username')

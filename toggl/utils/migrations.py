@@ -4,24 +4,35 @@ import pendulum
 import typing
 import webbrowser
 
+from pbr import version
 import click
 import inquirer
 
-from .. import exceptions, VERSION
+from .. import exceptions
 
 logger = logging.getLogger('toggl.utils.config')
 
 
-class Migration200:
+class MigrationBase:
+    version = None
+
+    @classmethod
+    def semantic_version(cls):
+        return version.SemanticVersion.from_pip_string(cls.version)
+
+
+class Migration200b1(MigrationBase):
+
+    version = '2.0.0.0b1'
 
     @staticmethod
     def migrate_authentication(parser):  # type: (configparser.ConfigParser) -> None
         from .others import convert_credentials_to_api_token, are_credentials_valid
 
-        if parser.get('auth', 'prefer_token', fallback='').lower() == 'true':
+        if parser.get('options', 'prefer_token', fallback='').lower() == 'true':
             parser.has_option('auth', 'username') and parser.remove_option('auth', 'username')
             parser.has_option('auth', 'password') and parser.remove_option('auth', 'password')
-        elif parser.get('auth', 'prefer_token', fallback='').lower() == 'false':
+        elif parser.get('options', 'prefer_token', fallback='').lower() == 'false':
             api_token = convert_credentials_to_api_token(
                 parser.get('auth', 'username'),
                 parser.get('auth', 'password')
@@ -42,8 +53,7 @@ class Migration200:
 
             parser.has_option('auth', 'username') and parser.remove_option('auth', 'username')
             parser.has_option('auth', 'password') and parser.remove_option('auth', 'password')
-
-        parser.has_option('auth', 'prefer_token') and parser.remove_option('auth', 'prefer_token')
+        parser.has_option('options', 'prefer_token') and parser.remove_option('options', 'prefer_token')
 
     @staticmethod
     def validate_datetime_format(value):
@@ -62,7 +72,7 @@ class Migration200:
 
         while True:
             value = inquirer.shortcuts.text('What datetime format we should use? Type \'doc\' to display format help. Default is based on system\'s locale.',
-                                            default='LTS L', validate=lambda _, i: i == 'doc' or Migration200.validate_datetime_format(i))
+                                            default='LTS L', validate=lambda _, i: i == 'doc' or Migration200b1.validate_datetime_format(i))
 
             if value == 'doc':
                 webbrowser.open('https://pendulum.eustace.io/docs/#tokens')
@@ -72,7 +82,7 @@ class Migration200:
 
         while True:
             value = inquirer.shortcuts.text('What time format we should use? Type \'doc\' to display format help. Default is based on system\'s locale.',
-                                            default='L', validate=lambda _, i: i == 'doc' or Migration200.validate_datetime_format(i))
+                                            default='L', validate=lambda _, i: i == 'doc' or Migration200b1.validate_datetime_format(i))
 
             if value == 'doc':
                 webbrowser.open('https://pendulum.eustace.io/docs/#tokens')
@@ -106,66 +116,37 @@ class IniConfigMigrator:
     Class which orchestrate migration of configuration files between versions.
     """
 
-    # List of all migrations and the versions they are migrating to, order is important!
-    migrations = {
-        (2, 0, 0): Migration200
-    }
+    # List of all migrations, ordered by their version!
+    migrations = (
+        Migration200b1,
+    )
 
     def __init__(self, store, config_path):  # type: (configparser.ConfigParser, typing.Union[str, typing.TextIO]) -> None
         self.store = store
         self.config_file = config_path
 
-    @staticmethod
-    def _should_be_migration_executed(current_version, from_version):  # type: (typing.Tuple[int, int, int], typing.Tuple[int, int, int]) -> bool
-        """
-        Method which verifies if the current_version is newer then from_version.
-        It assumes semver style. It boils down to: current_version > from_version.
-        """
-        if current_version[0] > from_version[0]:
-            return True
+    @classmethod
+    def is_migration_needed(cls, config_version):  # type: (version.SemanticVersion) -> bool
+        return cls.migrations[-1].semantic_version() > config_version
 
-        if current_version[0] >= from_version[0] and current_version[1] > from_version[1]:
-            return True
-
-        if current_version[0] >= from_version[0] \
-                and current_version[1] >= from_version[1] \
-                and current_version[2] > from_version[2]:
-            return True
-
-        return False
-
-    def _set_version(self, version):  # type: (tuple) -> None
+    def _set_version(self, version):  # type: (version.SemanticVersion) -> None
         """
         Method which set a version into the config's file.
         """
         if not self.store.has_section('version'):
             self.store.add_section('version')
 
-        verbose_version = self._format_version(version)
+        self.store.set('version', 'version', version.release_string())
 
-        self.store.set('version', 'version', verbose_version)
-
-    def _format_version(self, version, delimiter='.'):  # type: (typing.Tuple[int, int, int], str) -> str
-        """
-        Format tuple version into semver string.
-        """
-        return delimiter.join(str(e) for e in version)
-
-    def migrate(self, from_version):  # type: (typing.Tuple[int, int, int]) -> None
+    def migrate(self, config_version):  # type: (version.SemanticVersion) -> None
         """
         Main entry point for running the migration. The starting point of the migration is defined by from_version.
         """
-        if len(from_version) != 3:
-            raise exceptions.TogglConfigException('Unknown format of from_version: \'{}\'! '
-                                                  'Tuple with three elements is expected!'.format(from_version))
-
-        something_migrated = False
-        for migration_version, migration in self.migrations.items():
-            if self._should_be_migration_executed(migration_version, from_version):
+        for migration in self.migrations:
+            if migration.semantic_version() > config_version:
                 migration.migrate(self.store)
-                something_migrated = True
 
-        new_version = VERSION
+        new_version = self.migrations[-1].semantic_version()
         self._set_version(new_version)
 
         if isinstance(self.config_file, str):
@@ -174,8 +155,7 @@ class IniConfigMigrator:
         else:
             self.store.write(self.config_file)
 
-        if something_migrated:
-            click.echo('Configuration file was migrated from version {} to {}'.format(
-                self._format_version(from_version),
-                self._format_version(new_version)
-            ))
+        click.echo('Configuration file was migrated from version {} to {}'.format(
+            config_version.release_string(),
+            new_version.release_string()
+        ))
