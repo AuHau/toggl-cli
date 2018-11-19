@@ -16,9 +16,6 @@ class TogglFactory(factory.Factory):
     def _create(cls, model_class, *args, **kwargs):
         obj = cls._build(model_class, *args, **kwargs)
         obj.save()
-
-        print('Saving: ' + str(obj))
-
         return obj
 
 
