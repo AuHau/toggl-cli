@@ -71,8 +71,10 @@ class Migration200b1(MigrationBase):
             return
 
         while True:
-            value = inquirer.shortcuts.text('What datetime format we should use? Type \'doc\' to display format help. Default is based on system\'s locale.',
-                                            default='LTS L', validate=lambda _, i: i == 'doc' or Migration200b1.validate_datetime_format(i))
+            value = inquirer.shortcuts.text('What datetime format we should use? Type \'doc\' to display format help. '
+                                            'Default is based on system\'s locale.',
+                                            default='LTS L', validate=lambda _, i: i == 'doc'
+                                                                      or Migration200b1.validate_datetime_format(i))
 
             if value == 'doc':
                 webbrowser.open('https://pendulum.eustace.io/docs/#tokens')
@@ -81,8 +83,10 @@ class Migration200b1(MigrationBase):
                 break
 
         while True:
-            value = inquirer.shortcuts.text('What time format we should use? Type \'doc\' to display format help. Default is based on system\'s locale.',
-                                            default='L', validate=lambda _, i: i == 'doc' or Migration200b1.validate_datetime_format(i))
+            value = inquirer.shortcuts.text('What time format we should use? Type \'doc\' to display format help. '
+                                            'Default is based on system\'s locale.',
+                                            default='L', validate=lambda _, i: i == 'doc'
+                                                                   or Migration200b1.validate_datetime_format(i))
 
             if value == 'doc':
                 webbrowser.open('https://pendulum.eustace.io/docs/#tokens')
@@ -129,14 +133,14 @@ class IniConfigMigrator:
     def is_migration_needed(cls, config_version):  # type: (version.SemanticVersion) -> bool
         return cls.migrations[-1].semantic_version() > config_version
 
-    def _set_version(self, version):  # type: (version.SemanticVersion) -> None
+    def _set_version(self, new_version):  # type: (version.SemanticVersion) -> None
         """
         Method which set a version into the config's file.
         """
         if not self.store.has_section('version'):
             self.store.add_section('version')
 
-        self.store.set('version', 'version', version.release_string())
+        self.store.set('version', 'version', new_version.release_string())
 
     def migrate(self, config_version):  # type: (version.SemanticVersion) -> None
         """

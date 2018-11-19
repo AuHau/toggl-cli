@@ -9,7 +9,8 @@ sentinel = object()
 
 class CachedFactoryMeta(type):
     """
-    Meta class that implements patern similar to Singleton, except there are more instances cached based on a input parameter.
+    Meta class that implements patern similar to Singleton, except there are more instances cached based on
+    a input parameter.
     It utilizes Factory pattern and forbids direct instantion of the class.
     """
 
@@ -18,7 +19,7 @@ class CachedFactoryMeta(type):
     def __new__(mcs, name, bases, namespace):
         mcs.cache = {}
 
-        def new__init__(self):
+        def new__init__(_):
             raise ValueError('Cannot directly instantiate new object, you have to use \'factory\' method for that!')
 
         old_init = namespace.get('__init__')

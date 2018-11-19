@@ -93,7 +93,7 @@ class Cleanup:
         config = config or get_config()
 
         if batch:
-            utils.toggl('/{}/{}'.format(base, ','.join([str(id) for id in ids])), 'delete', config=config)
+            utils.toggl('/{}/{}'.format(base, ','.join([str(eid) for eid in ids])), 'delete', config=config)
         else:
             for entity_id in ids:
                 utils.toggl('/{}/{}'.format(base, entity_id), 'delete', config=config)
@@ -174,7 +174,8 @@ class Cleanup:
         if not ids:
             config = config or get_config()
             # Making sure not to delete myself from the Workspace
-            entities = filter(lambda wu: wu.__dict__.get('uid') != config.user.id, api.WorkspaceUser.objects.all(config=config))
+            entities = filter(lambda wu: wu.__dict__.get('uid') != config.user.id,
+                              api.WorkspaceUser.objects.all(config=config))
             Cleanup.cleanup(entities)
         else:
             Cleanup._ids_cleanup('workspace_users', config, False, *ids)

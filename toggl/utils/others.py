@@ -40,8 +40,8 @@ class SubCommandsGroup(click.Group):
             if cmd is None:
                 continue
 
-            help = cmd.short_help or ''
-            rows.append((subcommand, help))
+            subcommand_help = cmd.short_help or ''
+            rows.append((subcommand, subcommand_help))
 
         if rows:
             with formatter.section(self.SUB_COMMANDS_SECTION_TITLE):
@@ -51,7 +51,7 @@ class SubCommandsGroup(click.Group):
         self.format_subcommands(ctx, formatter)
         super().format_commands(ctx, formatter)
 
-    def list_subcommands(self, ctx):
+    def list_subcommands(self, _):
         return sorted(self.subcommands)
 
     def list_commands(self, ctx):

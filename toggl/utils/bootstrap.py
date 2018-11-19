@@ -7,7 +7,7 @@ import click
 import inquirer
 import pendulum
 
-from .. import exceptions, __version__
+from .. import exceptions, __version__, utils
 
 logger = logging.getLogger('toggl.utils.bootstrap')
 
@@ -26,7 +26,7 @@ class ConfigBootstrap:
     def __init__(self):
         self.workspaces = None
 
-    def _build_tmp_config(self, api_token=None, username=None, password=None):  # type: (str, str, str) -> Config
+    def _build_tmp_config(self, api_token=None, username=None, password=None):  # type: (str, str, str) -> utils.Config
         """
         Method for creating temporary Config with specified credentials (eq. either api token or username/password)
         """
@@ -99,7 +99,7 @@ class ConfigBootstrap:
 
         if type_auth == self.API_TOKEN_OPTION:
             return inquirer.shortcuts.password(message="Your API token",
-                                               validate=lambda answers, current: are_credentials_valid(api_token=current))
+                                               validate=lambda _, current: are_credentials_valid(api_token=current))
 
         questions = [
             inquirer.Text('username', message="Your Username"),
@@ -136,8 +136,8 @@ class ConfigBootstrap:
 """, fg="red")
 
         click.echo("Welcome to Toggl CLI!\n"
-                   "Unfortunately for Windows users we don't have interactive initialization of TogglCLI. We have created"
-                   "dummy configuration file which you should configure before using this tool.\n")
+                   "Unfortunately for Windows users we don't have interactive initialization of TogglCLI. "
+                   "We have created dummy configuration file which you should configure before using this tool.\n")
 
         return {
             'version': __version__,
@@ -202,4 +202,3 @@ class ConfigBootstrap:
 
     def start_windows(self):
         pass
-

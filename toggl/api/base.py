@@ -66,7 +66,8 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dic
             if isinstance(value, set) and not entity_value._inner_set.issuperset(value):
                 return False
 
-            if isinstance(value, model_fields.SetContainer) and not entity_value._inner_set.issuperset(value._inner_set):
+            if isinstance(value, model_fields.SetContainer) \
+                    and not entity_value._inner_set.issuperset(value._inner_set):
                 return False
 
             continue
@@ -400,6 +401,8 @@ class TogglEntity(metaclass=TogglEntityMeta):
     _can_get_list = True
 
     id = model_fields.IntegerField(required=False, default=None)
+
+    objects = None  # type: TogglSet
 
     def __init__(self, config=None, **kwargs):
         self._config = config or utils.Config.factory()

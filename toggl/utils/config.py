@@ -4,13 +4,13 @@ import os
 import platform
 import typing
 from collections import namedtuple
-from pbr import version
 
 import click
 import requests
+from pbr import version
 
 from . import metas, bootstrap, migrations
-from .. import exceptions, __version__
+from .. import exceptions
 
 logger = logging.getLogger('toggl.utils.config')
 
@@ -65,7 +65,6 @@ class IniConfigMixin:
 
     def __init__(self, config_path=sentinel, **kwargs):  # type: (str, **typing.Any) -> None
         self._config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path
-        print(self._config_path)
         self._store = configparser.ConfigParser(interpolation=None)
         self._loaded = False
 
@@ -226,13 +225,15 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
 
     """
     Setting which specifies behaviour for dateutils.parse() behaviour.
-    Whether to interpret the first value in an ambiguous 3-integer date (e.g. 01/05/09) as the day (True) or month (False).
+    Whether to interpret the first value in an ambiguous 3-integer date (e.g. 01/05/09) as the day (True)
+    or month (False).
     """
     day_first = False
 
     """
     Setting which specifies behaviour for dateutils.parse() behaviour.
-    Whether to interpret the first value in an ambiguous 3-integer date (e.g. 01/05/09) as the year. If True, the first number is taken to be the year, otherwise the last number is taken to be the year. 
+    Whether to interpret the first value in an ambiguous 3-integer date (e.g. 01/05/09) as the year. 
+    If True, the first number is taken to be the year, otherwise the last number is taken to be the year. 
     """
     year_first = False
 
@@ -247,7 +248,8 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     file_logging_path = None
 
     """
-    In case when the HTTP API call is interrupted or the API rejects it because of throttling reasons, the tool will use exponential back-off with number of retries specified by this value. 
+    In case when the HTTP API call is interrupted or the API rejects it because of throttling reasons, 
+    the tool will use exponential back-off with number of retries specified by this value. 
     """
     retries = 2
 
