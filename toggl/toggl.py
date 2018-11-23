@@ -1276,5 +1276,10 @@ def run(cmd):
     parsed = re.findall(r"([\"]([^\"]+)\")|([']([^']+)')|(\S+)", cmd) # Simulates quoting of strings with spaces ("some important task")
     CLI([i[1] or i[3] or i[4] for i in parsed]).act()
 
-if __name__ == "__main__":
+
+def main():
     CLI(sys.argv[1:]).act()
+
+
+if __name__ == "__main__":
+    main()
