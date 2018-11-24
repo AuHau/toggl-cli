@@ -1,5 +1,7 @@
 # Toggl CLI
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/869d787a75dd4e259b824fb8754d3388)](https://app.codacy.com/app/AuHau/toggl-cli?utm_source=github.com&utm_medium=referral&utm_content=AuHau/toggl-cli&utm_campaign=Badge_Grade_Dashboard)
+
 > Command line tool and set of Python wrapper classes for interacting with toggl's API
 
 ## Install
