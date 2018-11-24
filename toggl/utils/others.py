@@ -1,6 +1,7 @@
 import logging
 import json
 from pprint import pformat
+from time import sleep
 
 import click
 import requests
@@ -167,7 +168,8 @@ def toggl(url, method, data=None, headers=None, config=None):
             logger.debug('Response {}:\n{}'.format(response.status_code, pformat(response_json)))
             return response_json
         except (exceptions.TogglThrottlingException, requests.exceptions.ConnectionError) as e:
-            pass
+            sleep(0.1)  # Lets give Toggl API some time to recover
+            # TODO: Make it exponential
 
     # If retries failed then 'e' contains the last Exception/Error, lets re-raise it!
     raise e
