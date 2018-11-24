@@ -63,7 +63,7 @@ class IniConfigMixin:
 
     DEFAULT_CONFIG_PATH = os.path.expanduser('~/.togglrc')
 
-    def __init__(self, config_path=sentinel, **kwargs):  # type: (str, **typing.Any) -> None
+    def __init__(self, config_path=sentinel, **kwargs):  # type: (typing.Optional[str], **typing.Any) -> None
         self._config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path
         self._store = configparser.ConfigParser(interpolation=None)
         self._loaded = False
@@ -72,7 +72,7 @@ class IniConfigMixin:
             self._loaded = self._store.read(self._config_path)
 
             config_version = self._get_version()
-            if migrations.IniConfigMigrator.is_migration_needed(config_version):
+            if self.is_loaded and migrations.IniConfigMigrator.is_migration_needed(config_version):
                 migrator = migrations.IniConfigMigrator(self._store, self._config_path)
                 migrator.migrate(config_version)
 

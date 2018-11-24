@@ -1,15 +1,17 @@
 language: python
 python:
-- '3.5'
-- '3.6'
-- '3.7'
+  - '3.5'
+  - '3.6'
+  - '3.7'
+dist: xenial
+sudo: true
 install:
-- pip install -r test-requirements.txt
-- pip install codecov
+  - pip install -r test-requirements.txt
+  - pip install codecov
 script:
-- pytest --cov toggl
+  - pytest --cov toggl
 after_success:
-- codecov
+  - codecov
 deploy:
   provider: pypi
   user: AuHau-deploy

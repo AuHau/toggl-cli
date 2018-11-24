@@ -29,7 +29,7 @@ def get_config(config='default.config'):
     if isinstance(config, utils.Config):
         return config
 
-    config_path = Path(__file__).parent.parent
+    config_path = Path(__file__).parent
     config_path = config_path.joinpath('configs/' + config)
 
     if not config_path.exists():

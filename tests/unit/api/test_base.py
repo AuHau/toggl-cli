@@ -7,6 +7,8 @@ import pytest
 from toggl.api import base, fields
 from toggl import exceptions, utils
 
+from ... import helpers
+
 
 class RandomEntity(base.TogglEntity):
     some_field = fields.StringField()
@@ -57,39 +59,41 @@ class EvaluateConditionsEntityMapping(EvaluateConditionsEntity):
     mapping = fields.MappingField(RandomEntity, 'rid')
 
 
+config = helpers.get_config()
+
 evaluate_conditions_testset = (
-    ({'string': 'asd'}, EvaluateConditionsEntity(string='asd'), True),
-    ({'string': 'something'}, EvaluateConditionsEntity(string='else'), False),
-    ({'string': 'asd', 'non-existing-field': 'value'}, EvaluateConditionsEntity(string='asd'), False),
+    ({'string': 'asd'}, EvaluateConditionsEntity(config=config, string='asd'), True),
+    ({'string': 'something'}, EvaluateConditionsEntity(config=config, string='else'), False),
+    ({'string': 'asd', 'non-existing-field': 'value'}, EvaluateConditionsEntity(config=config, string='asd'), False),
 
     ({'string': 'asd', 'integer': 123, 'boolean': True},
-     EvaluateConditionsEntity(string='asd', integer=123, boolean=True),
+     EvaluateConditionsEntity(config=config, string='asd', integer=123, boolean=True),
      True),
 
     ({'string': 'asd', 'integer': 123},
-     EvaluateConditionsEntity(string='asd', integer=123, boolean=True),
+     EvaluateConditionsEntity(config=config, string='asd', integer=123, boolean=True),
      True),
 
     ({'integer': 123, 'boolean': True, 'set': {1, 2}},
-     EvaluateConditionsEntity(string='asd', integer=123, boolean=True, set={1, 2, 3, 4}),
+     EvaluateConditionsEntity(config=config, string='asd', integer=123, boolean=True, set={1, 2, 3, 4}),
      True),
 
     ({'integer': 123, 'boolean': True, 'set': {1, 2, 3, 4}},
-     EvaluateConditionsEntity(string='asd', integer=123, boolean=True, set={1, 2, 3, 4}),
+     EvaluateConditionsEntity(config=config, string='asd', integer=123, boolean=True, set={1, 2, 3, 4}),
      True),
 
     ({'integer': 123, 'boolean': True, 'set': {5, 6}},
-     EvaluateConditionsEntity(string='asd', integer=123, boolean=True, set={1, 2, 3, 4}),
+     EvaluateConditionsEntity(config=config, string='asd', integer=123, boolean=True, set={1, 2, 3, 4}),
      False),
 )
 
 evaluate_conditions_contain_testset = (
-    ({'string': 'asd'}, EvaluateConditionsEntity(string='asd'), True),
-    ({'string': 'as'}, EvaluateConditionsEntity(string='asd'), True),
-    ({'string': 'a'}, EvaluateConditionsEntity(string='asd'), True),
-    ({'string': 'asdf'}, EvaluateConditionsEntity(string='asd'), False),
-    ({'integer': 123}, EvaluateConditionsEntity(integer=123), True),
-    ({'integer': 12}, EvaluateConditionsEntity(integer=123), False),
+    ({'string': 'asd'}, EvaluateConditionsEntity(config=config, string='asd'), True),
+    ({'string': 'as'}, EvaluateConditionsEntity(config=config, string='asd'), True),
+    ({'string': 'a'}, EvaluateConditionsEntity(config=config, string='asd'), True),
+    ({'string': 'asdf'}, EvaluateConditionsEntity(config=config, string='asd'), False),
+    ({'integer': 123}, EvaluateConditionsEntity(config=config, integer=123), True),
+    ({'integer': 12}, EvaluateConditionsEntity(config=config, integer=123), False),
 )
 
 

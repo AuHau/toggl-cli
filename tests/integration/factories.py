@@ -2,7 +2,7 @@ import factory
 import faker
 
 from toggl import api
-from . import helpers
+from tests import helpers
 
 
 class TogglFactory(factory.Factory):

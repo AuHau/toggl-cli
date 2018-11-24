@@ -1,9 +1,7 @@
-import re
-
 import pytest
 from faker import Faker
 
-from . import helpers
+from .. import helpers
 
 
 @pytest.fixture()
