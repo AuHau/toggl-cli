@@ -1,5 +1,12 @@
 # Toggl CLI
 
+[![PyPI version](https://badge.fury.io/py/togglCli.svg)](https://badge.fury.io/py/togglCli) 
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/togglCli.svg)](https://pypi.org/project/togglCli)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/togglCli.svg)](https://pypi.org/project/togglCli/) 
+[![codecov](https://codecov.io/gh/AuHau/toggl-cli/branch/master/graph/badge.svg)](https://codecov.io/gh/AuHau/toggl-cli) 
+[![Build Status](https://travis-ci.org/AuHau/toggl-cli.svg?branch=master)](https://travis-ci.org/AuHau/toggl-cli)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/869d787a75dd4e259b824fb8754d3388)](https://app.codacy.com/app/AuHau/toggl-cli?utm_source=github.com&utm_medium=referral&utm_content=AuHau/toggl-cli&utm_campaign=Badge_Grade_Dashboard)
+
 > Command line tool and set of Python wrapper classes for interacting with toggl's API
 
 ## Install
@@ -12,7 +19,7 @@ $ pip install togglCli
 
 ## Usage
 
-For full overview of Toggl CLI capabilities please see [full documentation](https://TODO).
+For full overview of Toggl CLI capabilities please see [full documentation](https://toggl.adam-uhlir.me).
 
 ### CLI tool
 
@@ -38,7 +45,7 @@ $ toggl projects ls
 
 Toggl CLI comes with set of Python's class wrappers which follow similar pattern like Django ORM. 
 
-The wrappers depends on config object which if not provided, the default config file (eq. '~/.togglrc') is used. 
+The wrappers depends on config object which if not provided, the default config file (eq. `~/.togglrc`) is used. 
 
 Toggl CLI uses `pendulum` for datetime management, but it is compatible with Python's native datetime, so you can use that if you want to.
 
@@ -61,7 +68,7 @@ config = utils.Config.factory(None)  # Without None it will load the default con
 config.api_token = 'your token'
 config.timezone = 'utc'  # Custom timezone
 
-project = api.Project.object.get(config=config)
+project = api.Project.object.get(123, config=config)
 project.name = 'Some new name'
 project.save()
 ```
