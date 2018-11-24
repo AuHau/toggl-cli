@@ -1,0 +1,22 @@
+language: python
+python:
+- '3.5'
+- '3.6'
+- '3.7'
+install:
+- pip install -r test-requirements.txt
+- pip install codecov
+script:
+- pytest --cov toggl
+after_success:
+- codecov
+deploy:
+  provider: pypi
+  user: AuHau-deploy
+  distributions: sdist bdist_wheel
+  skip_existing: true
+  password:
+    secure: jFzpBrVs69oMM/Ig16Q2pdo9ihK8330fpkF8wAdKq4O+nuNB7AntORjxFUh0PBvEwkfvvwML7HMnvlP8i8IMTaJoPvPYqAJYbNrUiG1SZj3AkufG6fyJ9LH8xU1iL5WB0MKjXDqcRGx+prjwp6HJkuYcgKYm8Mi5g8ydy7o+GtF2TYIWlfi7EzpkvIJJADxQvF5qUmKubz3AcIdfVQSjKiw4u30HIKHxEkqs6yDetNffTLz5MGiUTxkGIvgy7LsjTCwR92iDqNUZJdAG6lt3Zlu5T+mdh90ezk/AF7m6GMHmx+A77cnYPyblTaLdKmHGEmAgQeTdkqIi/bMQnf6hw4K2ntuqyQVeRfps4e5mEqs0jCYAQ+SNP5oMT0PS/D6faq930Si2Zdn2SVHi+S1n6FyH4Xh3rtn1/cymD5YhM02LeFgfTummHPI3dW8L1UZXD5SIRPvWRPiBqs5DjMFzWKZLgq7miMZrlu6b56rtI9FwryPXlvx9q6lN4tK+fG9XqYkEF5qmSurefTLxOeNm1wu+GBUr+hSPkY4eJOj3f7gzBPGWqruBMawFFY8ZS/CHCoBwHCWfkNxI594p0xUe0Hlcq0n5IrlKMmliTJfGruzVloP013AhpeeoOH5bImSeH6jShVgSdsHiva9GAetqnNK3aBKO2d3eKcbKljxel1U=
+  on:
+    tags: true
+    repo: AuHau/toggl-cli
