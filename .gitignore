@@ -2,3 +2,19 @@
 .DS_Store
 *.pyc
 *.pyproj
+.idea
+
+# Direnv
+.direnv
+.envrc
+
+.pytest_cache/
+__pycache__/
+.tox
+*.egg-info
+.coverage
+htmlcov
+.eggs
+
+# Docs
+site/

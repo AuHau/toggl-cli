@@ -1,0 +1,6 @@
+pytest==3.*
+pytest-mock==1.*
+pytest-cov==2.*
+factory_boy==2.*
+mkdocs-material
+mkdocs
