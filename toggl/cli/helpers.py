@@ -86,7 +86,7 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name',
         if obj.get('header'):
             entity_string += '\n{}: {}'.format(
                 click.style(key.replace('_', ' ').capitalize(), fg='white', dim=1),
-                value
+                '' if value is None else value
             )
         else:
             entity_string += '\n' + str(value)

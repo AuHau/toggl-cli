@@ -625,7 +625,7 @@ class TestTogglEntity:
         obj.save()
 
         assert obj.id == 333
-        utils.toggl.assert_called()
+        assert utils.toggl.called is True
 
         obj = Entity(string='asd', integer=123)
         obj._can_create = False
@@ -645,7 +645,7 @@ class TestTogglEntity:
         obj.save()
 
         assert obj.id == 333
-        utils.toggl.assert_called()
+        assert utils.toggl.called is True
 
         obj = Entity(string='asd', integer=123)
         obj.id = 333
@@ -666,7 +666,7 @@ class TestTogglEntity:
         obj.save()
 
         assert obj.id == 333
-        utils.toggl.assert_called()
+        assert utils.toggl.called is True
 
         obj = Entity(string='asd', integer=123)
         obj.id = 333

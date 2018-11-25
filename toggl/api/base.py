@@ -5,6 +5,7 @@ import typing
 from abc import ABCMeta
 from collections import OrderedDict
 from inspect import Signature, Parameter
+from pprint import pprint
 
 from .. import utils, exceptions
 from . import fields as model_fields
@@ -359,6 +360,10 @@ class TogglEntityMeta(ABCMeta):
 
         return out
 
+    @classmethod
+    def __prepare__(mcs, name, bases):
+        return OrderedDict()
+
     def __new__(mcs, name, bases, attrs, **kwargs):
         new_class = super().__new__(mcs, name, bases, attrs, **kwargs)
 
@@ -577,13 +582,13 @@ class TogglEntity(metaclass=TogglEntityMeta):
         instance._config = config
         instance.__change_dict__ = {}
 
-        for key, value in kwargs.items():
+        for key, field in instance.__fields__.items():
             try:
-                field = instance.__fields__[key]
+                value = kwargs[key]
             except KeyError:
                 try:
-                    field = instance.__mapped_fields__[key]
-                except KeyError:
+                    value = kwargs[field.mapped_field]
+                except (KeyError, AttributeError):
                     continue
 
             field.init(instance, value)
