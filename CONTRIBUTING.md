@@ -14,9 +14,9 @@ There are two sets of integration tests: normal and premium. To be able to run t
 workspace. As this is quiet unlikely you can leave the testing on Travis CI as it runs also the premium tests set.
 
 Tests are written using `pytest` framework and are split into three categories (each having its own pytest mark):
- * **unit** - unit tests testing mostly the framework around building the API wrappers
- * **integration** - Integration tests which tests end to end coherence of API wrapper. Requires connectivity to Toggl API.
- * **premium**: Subcategory of Integration tests that requires to have Premium/Paid workspace for the tests.
+*  **unit** - unit tests testing mostly the framework around building the API wrappers
+*  **integration** - Integration tests which tests end to end coherence of API wrapper. Requires connectivity to Toggl API.
+*  **premium**: Subcategory of Integration tests that requires to have Premium/Paid workspace for the tests.
 
 ## Running tests
 

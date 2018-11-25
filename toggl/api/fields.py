@@ -17,8 +17,6 @@ logger = logging.getLogger('toggl.api.fields')
 
 NOTSET = object()
 
-Field = typing.TypeVar('Field', bound='TogglField')
-
 
 class TogglField:
     """
@@ -39,16 +37,17 @@ class TogglField:
     Attribute 'default' defines a default value to be used if no value is provided (None is valid default value).
     It can also be callable, which is evaluated everytime
 
-    Attribute 'admin_only' specifies that the field can be set only when the user has admin role in the related Workspace
-    (meaningful for WorkspaceEntity and its subclasses).
+    Attribute 'admin_only' specifies that the field can be set only when the user has admin role in the related
+    Workspace (meaningful for WorkspaceEntity and its subclasses).
 
     Attribute 'is_read_only' specifies if user can set value to the field.
 
     Attribute 'premium' specifies if the field can be used only for premium workspaces.
     """
 
-    # Represents Python's primitive type for easy implementation of basic Fields like String, Integer etc. using Python builtins (eq. bool, str, etc.).
-    _field_type = None
+    # Represents Python's primitive type for easy implementation of basic Fields like String, Integer etc. using
+    # Python builtins (eq. bool, str, etc.).
+    _field_type = str
 
     name = None
     verbose_name = None
@@ -58,7 +57,8 @@ class TogglField:
     is_read_only = False
     premium = False
 
-    def __init__(self, verbose_name=None, required=False, default=NOTSET, admin_only=False, is_read_only=False, premium=False):
+    def __init__(self, verbose_name=None, required=False, default=NOTSET, admin_only=False, is_read_only=False,
+                 premium=False):
         self.name = None
         self.verbose_name = verbose_name
         self.required = required
@@ -85,10 +85,11 @@ class TogglField:
             workspace = instance.workspace if isinstance(instance, WorkspaceEntity) else instance  # type: Workspace
 
             if getattr(instance, self.name, False) and not workspace.premium:
-                raise exceptions.TogglPremiumException('You are trying to save object with premium field \'{}.{}\''.format(
-                    instance.__class__.__name__,
-                    self.name
-                ))
+                raise exceptions.TogglPremiumException('You are trying to save object with premium field \'{}.{}\''
+                                                        .format(
+                                                            instance.__class__.__name__,
+                                                            self.name
+                                                        ))
 
     def serialize(self, value):  # type: (typing.Any) -> typing.Any
         """
@@ -194,13 +195,15 @@ class TogglField:
 
             if self.admin_only and not workspace.admin:
                 raise exceptions.TogglNotAllowedException(
-                    'You are trying edit field \'{}.{}\' which is admin only field, but you are not an admin in workspace \'{}\'!'
+                    'You are trying edit field \'{}.{}\' which is admin only field, '
+                    'but you are not an admin in workspace \'{}\'!'
                         .format(instance.__class__.__name__, self.name, workspace.name)
                 )
 
             if self.premium and not workspace.premium:
                 raise exceptions.TogglPremiumException(
-                    'You are trying to edit field \'{}.{}\' which is premium only field, but the associated workspace \'{}\' is not premium!'
+                    'You are trying to edit field \'{}.{}\' which is premium only field, '
+                    'but the associated workspace \'{}\' is not premium!'
                         .format(instance.__class__.__name__, self.name, workspace.name)
                 )
 
@@ -223,8 +226,11 @@ class TogglField:
         return '{} - {}'.format(self.__class__.__name__, self.name)
 
 
+Field = typing.TypeVar('Field', bound=TogglField)
+
+
 #########################################################################
-## Primitive fields implementation using _field_type
+# Primitive fields implementation using _field_type
 
 
 class StringField(TogglField):
@@ -244,7 +250,7 @@ class BooleanField(TogglField):
 
 
 #########################################################################
-## Advanced fields
+# Advanced fields
 
 
 class DateTimeField(StringField):
@@ -543,13 +549,13 @@ class SetContainer(collections.MutableSet):
         self._instance = entity_instance
         self._field_name = field_name
 
-    def add(self, x):
+    def add(self, value):
         self._instance.__change_dict__[self._field_name] = self
-        self._inner_set.add(x)
+        self._inner_set.add(value)
 
-    def discard(self, x):
+    def discard(self, value):
         self._instance.__change_dict__[self._field_name] = self
-        self._inner_set.discard(x)
+        self._inner_set.discard(value)
 
     def __contains__(self, x):
         return x in self._inner_set

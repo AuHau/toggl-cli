@@ -24,7 +24,7 @@ class ConfigMeta(metas.CachedFactoryMeta, metas.ClassAttributeModificationWarnin
     See MERGE_ATTRS.
     """
 
-    def __new__(mcs, name, bases, attrs, **kwargs):
+    def __new__(mcs, name, bases, attrs):
         attrs = mcs._merge_attrs(attrs, bases)
         return super().__new__(mcs, name, bases, attrs)
 
@@ -212,13 +212,13 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     # Default values
 
     """
-    Setting which specifies the format in which all the datetimes will be printed. 
+    Setting which specifies the format in which all the datetimes will be printed.
     For syntax see: https://pendulum.eustace.io/docs/#tokens
     """
     datetime_format = 'LTS L'
 
     """
-    Setting which specifies the format in which all the times will be printed. 
+    Setting which specifies the format in which all the times will be printed.
     For syntax see: https://pendulum.eustace.io/docs/#tokens
     """
     time_format = 'LTS'
@@ -232,8 +232,8 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
 
     """
     Setting which specifies behaviour for dateutils.parse() behaviour.
-    Whether to interpret the first value in an ambiguous 3-integer date (e.g. 01/05/09) as the year. 
-    If True, the first number is taken to be the year, otherwise the last number is taken to be the year. 
+    Whether to interpret the first value in an ambiguous 3-integer date (e.g. 01/05/09) as the year.
+    If True, the first number is taken to be the year, otherwise the last number is taken to be the year.
     """
     year_first = False
 

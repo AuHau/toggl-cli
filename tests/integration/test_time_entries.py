@@ -53,11 +53,11 @@ class TestTimeEntries:
         parsed = result.parse_list()
         assert len(parsed) == 3
 
-        result = cmd('ls --tags \'a,b\''.format(project.id))
+        result = cmd('ls --tags \'a,b\'')
         parsed = result.parse_list()
         assert len(parsed) == 1
 
-        result = cmd('ls --tags \'a\''.format(project.id))
+        result = cmd('ls --tags \'a\'')
         parsed = result.parse_list()
         assert len(parsed) == 2
 
@@ -79,7 +79,9 @@ class TestTimeEntries:
     def test_add_tags(self, cmd, fake, config):
         start = pendulum.instance(fake.past_datetime(start_date='-9d'))
         end = start + pendulum.duration(hours=2)
-        result = cmd('add \'{}\' \'{}\' \'{}\' --tags \'some tag,another tag\''.format(start.format('MMM D HH:mm:ss'), end.format('MMM D HH:mm:ss'), fake.sentence()))
+        result = cmd('add \'{}\' \'{}\' \'{}\' --tags \'some tag,another tag\''.format(start.format('MMM D HH:mm:ss'),
+                                                                                       end.format('MMM D HH:mm:ss'),
+                                                                                       fake.sentence()))
         assert result.obj.exit_code == 0
 
         entry = TimeEntry.objects.get(result.created_id(), config=config)  # type: TimeEntry

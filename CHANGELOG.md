@@ -6,18 +6,18 @@ Earlier changes were not versioned. Therefore dates of change are used instead t
 
 Full rewrite of the tool by [AuHau](https://github.com/AuHau), which implements most of the toggl's API capabilities. Entities which is now possible to 
 fully manage (eq. CRUD operations):
- * Time entries
- * Clients
- * Projects
- * Project users
- * Tasks (only for premium workspaces)
- * Workspaces
- * Workspace users
+*  Time entries
+*  Clients
+*  Projects
+*  Project users
+*  Tasks (only for premium workspaces)
+*  Workspaces
+*  Workspace users
  
 Main new features of the tool:
- * Possibility to use environment variables to specify some of the input parameters
- * Possibility to specify different config to be used for the command's execution
- * Django ORM's like API Classes
+*  Possibility to use environment variables to specify some of the input parameters
+*  Possibility to specify different config to be used for the command's execution
+*  Django ORM's like API Classes
  
 
 ## 15 Dec 2014 
