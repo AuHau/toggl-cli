@@ -1,5 +1,5 @@
 pendulum==2.*
-requests==2.*
+requests>=2.20.0
 click==7.*
 inquirer==2.*
 PTable==0.*
