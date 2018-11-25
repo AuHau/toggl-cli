@@ -1,9 +1,9 @@
-import collections
 import datetime
 import logging
 from builtins import int
 from copy import copy
 from enum import Enum
+from collections.abc import MutableSequence, MutableSet
 import typing
 
 import pendulum
@@ -465,7 +465,7 @@ class ChoiceField(StringField):
         return self.choices[value]
 
 
-class ListContainer(collections.MutableSequence):
+class ListContainer(MutableSequence):
     def __init__(self, entity_instance, field_name, existing_list=None):
         if existing_list is not None:
             self._inner_list = copy(existing_list)
@@ -536,7 +536,7 @@ class ListField(TogglField):
         super().__set__(instance, value)
 
 
-class SetContainer(collections.MutableSet):
+class SetContainer(MutableSet):
     def __init__(self, entity_instance, field_name, existing_set=None):
         if existing_set is not None:
             if isinstance(existing_set, list):

@@ -1,6 +1,6 @@
 import logging
 import typing
-from collections import Iterable
+from collections.abc import Iterable
 
 import click
 from prettytable import PrettyTable
