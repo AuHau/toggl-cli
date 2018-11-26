@@ -161,10 +161,18 @@ class ModifierSetType(SetType):
 
     name = 'modifier-type'
 
+    @staticmethod
+    def is_modifiers_value(parsed_values):
+        for value in parsed_values:
+            if value[0] != '+' and value[0] != '-':
+                return False
+
+        return True
+
     def convert(self, value, param, ctx):
         parsed = super().convert(value, param, ctx)
 
-        if '-' not in value and '+' not in value:
+        if not self.is_modifiers_value(parsed):
             return parsed
 
         mod = Modifier()
