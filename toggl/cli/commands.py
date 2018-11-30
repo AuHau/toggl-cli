@@ -3,6 +3,8 @@ import traceback
 import webbrowser
 
 import click
+import click_completion
+
 import pendulum
 from prettytable import PrettyTable
 
@@ -12,6 +14,7 @@ from . import helpers, types
 DEFAULT_CONFIG_PATH = '~/.togglrc'
 
 logger = logging.getLogger('toggl.cli.commands')
+click_completion.init()
 
 
 # TODO: Improve better User's management. Hide all the Project's users/Workspace's users and work only with User object
@@ -42,7 +45,7 @@ def entrypoint(args, obj=None):
 @click.option('--simple', '-s', is_flag=True,
               help="Instead of pretty aligned tables prints only data separated by tabulator")
 @click.option('--config', type=click.Path(), envvar='TOGGL_CONFIG',
-              help="sets specific Config file to be used (ENV: TOGGL_CONFIG)")
+              help="Sets specific Config file to be used (ENV: TOGGL_CONFIG)")
 @click.version_option(__version__)
 @click.pass_context
 def cli(ctx, quiet, verbose, debug, simple, header, config=None):
@@ -57,7 +60,7 @@ def cli(ctx, quiet, verbose, debug, simple, header, config=None):
 
     \b
     Currently known limitations:
-     - For every non-ID (using names, emails etc.) resource lookup the lookup is done
+     * For every non-ID (using names, emails etc.) resource lookup the lookup is done
        in the default workspace, unless there is option to specify workspace in the command.
 
     \b
@@ -685,7 +688,7 @@ def workspace_users(ctx, workspace):
 @click.option('--email', '-e', help='Email address of the user to invite into the workspace',
               prompt='Email address of the user to invite into the workspace')
 @click.pass_context
-def workspace_invite(ctx, email):
+def workspace_users_invite(ctx, email):
     """
     Invites an user into the workspace.
 
@@ -998,3 +1001,43 @@ def timezone(ctx, tz, default):
         click.echo('Current timezone: ==Toggl\'s default setting==')
     else:
         click.echo('Current timezone: {}'.format(config.timezone))
+
+
+cmd_help = """Shell completion for toggl command
+
+Available shell types:
+
+\b
+  {}
+
+Default type: auto
+""".format("\n  ".join('{:<12} {}'.format(k, click_completion.core.shells[k]) for k in sorted(
+    click_completion.core.shells.keys())))
+
+
+@user_config.group(help=cmd_help, short_help='shell completion for toggl')
+def completion():
+    pass
+
+
+@completion.command()
+@click.option('-i', '--case-insensitive/--no-case-insensitive', help="Case insensitive completion")
+@click.argument('shell', required=False, type=click_completion.DocumentedChoice(click_completion.core.shells))
+def show(shell, case_insensitive):
+    """Show the toggl completion code"""
+    extra_env = {'_TOGGL_CASE_INSENSITIVE_COMPLETE': 'ON'} if case_insensitive else {}
+    click.echo(click_completion.core.get_code(shell, extra_env=extra_env))
+
+
+@completion.command()
+@click.option('--append/--overwrite', help="Append the completion code to the file", default=None)
+@click.option('-i', '--case-insensitive/--no-case-insensitive', help="Case insensitive completion")
+@click.argument('shell', required=False, type=click_completion.DocumentedChoice(click_completion.core.shells))
+@click.argument('path', required=False)
+def install(append, case_insensitive, shell, path):
+    """Install the toggl completion"""
+    extra_env = {'_TOGGL_CASE_INSENSITIVE_COMPLETE': 'ON'} if case_insensitive else {}
+    shell, path = click_completion.core.install(shell=shell, path=path, append=append, extra_env=extra_env)
+    click.echo('%s completion installed in %s' % (shell, path))
+
+

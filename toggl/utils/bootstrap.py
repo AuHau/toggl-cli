@@ -196,7 +196,14 @@ class ConfigBootstrap:
         if answers is None:
             self._exit()
 
-        click.echo("\nConfiguration successfully finished!\nNow continuing with your command:\n\n")
+        click.echo("""
+        Configuration successfully finished!
+        
+        If you want to enable command completion run: toggl config completion install
+        
+        Now continuing with your command:
+        
+        """)
 
         return self._map_answers(api_token=api_token, **answers)
 

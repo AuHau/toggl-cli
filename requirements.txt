@@ -4,4 +4,5 @@ click==7.*
 inquirer==2.*
 PTable==0.*
 validate_email==1.*
+click-completion
 pbr
