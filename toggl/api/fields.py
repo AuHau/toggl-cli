@@ -432,7 +432,8 @@ class ChoiceField(StringField):
     """
     Field that limits the range of possible values.
 
-    The choices are defined as dict where keys are values of the field and the dict's values are labels for these values.
+    The choices can defined either as dict where keys are values of the field and the dict's values are
+    labels for these values, or as list which contains the set of possible values.
     """
 
     choices = {}
@@ -442,9 +443,9 @@ class ChoiceField(StringField):
 
         self.choices = choices
 
-    def __set__(self, instance, value):
+    def __set__(self, instance: typing.Optional['base.Entity'], value: str):
         # User entered the choice's label and not the key, let's remap it
-        if value not in self.choices:
+        if value not in self.choices and isinstance(self.choices, dict):
             for key, choice_value in self.choices.items():
                 if value == choice_value:
                     value = key
@@ -452,16 +453,19 @@ class ChoiceField(StringField):
 
         super().__set__(instance, value)
 
-    def validate(self, value, instance):
+    def validate(self, value: str, instance: typing.Optional['base.Entity']):
         super().validate(value, instance)
 
-        if value not in self.choices and value not in self.choices.values():
+        if value not in self.choices:
             raise exceptions.TogglValidationException('Value \'{}\' is not valid choice!'.format(value))
 
-    def format(self, value, config=None):
+    def format(self, value: str, config: utils.Config = None) -> str:
         return self.get_label(value)
 
-    def get_label(self, value):
+    def get_label(self, value: str) -> str:
+        if not isinstance(self.choices, dict):
+            return value
+
         return self.choices[value]
 
 
