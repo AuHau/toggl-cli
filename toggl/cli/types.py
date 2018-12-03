@@ -210,10 +210,12 @@ class FieldsType(click.ParamType):
         if param is None:
             out = OrderedDict()
         else:
-            out = OrderedDict([(key, None) for key in param.default.split(',')])
+            out = OrderedDict([(key.strip(), None) for key in param.default.split(',')])
 
         modifier_values = value.split(',')
         for modifier_value in modifier_values:
+            modifier_value = modifier_value.strip()
+
             modifier = modifier_value[0]
 
             if modifier != '+' and modifier != '-':
