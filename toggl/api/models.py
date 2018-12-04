@@ -74,7 +74,7 @@ class Workspace(base.TogglEntity):
     # but we want vanilla TogglSet so defining it here explicitly.
     objects = base.TogglSet()
 
-    def invite(self, *emails: str) -> None:
+    def invite(self, *emails):  # type: (str) -> None
         """
         Invites users defined by email addresses. The users does not have to have account in Toggl, in that case after
         accepting the invitation, they will go through process of creating the account in the Toggl web.
@@ -98,7 +98,7 @@ class WorkspacedEntity(base.TogglEntity):
     Abstract entity which has linked Workspace
     """
 
-    workspace: Workspace = fields.MappingField(Workspace, 'wid', is_read_only=True,
+    workspace = fields.MappingField(Workspace, 'wid', is_read_only=True,
                                                default=lambda config: config.default_workspace)
     """
     Workspace to which the resource is linked to.
@@ -111,7 +111,7 @@ class PremiumEntity(WorkspacedEntity):
     Abstract entity that enforces that linked Workspace is premium (paid).
     """
 
-    def save(self, config: 'utils.Config' = None) -> None:
+    def save(self, config=None):  # type: (utils.Config) -> None
         if not self.workspace.premium:
             raise exceptions.TogglPremiumException('The entity {} requires to be associated with Premium workspace!')
 
@@ -196,7 +196,7 @@ class Project(WorkspacedEntity):
     (Available only for Premium workspaces)
     """
 
-    def add_user(self, user: 'User', manager: bool = False, rate: typing.Optional[float] = None) -> 'ProjectUser':
+    def add_user(self, user, manager=False, rate=None) :  # type: (User, bool, typing.Optional[float]) -> ProjectUser
         """
         Add new user to a project.
 
@@ -239,7 +239,6 @@ class User(WorkspacedEntity):
     """
 
     send_timer_notifications = fields.BooleanField()
-    openid_enabled = fields.BooleanField()
 
     default_workspace = fields.MappingField(Workspace, 'default_wid')  # type: Workspace
     """
@@ -258,7 +257,6 @@ class User(WorkspacedEntity):
     Full name of the user.
     """
 
-    store_start_and_stop_time = fields.BooleanField()
     beginning_of_week = fields.ChoiceField({
         '0': 'Sunday',
         '1': 'Monday',
@@ -298,6 +296,7 @@ class User(WorkspacedEntity):
     Format of time used to display time.
     """
 
+    # TODO: Add possibility to use this value in Config.datetime_format
     date_format = fields.ChoiceField(
         ["YYYY-MM-DD", "DD.MM.YYYY", "DD-MM-YYYY", "MM/DD/YYYY", "DD/MM/YYYY", "MM-DD-YYYY"]
     )
@@ -465,7 +464,7 @@ class TimeEntryDateTimeField(fields.DateTimeField):
     """
 
     def format(self, value, config=None, instance=None, display_running=False,
-               only_time_for_same_day=None) -> str:
+               only_time_for_same_day=None):
         if not display_running and not only_time_for_same_day:
             return super().format(value, config)
 
@@ -482,7 +481,7 @@ class TimeEntryDateTimeField(fields.DateTimeField):
         return super().format(value, config)
 
 
-def get_duration(name: str, instance: 'base.Entity') -> int:
+def get_duration(name, instance):  # type: (str, base.Entity) -> int
     """
     Getter for Duration Property field.
 
@@ -494,8 +493,7 @@ def get_duration(name: str, instance: 'base.Entity') -> int:
     return int((instance.stop - instance.start).in_seconds())
 
 
-def set_duration(name: str, instance: 'base.Entity', value: typing.Optional[int], init: bool=False) \
-        -> typing.Optional[bool]:
+def set_duration(name, instance, value, init=False):  # type: (str, base.Entity, typing.Optional[int], bool) -> typing.Optional[bool]
     """
     Setter for Duration Property field.
     """
@@ -512,7 +510,7 @@ def set_duration(name: str, instance: 'base.Entity', value: typing.Optional[int]
     return True  # Any change will result in updated instance's state.
 
 
-def format_duration(value: int, config: 'utils.Config'=None) -> str:
+def format_duration(value, config=None):  # type: (int, utils.Config) -> str
     """
     Formatting the duration into HOURS:MINUTES:SECOND format.
     """
@@ -639,8 +637,7 @@ class TimeEntry(WorkspacedEntity):
         return super().to_dict(serialized=serialized, changes_only=changes_only)
 
     @classmethod
-    def start_and_save(cls, start=None, config=None,
-                       **kwargs):  # type: (pendulum.DateTime, utils.Config, **typing.Any) -> TimeEntry
+    def start_and_save(cls, start=None, config=None, **kwargs):  # type: (pendulum.DateTime, utils.Config, **typing.Any) -> TimeEntry
         """
         Creates a new running entry.
 
