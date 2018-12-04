@@ -142,10 +142,10 @@ class TestTogglField:
             admin = True
             name = 'WorkspaceMock'
 
-        class WorkspaceEntityMock(models.WorkspaceEntity):
+        class WorkspacedEntityMock(models.WorkspacedEntity):
             workspace = WorkspaceMock
 
-        obj = WorkspaceEntityMock()
+        obj = WorkspacedEntityMock()
 
         field = fields.StringField(admin_only=True)
         field.name = 'field'
@@ -162,15 +162,15 @@ class TestTogglField:
             premium = False
             name = 'WorkspaceMock'
 
-        class WorkspaceEntityMock(models.WorkspaceEntity):
+        class WorkspacedEntityMock(models.WorkspacedEntity):
             workspace = WorkspaceMock
             premium_field = fields.StringField(premium=True)
 
         with pytest.raises(exceptions.TogglPremiumException):
-            obj = WorkspaceEntityMock(premium_field='something')
+            obj = WorkspacedEntityMock(premium_field='something')
             obj.save()
 
-        obj = WorkspaceEntityMock()
+        obj = WorkspacedEntityMock()
 
         field = fields.StringField(premium=True)
         field.name = 'field'

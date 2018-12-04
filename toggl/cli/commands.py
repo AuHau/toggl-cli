@@ -1,6 +1,7 @@
 import logging
 import traceback
 import webbrowser
+import os
 
 import click
 import click_completion
@@ -23,6 +24,8 @@ click_completion.init()
 def entrypoint(args, obj=None):
     """
     CLI entry point, where exceptions are handled.
+
+    If the exceptions should be propagated out of the tool use env. variable: TOGGL_EXCEPTIONS=1
     """
 
     try:
@@ -32,6 +35,9 @@ def entrypoint(args, obj=None):
         logger.debug(traceback.format_exc())
         exit(e.exit_code)
     except Exception as e:
+        if os.environ.get('TOGGL_EXCEPTIONS') == '1':
+            raise
+
         logger.error(str(e).strip())
         logger.debug(traceback.format_exc())
         exit(1)

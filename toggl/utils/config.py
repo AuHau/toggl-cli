@@ -10,7 +10,7 @@ import requests
 from pbr import version
 
 from . import metas, bootstrap, migrations
-from .. import exceptions
+from .. import exceptions, api
 
 logger = logging.getLogger('toggl.utils.config')
 
@@ -337,7 +337,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
             exit(1)
 
     @property
-    def user(self):  # type: () -> '..api.User'
+    def user(self):  # type: () -> 'api.User'
         # Cache the User defined by the instance's config
         if self._user is None:
             from ..api import User
@@ -354,7 +354,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         self.tz = value
 
     @property
-    def default_workspace(self):  # type: () -> '..api.Workspace'
+    def default_workspace(self):  # type: () -> 'api.Workspace'
         """
         Method returns user's default workspace
         """

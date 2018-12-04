@@ -21,19 +21,60 @@ class Workspace(base.TogglEntity):
     _can_delete = False
 
     name = fields.StringField(required=True)
+    """
+    Name of the workspace
+    """
+
     premium = fields.BooleanField()
+    """
+    If it's a pro workspace or not. Shows if someone is paying for the workspace or not
+    """
+
     admin = fields.BooleanField()
+    """
+    Shows whether currently requesting user has admin access to the workspace
+    """
+
     only_admins_may_create_projects = fields.BooleanField()
+    """
+    Whether only the admins can create projects or everybody
+    """
+
     only_admins_see_billable_rates = fields.BooleanField()
+    """
+    Whether only the admins can see billable rates or everybody
+    """
+
     rounding = fields.IntegerField()
+    """
+    Type of rounding:
+    
+    * round down: -1
+    * nearest: 0
+    * round up: 1
+    """
+
     rounding_minutes = fields.IntegerField()
+    """
+    Round up to nearest minute
+    """
+
     default_hourly_rate = fields.FloatField()
+    """
+    Default hourly rate for workspace, won't be shown to non-admins 
+    if the only_admins_see_billable_rates flag is set to true
+    """
+
+    default_currency = fields.StringField()
+    """
+    Default currency for workspace
+    """
 
     # As TogglEntityMeta is by default adding WorkspaceTogglSet to TogglEntity,
     # but we want vanilla TogglSet so defining it here explicitly.
     objects = base.TogglSet()
 
-    def invite(self, *emails):  # type: (*str) -> None
+    def invite(self, *emails: str) -> None:
         """
         Invites users defined by email addresses. The users does not have to have account in Toggl, in that case after
         accepting the invitation, they will go through process of creating the account in the Toggl web.
@@ -52,18 +93,25 @@ class Workspace(base.TogglEntity):
             raise exceptions.TogglException(data['notifications'])
 
 
-class WorkspaceEntity(base.TogglEntity):
-    workspace = fields.MappingField(Workspace, 'wid', is_read_only=True,
-                                    default=lambda config: config.default_workspace)  # type: Workspace
+class WorkspacedEntity(base.TogglEntity):
+    """
+    Abstract entity which has linked Workspace
+    """
+
+    workspace: Workspace = fields.MappingField(Workspace, 'wid', is_read_only=True,
+                                               default=lambda config: config.default_workspace)
+    """
+    Workspace to which the resource is linked to.
+    """
 
 
 # Premium Entity
-class PremiumEntity(WorkspaceEntity):
+class PremiumEntity(WorkspacedEntity):
     """
     Abstract entity that enforces that linked Workspace is premium (paid).
     """
 
-    def save(self, config=None):  # type: (utils.Config) -> None
+    def save(self, config: 'utils.Config' = None) -> None:
         if not self.workspace.premium:
             raise exceptions.TogglPremiumException('The entity {} requires to be associated with Premium workspace!')
 
@@ -73,23 +121,90 @@ class PremiumEntity(WorkspaceEntity):
 # ----------------------------------------------------------------------------
 # Entities definitions
 # ----------------------------------------------------------------------------
-class Client(WorkspaceEntity):
+class Client(WorkspacedEntity):
+    """
+    Client entity
+    """
+
     name = fields.StringField(required=True)
+    """
+    Name of client (Required)
+    """
+
     notes = fields.StringField()
+    """
+    Notes about the client
+    """
 
 
-class Project(WorkspaceEntity):
+class Project(WorkspacedEntity):
+    """
+    Project entity
+    """
+
     name = fields.StringField(required=True)
-    client = fields.MappingField(Client, 'cid')  # type: Client
-    active = fields.BooleanField(default=True)
-    is_private = fields.BooleanField(default=True)
-    billable = fields.BooleanField(premium=True)
-    auto_estimates = fields.BooleanField(default=False, premium=True)
-    estimated_hours = fields.IntegerField(premium=True)
-    color = fields.IntegerField()
-    rate = fields.FloatField(premium=True)
+    """
+    Name of the project. (Required)
+    """
 
-    def add_user(self, user, manager=False, rate=None):  # type: (User, bool, typing.Optional[float]) -> ProjectUser
+    client = fields.MappingField(Client, 'cid')
+    """
+    Client associated to the project.
+    """
+
+    active = fields.BooleanField(default=True)
+    """
+    Whether the project is archived or not. (Default: True)
+    """
+
+    is_private = fields.BooleanField(default=True)
+    """
+    Whether project is accessible for only project users or for all workspace users. (Default: True)
+    """
+
+    billable = fields.BooleanField(premium=True)
+    """
+    Whether the project is billable or not. 
+    
+    (Available only for Premium workspaces)
+    """
+
+    auto_estimates = fields.BooleanField(default=False, premium=True)
+    """
+    Whether the estimated hours are automatically calculated based on task estimations or manually 
+    fixed based on the value of 'estimated_hours'. 
+    
+    (Available only for Premium workspaces)
+    """
+
+    estimated_hours = fields.IntegerField(premium=True)
+    """
+    If auto_estimates is true then the sum of task estimations is returned, otherwise user inserted hours.
+    
+    (Available only for Premium workspaces)
+    """
+
+    color = fields.IntegerField()
+    """
+    Id of the color selected for the project
+    """
+
+    rate = fields.FloatField(premium=True)
+    """
+    Hourly rate of the project.
+    
+    (Available only for Premium workspaces)
+    """
+
+    def add_user(self, user: 'User', manager: bool = False, rate: typing.Optional[float] = None) -> 'ProjectUser':
+        """
+        Add new user to a project.
+
+        :param user: User to be added
+        :param manager: Specifies if the user should have manager's rights
+        :param rate: Rate for billing
+        :return: ProjectUser instance.
+        """
         project_user = ProjectUser(project=self, user=user, workspace=self.workspace, manager=manager, rate=rate)
         project_user.save()
 
@@ -98,7 +213,7 @@ class Project(WorkspaceEntity):
 
 class UserSet(base.WorkspaceTogglSet):
 
-    def current_user(self, config=None):  # type: (utils.Config) -> User
+    def current_user(self, config=None):  # type: (utils.Config) -> 'User'
         """
         Fetches details about the current user.
         """
@@ -106,18 +221,43 @@ class UserSet(base.WorkspaceTogglSet):
         return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
 
 
-class User(WorkspaceEntity):
+class User(WorkspacedEntity):
+    """
+    User entity.
+    """
+
     _can_create = False
     _can_update = False
     _can_delete = False
     _can_get_detail = False
 
     api_token = fields.StringField()
+    """
+    API token to use for API calls.
+    
+    (Returned only for User.objects.current_user() call.)
+    """
+
     send_timer_notifications = fields.BooleanField()
     openid_enabled = fields.BooleanField()
+
     default_workspace = fields.MappingField(Workspace, 'default_wid')  # type: Workspace
+    """
+    Default workspace for calls that does not specify Workspace.
+    
+    (Returned only for User.objects.current_user() call.)
+    """
+
     email = fields.EmailField()
+    """
+    Email address of user.
+    """
+
     fullname = fields.StringField()
+    """
+    Full name of the user.
+    """
+
     store_start_and_stop_time = fields.BooleanField()
     beginning_of_week = fields.ChoiceField({
         '0': 'Sunday',
@@ -128,9 +268,42 @@ class User(WorkspaceEntity):
         '5': 'Friday',
         '6': 'Saturday'
     })
+    """
+    Defines which day is the first day of week for the user.
+    """
+
     language = fields.StringField()
+    """
+    Stores language used for the user.
+    """
+
     image_url = fields.StringField()
+    """
+    URL of the profile image of the user.
+    """
+
     timezone = fields.StringField()
+    """
+    Timezone which is used to convert the times into. 
+    
+    May differ from one used in this tool, see toggl.utils.Config().
+    """
+
+    # TODO: Add possibility to use this value in Config.time_format
+    timeofday_format = fields.ChoiceField({
+        'H:mm': '24-hour',
+        'h:mm': '12-hour'
+    })
+    """
+    Format of time used to display time.
+    """
+
+    date_format = fields.ChoiceField(
+        ["YYYY-MM-DD", "DD.MM.YYYY", "DD-MM-YYYY", "MM/DD/YYYY", "DD/MM/YYYY", "MM-DD-YYYY"]
+    )
+    """
+    Format of date used to display dates.
+    """
 
     objects = UserSet()
 
@@ -175,38 +348,112 @@ class User(WorkspaceEntity):
         return '{} (#{})'.format(self.fullname, self.id)
 
 
-class WorkspaceUser(WorkspaceEntity):
+class WorkspaceUser(WorkspacedEntity):
+    """
+    Workspace User entity.
+
+    This entity represents assignment of specific User into Workspace.
+    It additionally configures access rights and several other things.
+    """
+
     _can_get_detail = False
     _can_create = False
 
     email = fields.EmailField(is_read_only=True)
+    """
+    Email of the user.
+    """
+
     active = fields.BooleanField()
+    """
+    If user is active in Workspace.
+    """
+
     admin = fields.BooleanField(admin_only=True)
-    user = fields.MappingField(User, 'uid', is_read_only=True)  # type: User
+    """
+    Weather user has admin privilege in the Workspace. 
+    """
+
+    user = fields.MappingField(User, 'uid', is_read_only=True)
+    """
+    User's instance
+    """
 
     def __str__(self):
         return '{} (#{})'.format(self.email, self.id)
 
 
-class ProjectUser(WorkspaceEntity):
+class ProjectUser(WorkspacedEntity):
+    """
+    Project User entity.
+
+    Similarly to WorkspaceUser, it is entity which represents assignment of specific User into Project.
+    It additionally configures access rights and several other things.
+    """
     _can_get_detail = False
 
     rate = fields.FloatField(admin_only=True)
+    """
+    Hourly rate for the project user in the currency of the project's client or in workspace default currency.
+    
+    (Available only for Premium workspaces)
+    """
+
     manager = fields.BooleanField(default=False)
-    project = fields.MappingField(Project, 'pid', is_read_only=True)  # type: Project
-    user = fields.MappingField(User, 'uid', is_read_only=True)  # type: User
+    """
+    Admin rights for this project    
+    """
+
+    project = fields.MappingField(Project, 'pid', is_read_only=True)
+    """
+    Project to which the User is assigned.
+    """
+
+    user = fields.MappingField(User, 'uid', is_read_only=True)
+    """
+    User which is linked to Project.
+    """
 
     def __str__(self):
         return '{}/{} (#{})'.format(self.project.name, self.user.email, self.id)
 
 
 class Task(PremiumEntity):
+    """
+    Task entity.
+
+    This entity is available only for Premium workspaces.
+    """
+
     name = fields.StringField(required=True)
-    project = fields.MappingField(Project, 'pid', required=True)  # type: Project
-    user = fields.MappingField(User, 'uid')  # type: User
+    """
+    Name of task
+    """
+
+    project = fields.MappingField(Project, 'pid', required=True)
+    """
+    Project to which the Task is linked to.
+    """
+
+    user = fields.MappingField(User, 'uid')
+    """
+    User to which the Task is assigned to.
+    """
+
     estimated_seconds = fields.IntegerField()
+    """
+    Estimated duration of task in seconds.
+    """
+
     active = fields.BooleanField(default=True)
+    """
+    Whether the task is done or not.
+    """
+
     tracked_seconds = fields.IntegerField(is_read_only=True)
+    """
+    Total time tracked (in seconds) for the task.
+    """
 
 
 # Time Entry entity
@@ -218,7 +465,7 @@ class TimeEntryDateTimeField(fields.DateTimeField):
     """
 
     def format(self, value, config=None, instance=None, display_running=False,
-               only_time_for_same_day=None):  # type: (typing.Any, utils.Config, base.Entity, bool, pendulum.DateTime) -> typing.Any
+               only_time_for_same_day=None) -> str:
         if not display_running and not only_time_for_same_day:
             return super().format(value, config)
 
@@ -229,13 +476,13 @@ class TimeEntryDateTimeField(fields.DateTimeField):
             config = config or utils.Config.factory()
 
             if value.in_timezone(config.timezone).to_date_string() == only_time_for_same_day.in_timezone(
-                    config.timezone).to_date_string():
+                config.timezone).to_date_string():
                 return value.in_timezone(config.timezone).format(config.time_format)
 
         return super().format(value, config)
 
 
-def get_duration(name, instance):  # type: (str, base.Entity) -> int
+def get_duration(name: str, instance: 'base.Entity') -> int:
     """
     Getter for Duration Property field.
 
@@ -247,7 +494,8 @@ def get_duration(name, instance):  # type: (str, base.Entity) -> int
     return int((instance.stop - instance.start).in_seconds())
 
 
-def set_duration(name, instance, value, init=False):  # type: (str, base.Entity, typing.Any, bool) -> bool
+def set_duration(name: str, instance: 'base.Entity', value: typing.Optional[int], init: bool=False) \
+        -> typing.Optional[bool]:
     """
     Setter for Duration Property field.
     """
@@ -264,7 +512,7 @@ def set_duration(name, instance, value, init=False):  # type: (str, base.Entity,
     return True  # Any change will result in updated instance's state.
 
 
-def format_duration(value, config=None):  # type: (typing.Any, utils.Config) -> str
+def format_duration(value: int, config: 'utils.Config'=None) -> str:
     """
     Formatting the duration into HOURS:MINUTES:SECOND format.
     """
@@ -312,16 +560,59 @@ class TimeEntrySet(base.TogglSet):
         return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
 
 
-class TimeEntry(WorkspaceEntity):
+class TimeEntry(WorkspacedEntity):
     description = fields.StringField()
-    project = fields.MappingField(Project, 'pid')  # type: Project
-    task = fields.MappingField(Task, 'tid', premium=True)  # type: Task
+    """
+    Description of the entry.
+    """
+
+    project = fields.MappingField(Project, 'pid')
+    """
+    Project to which the Time entry is linked to.
+    """
+
+    task = fields.MappingField(Task, 'tid', premium=True)
+    """
+    Task to which the Time entry is linked to.
+
+    (Available only for Premium workspaces)
+    """
+
     billable = fields.BooleanField(default=False, premium=True)
+    """
+    If available to be billed. (Default: False)
+    
+    (Available only for Premium workspaces)
+    """
+
     start = TimeEntryDateTimeField(required=True)
+    """
+    DateTime of start of the time entry. (Required)
+    """
+
     stop = TimeEntryDateTimeField()
+    """
+    DateTime of end of the time entry.
+    """
+
     duration = fields.PropertyField(get_duration, set_duration, formatter=format_duration)
+    """
+    Dynamic field of entry's duration in seconds. 
+    
+    If the time entry is currently running, the duration attribute contains a negative value, 
+    denoting the start of the time entry in seconds since epoch (Jan 1 1970). The correct duration can be 
+    calculated as current_time + duration, where current_time is the current time in seconds since epoch.
+    """
+
     created_with = fields.StringField(required=True, default='TogglCLI')
+    """
+    Information who created the time entry.
+    """
+
     tags = fields.SetField()
+    """
+    Set of tags associated with the time entry.
+    """
 
     objects = TimeEntrySet()
 
