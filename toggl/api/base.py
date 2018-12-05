@@ -5,7 +5,6 @@ import typing
 from abc import ABCMeta
 from collections import OrderedDict
 from inspect import Signature, Parameter
-from pprint import pprint
 
 from .. import utils, exceptions
 from . import fields as model_fields
@@ -134,18 +133,19 @@ class TogglSet(object):
 
         :param caller: Defines which method called this method, it can be either 'filter' or 'all'.
         :param config: Config
-        :param conditions: If caller == 'filter' then contain conditions for filtering. Passed as reference, therefore any modifications will result modifications
+        :param conditions: If caller == 'filter' then contain conditions for filtering. Passed as reference,
+        therefore any modifications will result modifications
         """
         return '/{}'.format(self.base_url)
 
-    def build_detail_url(self, id, config):  # type: (int, utils.Config) -> str
+    def build_detail_url(self, eid, config):  # type: (int, utils.Config) -> str
         """
         Build the detail URL.
 
-        :param id: ID of the entity to fetch.
+        :param eid: ID of the entity to fetch.
         :param config: Config
         """
-        return '/{}/{}'.format(self.base_url, id)
+        return '/{}/{}'.format(self.base_url, eid)
 
 
     @property

@@ -695,7 +695,7 @@ class MappingField(TogglField[M]):
     """
 
     def __init__(self, mapped_cls, mapped_field, cardinality=MappingCardinality.ONE,
-                 *args, **kwargs):  # type: (typing.Type[M], str, str, list, dict) -> None
+                 *args, **kwargs):  # type: (typing.Type[M], str, str, *typing.Any, **typing.Any) -> None
         super().__init__(*args, **kwargs)
 
         if not issubclass(mapped_cls, base.TogglEntity):
