@@ -24,6 +24,8 @@ Easiest way to install this package is through PyPi:
 $ pip install togglCli --pre
 ```
 
+*(Note: this will install Beta version of the newly rewritten Toggl CLI)*
+
 ## Usage
 
 For full overview of Toggl CLI capabilities please see [full documentation](https://toggl.adam-uhlir.me).
