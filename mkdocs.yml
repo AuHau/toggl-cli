@@ -13,8 +13,6 @@ theme:
     accent: 'orange'
   logo:
     icon: 'power_settings_new'
-  feature:
-    tabs: true
 
 markdown_extensions:
   - admonition
@@ -24,8 +22,6 @@ markdown_extensions:
       permalink: true
 
 nav:
-  - Toggl CLI: 'index.md'
-  - Command Line Interface:
-      - 'cli.md'
-  - Wrappers:
-      - 'api.md'
+  - About: 'index.md'
+  - Command Line Interface: 'cli.md'
+  - API Wrappers: 'api.md'
