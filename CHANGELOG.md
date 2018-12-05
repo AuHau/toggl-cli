@@ -4,8 +4,8 @@ Earlier changes were not versioned. Therefore dates of change are used instead t
 
 ## v2.0.0
 
-Full rewrite of the tool by [AuHau](https://github.com/AuHau), which implements most of the toggl's API capabilities. Entities which is now possible to 
-fully manage (eq. CRUD operations):
+Full rewrite of the tool by [AuHau](https://github.com/AuHau), which implements most of the toggl's API capabilities. 
+Entities which is now possible to fully manage (eq. CRUD operations):
  *  Time entries
  *  Clients
  *  Projects
