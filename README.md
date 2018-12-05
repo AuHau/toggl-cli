@@ -9,12 +9,19 @@
 
 > Command line tool and set of Python wrapper classes for interacting with toggl's API
 
+## Beta
+
+Currently Toggl CLI is released after its full rewrite as beta. All information presented here are 
+related to this new version.
+
+Please report any bugs or issues you will encounter.
+
 ## Install
 
 Easiest way to install this package is through PyPi:
 
 ```shell
-$ pip install togglCli
+$ pip install togglCli --pre
 ```
 
 ## Usage
