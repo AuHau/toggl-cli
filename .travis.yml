@@ -22,6 +22,7 @@ deploy:
   on:
     tags: true
     repo: AuHau/toggl-cli
+    python: 3.7
 after_deploy:
   - git config user.name "Adam Uhlir";
   - git config user.email "hello@adam-uhlir.me";
