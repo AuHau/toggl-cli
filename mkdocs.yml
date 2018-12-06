@@ -21,6 +21,10 @@ markdown_extensions:
   - toc:
       permalink: true
 
+google_analytics:
+  - UA-69422360-3
+  - auto
+
 nav:
   - About: 'index.md'
   - Command Line Interface: 'cli.md'
