@@ -82,7 +82,8 @@ class ConfigBootstrap:
 
         return output
 
-    def _get_api_token(self):  # type: () -> typing.Optional[str]
+    @classmethod
+    def get_api_token(cls):  # type: () -> typing.Optional[str]
         """
         Method guide the user through first phase of the bootstrap: credentials gathering.
         It supports two ways of authentication: api token or credentials.
@@ -92,12 +93,12 @@ class ConfigBootstrap:
         from .others import are_credentials_valid
 
         type_auth = inquirer.shortcuts.list_input(message="Type of authentication you want to use",
-                                                  choices=[self.API_TOKEN_OPTION, self.CREDENTIALS_OPTION])
+                                                  choices=[cls.API_TOKEN_OPTION, cls.CREDENTIALS_OPTION])
 
         if type_auth is None:
             return None
 
-        if type_auth == self.API_TOKEN_OPTION:
+        if type_auth == cls.API_TOKEN_OPTION:
             return inquirer.shortcuts.password(message="Your API token",
                                                validate=lambda _, current: are_credentials_valid(api_token=current))
 
@@ -170,7 +171,7 @@ class ConfigBootstrap:
             click.style("Warning!", fg="yellow", bold=True)
         ))
 
-        api_token = self._get_api_token()
+        api_token = self.get_api_token()
 
         if api_token is None:
             self._exit()
