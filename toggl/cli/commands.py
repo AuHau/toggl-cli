@@ -178,8 +178,9 @@ def entry_add(ctx, start, stop, descr, **kwargs):
     click.echo("Time entry '{}' with #{} created.".format(entry.description, entry.id))
 
 
-# TODO: [Feature/Medium] Make possible to list really all time-entries, not first 1000 in last 9 days
+# TODO: [Feature/Low] Implement other filtrations for the Report's call
 @cli.command('ls', short_help='list a time entries')
+@click.option('--use-reports', is_flag=True, help='Will use different API call that will fetch all time entries.')
 @click.option('--start', '-s', type=types.DateTimeType(),
               help='Defines start of a date range to filter the entries by.')
 @click.option('--stop', '-p', type=types.DateTimeType(), help='Defines stop of a date range to filter the entries by.')
@@ -191,21 +192,29 @@ def entry_add(ctx, start, stop, descr, **kwargs):
                    'default set of fields using \'+\' and/or \'-\' characters. Supported values: '
                    + types.FieldsType.format_fields_for_help(api.TimeEntry))
 @click.pass_context
-def entry_ls(ctx, fields, **conditions):
+def entry_ls(ctx, fields, use_reports, **conditions):
     """
     Lists time entries the user has access to.
 
-    The list is limited with 1000 entries in last 9 days. The list visible
+    By default the command uses API call that has limited number of time entries fetched  with 1000 entries in
+    last 9 days. If you want to overcome this limitation use --user-reports flag, that will use different
+    API call, which overcomes this limitations but currently support only --start/--stop filtration.
+
+    The list visible
     through this utility and on toggl's web client might differ in the range
     as they developing new version of API and they are able to see in the future
     and also longer into past.
     """
 
-    conditions = {key: condition for key, condition in conditions.items() if condition is not None}
-    if conditions:
-        entities = api.TimeEntry.objects.filter(order='desc', config=ctx.obj['config'], **conditions)
+    if use_reports:
+        entities = api.TimeEntry.objects.all_from_reports(config=ctx.obj['config'],
+                                                          start=conditions.get('start'), stop=conditions.get('stop'))
     else:
-        entities = api.TimeEntry.objects.all(order='desc', config=ctx.obj['config'])
+        conditions = {key: condition for key, condition in conditions.items() if condition is not None}
+        if conditions:
+            entities = api.TimeEntry.objects.filter(order='desc', config=ctx.obj['config'], **conditions)
+        else:
+            entities = api.TimeEntry.objects.all(order='desc', config=ctx.obj['config'])
 
     if not entities:
         click.echo('No entries were found!')
@@ -236,13 +245,13 @@ def entry_ls(ctx, fields, **conditions):
         row = []
         for field in fields:
             if field == 'stop':
-                value = str(entity.__fields__[field].format(getattr(entity, field, ''), instance=entity,
+                value = str(entity.__fields__[field].format(getattr(entity, field, None), instance=entity,
                                                             display_running=True))
             elif field == 'start':
-                value = str(entity.__fields__[field].format(getattr(entity, field, ''), instance=entity,
+                value = str(entity.__fields__[field].format(getattr(entity, field, None), instance=entity,
                                                             only_time_for_same_day=entity.stop))
             else:
-                value = str(entity.__fields__[field].format(getattr(entity, field, '')))
+                value = str(entity.__fields__[field].format(getattr(entity, field, None)))
             row.append(value)
 
         table.add_row(row)

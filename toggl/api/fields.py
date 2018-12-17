@@ -127,7 +127,7 @@ class TogglField(typing.Generic[T]):
 
         return value
 
-    def format(self, value, config=None):  # type: (T, utils.Config) -> str
+    def format(self, value, config=None):  # type: (typing.Optional[T], utils.Config) -> str
         """
         Formats the value into human-readable string, for CLI purpose.
         """

@@ -5,12 +5,11 @@ from copy import copy
 from urllib.parse import quote_plus
 from validate_email import validate_email
 
+import datetime
 import pendulum
 
-from . import base
-from . import fields
-from .. import utils
-from .. import exceptions
+from . import base, fields
+from .. import utils, exceptions
 
 logger = logging.getLogger('toggl.api.models')
 
@@ -497,6 +496,9 @@ def set_duration(name, instance, value, init=False):  # type: (str, base.Entity,
     """
     Setter for Duration Property field.
     """
+    if init is True:
+        instance.is_running = False
+
     if value is None:
         return
 
@@ -524,6 +526,9 @@ def format_duration(value, config=None):  # type: (int, utils.Config) -> str
     return '{}:{:02d}:{:02d}'.format(hours, minutes, seconds)
 
 
+datetime_type = typing.Union[datetime.datetime, pendulum.DateTime]
+
+
 class TimeEntrySet(base.TogglSet):
     """
     TogglSet which is extended by current() method which returns the currently running TimeEntry.
@@ -549,6 +554,12 @@ class TimeEntrySet(base.TogglSet):
         return url
 
     def current(self, config=None):  # type: (utils.Config) -> TimeEntry
+        """
+        Method that returns currently running TimeEntry or None if there is no currently running time entry.
+
+        :param config:
+        :return:
+        """
         config = config or utils.Config.factory()
         fetched_entity = utils.toggl('/time_entries/current', 'get', config=config)
 
@@ -556,6 +567,73 @@ class TimeEntrySet(base.TogglSet):
             return None
 
         return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
+
+    def _build_reports_url(self, start, stop, page, wid):
+        url = '/details?user_agent=toggl_cli&workspace_id={}&page={}'.format(wid, page)
+
+        if start is not None:
+            url += '&since={}'.format(quote_plus(start.isoformat()))
+
+        if stop is not None:
+            url += '&until={}'.format(quote_plus(stop.isoformat()))
+
+        return url
+
+    def _should_fetch_more(self, page, returned):  # type: (int, typing.Dict) -> bool
+        return page * returned['per_page'] < returned['total_count']
+
+    def _deserialize_from_reports(self, config, entity_dict):
+        entity = {
+            'id': entity_dict['id'],
+            'start': entity_dict['start'],
+            'stop': entity_dict['end'],
+            'duration': entity_dict['dur'],
+            'description': entity_dict['description'],
+            'tags': entity_dict['tags'],
+            'pid': entity_dict['pid'],
+            'tid': entity_dict['tid'],
+            'billable': entity_dict['billable'],
+        }
+
+        return self.entity_cls.deserialize(config=config, **entity)
+
+    def all_from_reports(self, start=None, stop=None, workspace=None, config=None):  # type: (typing.Optional[datetime_type], typing.Optional[datetime_type], typing.Union[str, int, Workspace], typing.Optional[utils.Config]) -> typing.Generator[TimeEntry, None, None]
+        """
+        Method that implements fetching of all time entries through Report API.
+        No limitation on number of time entries.
+
+        :param start: From when time entries should be fetched. Defaults to today - 6 days.
+        :param stop: Until when time entries should be fetched. Defaults to today, unless since is in future or more than year ago, in this case until is since + 6 days.
+        :param workspace: Workspace from where should be the time entries fetched from. Defaults to Config.default_workspace.
+        :param config:
+        :return: Generator that yields TimeEntry
+        """
+        from .. import toggl
+        config = config or utils.Config.factory()
+        page = 1
+
+        try:
+            wid = workspace.id
+        except AttributeError:
+            try:
+                wid = int(workspace)
+            except (ValueError, TypeError):
+                wid = config.default_workspace.id
+
+        while True:
+            url = self._build_reports_url(start, stop, page, wid)
+            returned = utils.toggl(url, 'get', config=config, address=toggl.REPORTS_URL)
+
+            if not returned.get('data'):
+                return
+
+            for entity in returned.get('data'):
+                yield self._deserialize_from_reports(config, entity)
+
+            if not self._should_fetch_more(page, returned):
+                return
+
+            page += 1
 
 
 class TimeEntry(WorkspacedEntity):
@@ -620,8 +698,6 @@ class TimeEntry(WorkspacedEntity):
                 'You can create only finished time entries through this way! '
                 'You must supply either \'stop\' or \'duration\' parameter!'
             )
-
-        self.is_running = False
 
         super().__init__(start=start, stop=stop, duration=duration, **kwargs)
 

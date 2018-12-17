@@ -144,7 +144,7 @@ def _toggl_request(url, method, data, headers, auth):
     return response
 
 
-def toggl(url, method, data=None, headers=None, config=None):
+def toggl(url, method, data=None, headers=None, config=None, address=None):
     """
     Makes an HTTP request to toggl.com. Returns the parsed JSON as dict.
     """
@@ -156,7 +156,7 @@ def toggl(url, method, data=None, headers=None, config=None):
     if config is None:
         config = Config.factory()
 
-    url = "{}{}".format(TOGGL_URL, url)
+    url = "{}{}".format(address or TOGGL_URL, url)
 
     tries = config.retries if config.retries and config.retries > 1 else 1  # There needs to be at least one try!
 
