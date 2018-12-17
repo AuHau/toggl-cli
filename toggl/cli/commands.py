@@ -19,7 +19,7 @@ click_completion.init()
 
 
 # TODO: Improve better User's management. Hide all the Project's users/Workspace's users and work only with User object
-# ==> for that support for mapping filter needs to be written (eq. user.email == 'test@test.org')
+#   ==> for that support for mapping filter needs to be written (eq. user.email == 'test@test.org')
 
 def entrypoint(args, obj=None):
     """

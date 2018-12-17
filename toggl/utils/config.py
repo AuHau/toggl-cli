@@ -18,6 +18,7 @@ logger = logging.getLogger('toggl.utils.config')
 MERGE_ATTRS = ('INI_MAPPING', 'ENV_MAPPING')
 
 
+# TODO: Enable to allow register "default" config
 class ConfigMeta(metas.CachedFactoryMeta, metas.ClassAttributeModificationWarning):
     """
     Meta class which implements merging of defined attrs from base classes into the new one.
@@ -387,7 +388,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         self.default_wid = value.id
 
     # TODO: Decide if default values should be also persisted for backwards compatibility
-    def persist(self, items=None):  # type: (typing.Sequence) -> None
+    def persist(self, items=None):  # type: (typing.Dict) -> None
         """
         Method that enables persist the config and its parent's parts (eq. IniConfigMixin saves a file).
         """
