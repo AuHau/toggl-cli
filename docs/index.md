@@ -32,7 +32,7 @@ Master branch should contain mostly working version, but it is not guaranteed.
 ## Configuration
 
 Toggl CLI heavily depends on user's configuration. Upon first usage of the CLI the user is taken through bootstrap
-process where he is asked questions regarding the desired settings and authentication credentials the final configuration is
+process where he is asked questions regarding the desired settings and authentication credentials. The final configuration is
 stored as configuration file at `~/.togglrc`.
 
 If user select's to enter username & password, then the bootstrap process will convert it into API token which is then

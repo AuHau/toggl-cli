@@ -15,6 +15,20 @@ They wrappers are placed in `toggl.api` package. There are these classes availab
 Currently there is no API reference available, for details see directly the code which is well documented and readable
 [here](https://github.com/AuHau/toggl-cli/blob/master/toggl/api/models.py).
 
+## Configuration
+
+As described at [Configuration section](index.md#configuration) Toggl CLI heavily depends on configuration, which is also
+true for the API wrappers. 
+
+You can specify the config object to be used for the API calls passing the object to TogglSet's methods and entities's constructor using 
+`config=<config object>` (examples bellow). If no config object is passed, the default config is parsed from config
+file at `~/.togglrc`. 
+
+If you want to use some config object across whole application, you can replace the default config object using call
+`utils.Config.set_default(<config_obj>)` (example bellow). It is recommended to put this step as part of bootstraping 
+of your application.
+
+
 ## Examples
 
 The API wrapper classes follow similar design pattern like Django's ORM classes. Here are some examples of the API calls.
@@ -35,6 +49,7 @@ project.save() # Creating new instance does not automatically save the entity, y
 
 update_project = api.Project()
 
+
 # Loads config from different place then ~/.togglrc
 loaded_config = utils.Config.factory('/some/path/to/config')
 
@@ -53,6 +68,13 @@ some_task.tracked_seconds = 123
 
 some_task.name = 'new task name'
 some_task.save() # Again entity needs to be saved to propagate the changes to server
+
+# Getting default config object
+default_config = utils.Config.factory()
+
+# Set new default config
+utils.Config.set_default(empty_config)
+assert utils.Config.factory() is empty_config  # ==> True
 
 ```
 

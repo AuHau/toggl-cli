@@ -417,3 +417,6 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
             return requests.auth.HTTPBasicAuth(self.username, self.password)
         except AttributeError:
             raise exceptions.TogglConfigException("There is no authentication configuration!")
+
+    def __str__(self):
+        return 'Config <{}>'.format(self._config_path)

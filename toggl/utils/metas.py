@@ -9,9 +9,13 @@ sentinel = object()
 
 class CachedFactoryMeta(type):
     """
-    Meta class that implements patern similar to Singleton, except there are more instances cached based on
-    a input parameter.
-    It utilizes Factory pattern and forbids direct instantion of the class.
+    Meta class that implements pattern similar to Singleton, except there are more instances cached based on
+    a input parameter. It utilizes Factory pattern and forbids direct instantion of the class.
+
+    To retrieve/create unique instance use `factory(key)` class method.
+
+    It is possible to leave out 'key' parameter and then default value is returned. Related to this, it is possible
+    to set a default object using `set_default(obj)` class method.
     """
 
     SENTINEL_KEY = '20800fa4-c75d-4c2c-9c99-fb35122e1a18'
@@ -34,9 +38,11 @@ class CachedFactoryMeta(type):
 
             cached_key = mcs.SENTINEL_KEY if key == sentinel else key
 
+            # Is already cached ==> return it
             if cached_key in mcs.cache:
                 return mcs.cache[cached_key]
 
+            # Default value
             if key == sentinel:
                 obj = cls_obj.__new__(cls_obj, *args, **kwargs)
                 old_init(obj, *args, **kwargs)
@@ -48,6 +54,10 @@ class CachedFactoryMeta(type):
 
             return obj
 
+        def set_default(_, obj):
+            mcs.cache[mcs.SENTINEL_KEY] = obj
+
+        namespace['set_default'] = classmethod(set_default)
         namespace['factory'] = classmethod(factory)
         return super().__new__(mcs, name, bases, namespace)
 
