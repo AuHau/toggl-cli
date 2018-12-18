@@ -587,7 +587,7 @@ class TimeEntrySet(base.TogglSet):
             'id': entity_dict['id'],
             'start': entity_dict['start'],
             'stop': entity_dict['end'],
-            'duration': entity_dict['dur'],
+            'duration': entity_dict['dur'] / 1000,
             'description': entity_dict['description'],
             'tags': entity_dict['tags'],
             'pid': entity_dict['pid'],
