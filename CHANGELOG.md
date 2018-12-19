@@ -18,7 +18,15 @@ Main new features of the tool:
  *  Possibility to use environment variables to specify some of the input parameters
  *  Possibility to specify different config to be used for the command's execution
  *  Django ORM's like API Classes
- 
+
+## v2.0.0.0b2
+
+ * Adding support for Time entries Report API which enables fetching all time entries ( `api.TimeEntry.objects.all_from_reports()` / `toggl ls --use-reports`)
+ * Adding support to register specific Config object as default one
+
+## v2.0.0.0b1
+
+First Beta release of full rewrite
 
 ## 15 Dec 2014 
 Thanks to [FedericoVaga](https://github.com/FedericoVaga)

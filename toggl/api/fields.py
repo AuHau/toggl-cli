@@ -814,13 +814,13 @@ class MappingField(TogglField[M]):
     def __set__(self, instance, value):  # type: (base.Entity, MappedM) -> None
         if self.cardinality == MappingCardinality.ONE:
             try:
-                if not isinstance(value, self.mapped_cls):
-                    logger.warning('Assigning class {} to MappedField with class {}.'.format(type(value),
-                                                                                             self.mapped_cls))
                 if value.id is None:
                     raise RuntimeError(
                         'You are trying to assign mapped entity which was yet not saved! (Does not have ID)')
 
+                if not isinstance(value, self.mapped_cls):
+                    logger.warning('Assigning class {} to MappedField with class {}.'.format(type(value),
+                                                                                             self.mapped_cls))
                 self._set_value(instance, value.id)
             except AttributeError:
                 if not isinstance(value, int):

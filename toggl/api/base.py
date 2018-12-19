@@ -174,7 +174,7 @@ class TogglSet(object):
 
         return True
 
-    def get(self, id=None, config=None, **conditions):  # type: (typing.Any, utils.Config, dict) -> Entity
+    def get(self, id=None, config=None, **conditions):  # type: (typing.Any, utils.Config, **typing.Any) -> Entity
         """
         Method for fetching detail object of the entity. it fetches the object based on specified conditions.
 
@@ -238,7 +238,7 @@ class TogglSet(object):
 
         return output
 
-    def filter(self, order='asc', config=None, contain=False, **conditions):  # type: (str, utils.Config, bool, dict) -> typing.List[Entity]
+    def filter(self, order='asc', config=None, contain=False, **conditions):  # type: (str, utils.Config, bool, **typing.Any) -> typing.List[Entity]
         """
         Method that fetches all entries and filter them out based on specified conditions.
 
