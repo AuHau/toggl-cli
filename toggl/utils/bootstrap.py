@@ -99,7 +99,7 @@ class ConfigBootstrap:
             return None
 
         if type_auth == cls.API_TOKEN_OPTION:
-            return inquirer.shortcuts.password(name='api token', message="Your API token",
+            return inquirer.shortcuts.password(message="Your API token",
                                                validate=lambda _, current: are_credentials_valid(api_token=current))
 
         questions = [
