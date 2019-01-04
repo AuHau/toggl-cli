@@ -69,7 +69,7 @@ class TestTimeEntries:
 
     def test_add_basic(self, cmd, fake, config):
         start = pendulum.instance(fake.past_datetime(start_date='-9d'))
-        result = cmd('add \'{}\' 1h2m2s \'{}\''.format(start.format('MMM D HH:mm:ss'), fake.sentence()))
+        result = cmd('add \'{}\' 1h2m2s \'{}\''.format(start.format('MMM D YYYY HH:mm:ss'), fake.sentence()))
         assert result.obj.exit_code == 0
 
         entry = TimeEntry.objects.get(result.created_id(), config=config)  # type: TimeEntry
