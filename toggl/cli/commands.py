@@ -9,8 +9,8 @@ import click_completion
 import pendulum
 from prettytable import PrettyTable
 
-from .. import api, exceptions, utils, __version__
-from . import helpers, types
+from toggl import api, exceptions, utils, __version__
+from toggl.cli import helpers, types
 
 DEFAULT_CONFIG_PATH = '~/.togglrc'
 

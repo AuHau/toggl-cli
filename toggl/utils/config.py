@@ -9,8 +9,8 @@ import click
 import requests
 from pbr import version
 
-from . import metas, bootstrap, migrations
-from .. import exceptions, api
+from toggl.utils import metas, bootstrap, migrations
+from toggl import exceptions, api
 
 logger = logging.getLogger('toggl.utils.config')
 

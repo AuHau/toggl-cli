@@ -1,2 +1,2 @@
-from .others import toggl, SubCommandsGroup
-from .config import Config
+from toggl.utils.others import toggl, SubCommandsGroup
+from toggl.utils.config import Config

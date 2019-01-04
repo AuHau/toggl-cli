@@ -5,7 +5,7 @@ from collections.abc import Iterable
 import click
 from prettytable import PrettyTable
 
-from ..api import base
+from toggl.api import base
 
 logger = logging.getLogger('toggl.cli')
 

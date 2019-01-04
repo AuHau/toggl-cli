@@ -8,8 +8,8 @@ from validate_email import validate_email
 import datetime
 import pendulum
 
-from . import base, fields
-from .. import utils, exceptions
+from toggl.api import base, fields
+from toggl import utils, exceptions
 
 logger = logging.getLogger('toggl.api.models')
 

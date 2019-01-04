@@ -7,7 +7,7 @@ import click
 import inquirer
 import pendulum
 
-from .. import exceptions, __version__, utils
+from toggl import exceptions, __version__, utils
 
 logger = logging.getLogger('toggl.utils.bootstrap')
 

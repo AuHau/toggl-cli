@@ -9,9 +9,8 @@ import typing
 import pendulum
 from validate_email import validate_email
 
-from .. import exceptions
-from .. import utils
-from . import base
+from toggl import exceptions, utils
+from toggl.api import base
 
 logger = logging.getLogger('toggl.api.fields')
 

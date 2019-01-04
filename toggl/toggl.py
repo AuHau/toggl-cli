@@ -1,6 +1,6 @@
 import sys
 
-from . import cli
+from toggl import cli
 
 TOGGL_URL = "https://www.toggl.com/api/v8"
 REPORTS_URL = "https://toggl.com/reports/api/v2"

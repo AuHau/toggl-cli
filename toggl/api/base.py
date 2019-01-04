@@ -6,8 +6,8 @@ from abc import ABCMeta
 from collections import OrderedDict
 from inspect import Signature, Parameter
 
-from .. import utils, exceptions
-from . import fields as model_fields
+from toggl import utils, exceptions
+from toggl.api import fields as model_fields
 
 logger = logging.getLogger('toggl.api.base')
 

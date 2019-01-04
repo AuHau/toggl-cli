@@ -6,8 +6,8 @@ from time import sleep
 import click
 import requests
 
-from .config import Config
-from .. import exceptions
+from toggl.utils.config import Config
+from toggl import exceptions
 
 logger = logging.getLogger('toggl.utils')
 

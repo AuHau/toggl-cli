@@ -8,7 +8,7 @@ from pbr import version
 import click
 import inquirer
 
-from .. import exceptions
+from toggl import exceptions
 
 logger = logging.getLogger('toggl.utils.config')
 

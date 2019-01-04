@@ -6,7 +6,7 @@ from collections import OrderedDict
 import click
 import pendulum
 
-from .. import utils, exceptions
+from toggl import utils, exceptions
 
 logger = logging.getLogger('toggl.cli')
 

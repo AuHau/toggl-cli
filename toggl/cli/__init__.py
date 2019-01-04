@@ -1,1 +1,1 @@
-from .commands import entrypoint
+from toggl.cli.commands import entrypoint

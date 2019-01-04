@@ -84,7 +84,7 @@ project.save()
 
 ## Contributing
 
-Feel free to dive in, contributions are welcomed! [Open an issue](https://github.com/drobertadams/toggl-cli/issues/new) or submit PRs.
+Feel free to dive in, contributions are welcomed! [Open an issue](https://github.com/auhau/toggl-cli/issues/new) or submit PRs.
 
 For PRs please see [contribution guideline](./CONTRIBUTING.md).
 
