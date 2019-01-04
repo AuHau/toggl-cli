@@ -19,6 +19,12 @@ Main new features of the tool:
  *  Possibility to specify different config to be used for the command's execution
  *  Django ORM's like API Classes
 
+## v2.0.0.0b3
+
+ * Fixing bootstrap failures
+ * Dropping relative imports
+ * Minor improvements
+
 ## v2.0.0.0b2
 
  * Adding support for Time entries Report API which enables fetching all time entries ( `api.TimeEntry.objects.all_from_reports()` / `toggl ls --use-reports`)
