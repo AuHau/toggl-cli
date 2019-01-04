@@ -1,5 +1,5 @@
 -r requirements.txt
-pytest==3.*
+pytest==4.0.2
 pytest-mock==1.*
 pytest-cov==2.*
 factory_boy==2.*
