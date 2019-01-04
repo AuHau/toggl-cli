@@ -1,6 +1,6 @@
 -r requirements.txt
 pytest==4.0.2
-pytest-mock==1.*
+pytest-mock==1.10.0
 pytest-cov==2.*
 factory_boy==2.*
 mkdocs-material
