@@ -16,6 +16,10 @@ __pycache__/
 htmlcov
 .eggs
 .mypy_cache
+build
+dist
+AUTHORS
+ChangeLog
 
 # Docs
 site/
