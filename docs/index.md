@@ -5,19 +5,12 @@ Each part is discussed in detail in corresponding section.
 
 Originally written by [D. Robert Adams](https://github.com/drobertadams), currently maintained by [Adam Uhlir](https://github.com/AuHau).
 
-## Beta
-
-Currently Toggl CLI is released after its full rewrite as beta. All information presented here are 
-related to this new version.
-
-Please report any bugs or issues you will encounter.
-
 ## Installation
 
 To install Toggl CLI the easiest way is to use pip:
 
 ```shell
-$ pip install togglCli --pre
+$ pip install togglCli
 ```
 
 To use edge master you can also clone the repo and install it directly:
