@@ -88,6 +88,17 @@ class TestTogglField:
         with pytest.raises(AttributeError):
             field.__get__(obj, None)
 
+    def test_get_no_read(self):
+        obj = Entity()
+
+        field = fields.StringField(read=False)
+        field.name = 'field'
+
+        field.__set__(obj, 'asd')
+
+        with pytest.raises(exceptions.TogglNotAllowedException):
+            field.__get__(obj, None)
+
     def test_get_default(self):
         obj = Entity()
         obj.__dict__ = {}
@@ -128,14 +139,15 @@ class TestTogglField:
         with pytest.raises(TypeError):
             field.__set__(obj, None)
 
-    def test_set_read_only(self):
+    def test_set_no_write(self):
         obj = Entity()
 
-        field = fields.StringField(is_read_only=True)
+        field = fields.StringField(write=False)
         field.name = 'field'
 
-        with pytest.raises(exceptions.TogglException):
+        with pytest.raises(exceptions.TogglNotAllowedException):
             field.__set__(obj, 'asd')
+
 
     def test_set_admin(self):
         class WorkspaceMock:
@@ -285,7 +297,7 @@ class TestPropertyField:
         assert PropertyFieldStore.value == 'some value'
         assert instance.field == 'some value'
 
-    def test_read_only(self):
+    def test_no_write(self):
         PropertyFieldStore.value = None
         instance = ReadOnlyPropertyEntity()
 
@@ -295,9 +307,9 @@ class TestPropertyField:
         PropertyFieldStore.value = None
         instance = ReadOnlyPropertyEntity(field='some value')
         assert instance.field == 'some value'
-        assert instance.__fields__['field'].is_read_only == True
+        assert instance.__fields__['field'].write is False
         with pytest.raises(exceptions.TogglException):
-            instance.field = 'some value'
+            instance.field = 'some other value'
 
     def test_changes(self):
         PropertyFieldStore.value = None

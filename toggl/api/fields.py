@@ -27,7 +27,7 @@ class TogglField(typing.Generic[T]):
     Its main function is to set/get values from the Entity's instance, but it also perform's serialization, validation,
     parsing and many other features related to the Field and data it represents.
 
-    Attributes common to all fields: name, verbose_name, required, default, admin_only, is_read_only.
+    Attributes common to all fields: name, verbose_name, required, default, admin_only, write.
     """
 
     # Represents Python's primitive type for easy implementation of basic Fields like String, Integer etc. using
@@ -62,7 +62,9 @@ class TogglField(typing.Generic[T]):
     Workspace (meaningful for WorkspaceEntity and its subclasses).
     """
 
-    is_read_only = False  # type: bool
+    write = True  # type: bool
+    """
+    Attribute 'write' specifies if user can set value to the field.
     """
     Attribute 'is_read_only' specifies if user can set value to the field.
     """
@@ -73,13 +75,13 @@ class TogglField(typing.Generic[T]):
     """
 
     def __init__(self, verbose_name=None, required=False, default=NOTSET, admin_only=False,
-                 is_read_only=False, premium=False):  # type: (str, bool, T, bool, bool, bool) -> None
+                 write=True, premium=False):  # type: (str, bool, T, bool, bool, bool) -> None
         self.name = None
         self.verbose_name = verbose_name
         self.required = required
         self.default = default
         self.admin_only = admin_only
-        self.is_read_only = is_read_only
+        self.write = write
         self.premium = premium
 
     def validate(self, value, instance):  # type: (T, base.Entity) -> None
@@ -200,15 +202,16 @@ class TogglField(typing.Generic[T]):
         Main TogglField's method that defines how the value of the field is stored in the TogglEntity's instance.
 
         :raises RuntimeError: If the field does not have 'name' attribute set.
-        :raises exceptions.TogglNotAllowedException: If the field is read only or is only available only for admin's and
-                                                     the user does not have admin role in the assigned Workspace.
+        :raises exceptions.TogglNotAllowedException: If the field does not support write operation or is only available
+                only for admin's and the user does not have admin role in the assigned Workspace.
         :raises TypeError: If the value to be set is of wrong type.
         """
         if not self.name:
             raise RuntimeError('Name of the field is not defined!')
 
-        if self.is_read_only:
-            raise exceptions.TogglNotAllowedException('Attribute \'{}\' is read only!'.format(self.name))
+        if not self.write:
+            raise exceptions.TogglNotAllowedException('You are not allowed to write into \'{}\' attribute!'
+                                                      .format(self.name))
 
         if self.admin_only or self.premium:
             from .models import WorkspacedEntity, Workspace
@@ -376,7 +379,7 @@ class PropertyField(TogglField):
         self.formatter = formatter
         self.setter = setter or self.default_setter
 
-        super().__init__(verbose_name=verbose_name, admin_only=admin_only, is_read_only=setter is None)
+        super().__init__(verbose_name=verbose_name, admin_only=admin_only, write=setter is not None)
 
     @staticmethod
     def default_setter(name, instance, value, init=False):
@@ -429,7 +432,7 @@ class PropertyField(TogglField):
         if not self.name:
             raise RuntimeError('Name of the field is not defined!')
 
-        if self.is_read_only:
+        if not self.write:
             raise exceptions.TogglException('Attribute \'{}\' is read only!'.format(self.name))
 
         if self.admin_only:

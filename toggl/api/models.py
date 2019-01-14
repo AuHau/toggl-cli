@@ -97,7 +97,7 @@ class WorkspacedEntity(base.TogglEntity):
     Abstract entity which has linked Workspace
     """
 
-    workspace = fields.MappingField(Workspace, 'wid', is_read_only=True,
+    workspace = fields.MappingField(Workspace, 'wid', write=False,
                                                default=lambda config: config.default_workspace)
     """
     Workspace to which the resource is linked to.
@@ -357,7 +357,7 @@ class WorkspaceUser(WorkspacedEntity):
     _can_get_detail = False
     _can_create = False
 
-    email = fields.EmailField(is_read_only=True)
+    email = fields.EmailField(write=False)
     """
     Email of the user.
     """
@@ -372,7 +372,7 @@ class WorkspaceUser(WorkspacedEntity):
     Weather user has admin privilege in the Workspace. 
     """
 
-    user = fields.MappingField(User, 'uid', is_read_only=True)
+    user = fields.MappingField(User, 'uid', write=False)
     """
     User's instance
     """
@@ -402,12 +402,12 @@ class ProjectUser(WorkspacedEntity):
     Admin rights for this project    
     """
 
-    project = fields.MappingField(Project, 'pid', is_read_only=True)
+    project = fields.MappingField(Project, 'pid', write=False)
     """
     Project to which the User is assigned.
     """
 
-    user = fields.MappingField(User, 'uid', is_read_only=True)
+    user = fields.MappingField(User, 'uid', write=False)
     """
     User which is linked to Project.
     """
@@ -448,7 +448,7 @@ class Task(PremiumEntity):
     Whether the task is done or not.
     """
 
-    tracked_seconds = fields.IntegerField(is_read_only=True)
+    tracked_seconds = fields.IntegerField(write=False)
     """
     Total time tracked (in seconds) for the task.
     """

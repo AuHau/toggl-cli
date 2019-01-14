@@ -160,7 +160,7 @@ def toggl(url, method, data=None, headers=None, config=None, address=None):
 
     tries = config.retries if config.retries and config.retries > 1 else 1  # There needs to be at least one try!
 
-    e = None
+    exception = None
     for _ in range(tries):
         try:
             response = _toggl_request(url, method, data, headers, config.get_auth())
@@ -169,7 +169,8 @@ def toggl(url, method, data=None, headers=None, config=None, address=None):
             return response_json
         except (exceptions.TogglThrottlingException, requests.exceptions.ConnectionError) as e:
             sleep(0.1)  # Lets give Toggl API some time to recover
+            exception = e
             # TODO: Make it exponential
 
     # If retries failed then 'e' contains the last Exception/Error, lets re-raise it!
-    raise e
+    raise exception
