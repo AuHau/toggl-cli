@@ -66,7 +66,10 @@ class TogglField(typing.Generic[T]):
     """
     Attribute 'write' specifies if user can set value to the field.
     """
-    Attribute 'is_read_only' specifies if user can set value to the field.
+
+    read = True  # type: bool
+    """
+    Attribute 'read' specifies if user can get value from the field.
     """
 
     premium = False  # type: bool
@@ -75,14 +78,18 @@ class TogglField(typing.Generic[T]):
     """
 
     def __init__(self, verbose_name=None, required=False, default=NOTSET, admin_only=False,
-                 write=True, premium=False):  # type: (str, bool, T, bool, bool, bool) -> None
+                 write=True, read=True, premium=False):  # type: (str, bool, T, bool, bool, bool, bool) -> None
         self.name = None
         self.verbose_name = verbose_name
         self.required = required
         self.default = default
         self.admin_only = admin_only
         self.write = write
+        self.read = read
         self.premium = premium
+
+        if not write and not read:
+            logger.warning('The field \'{}\' does not support write nor read mode, it is maybe useless?'.format(self))
 
     def validate(self, value, instance):  # type: (T, base.Entity) -> None
         """
@@ -178,7 +185,11 @@ class TogglField(typing.Generic[T]):
 
         :raises RuntimeError: If the field does not have 'name' attribute set.
         :raises AttributeError: If the instance does not have set the corresponding attribute.
+        :raises exceptions.TogglNotAllowedException: If read is not supported by the field
         """
+        if not self.read:
+            raise exceptions.TogglNotAllowedException('You are not allowed to read from \'{}\' attribute!'
+                                                      .format(self.name))
 
         # When instance is None, then the descriptor as accessed directly from class and not its instance 
         # ==> return the descriptors instance.

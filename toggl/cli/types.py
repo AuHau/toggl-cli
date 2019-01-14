@@ -256,4 +256,4 @@ class FieldsType(click.ParamType):
 
     @staticmethod
     def format_fields_for_help(cls):
-        return ', '.join(cls.__fields__.keys())
+        return ', '.join([name for name, field in cls.__fields__.items() if field.read])

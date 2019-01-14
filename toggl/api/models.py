@@ -680,7 +680,7 @@ class TimeEntry(WorkspacedEntity):
     calculated as current_time + duration, where current_time is the current time in seconds since epoch.
     """
 
-    created_with = fields.StringField(required=True, default='TogglCLI')
+    created_with = fields.StringField(required=True, default='TogglCLI', read=False)
     """
     Information who created the time entry.
     """
