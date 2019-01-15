@@ -118,11 +118,11 @@ class Cleanup:
         Expensive operation as it goes over all resources in Toggl.
         """
         Cleanup.time_entries(config=config)
-        Cleanup.clients(config=config)
         Cleanup.project_users(config=config)
         Cleanup.workspace_users(config=config)
         Cleanup.tasks(config=config)
         Cleanup.projects(config=config)
+        Cleanup.clients(config=config)
 
     @staticmethod
     def clients(config=None, *ids):

@@ -76,7 +76,8 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name',
 
     entity_dict = {}
     for field in entity.__fields__.values():
-        entity_dict[field.name] = field.format(getattr(entity, field.name, ''))
+        if field.read:
+            entity_dict[field.name] = field.format(getattr(entity, field.name, ''))
 
     del entity_dict[primary_field]
     del entity_dict['id']

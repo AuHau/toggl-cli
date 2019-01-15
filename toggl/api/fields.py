@@ -70,6 +70,9 @@ class TogglField(typing.Generic[T]):
     read = True  # type: bool
     """
     Attribute 'read' specifies if user can get value from the field.
+    
+    It represents fields that are not returned from server, but you can only pass value to them.
+    It is allowed to read from the field once you set some value to it, but not before
     """
 
     premium = False  # type: bool
@@ -179,6 +182,19 @@ class TogglField(typing.Generic[T]):
         instance.__change_dict__[self.name] = value
         instance.__dict__[self.name] = value
 
+    def _get_value(self, instance):  # type: (base.Entity) -> T
+        try:
+            return instance.__dict__[self.name]
+        except KeyError:
+            if self.default is not NOTSET:
+                # TODO: [Q/Design] Should be callable evaluated every time or only during the initialization?
+                return self.default(getattr(instance, '_config', None)) if callable(self.default) else self.default
+
+            raise AttributeError('Instance of {} has not set \'{}\''.format(instance.__class__.__name__, self.name))
+
+    def _has_value(self, instance):
+        return self.name in instance.__dict__
+
     def __get__(self, instance, owner):  # type: (typing.Optional['base.Entity'], typing.Any) -> T
         """
         Main TogglField's method that defines how the value of the field is retrieved from TogglEntity's instance.
@@ -187,7 +203,10 @@ class TogglField(typing.Generic[T]):
         :raises AttributeError: If the instance does not have set the corresponding attribute.
         :raises exceptions.TogglNotAllowedException: If read is not supported by the field
         """
-        if not self.read:
+        if not self.name:
+            raise RuntimeError('Name of the field is not defined!')
+
+        if not self.read and not self._has_value(instance):
             raise exceptions.TogglNotAllowedException('You are not allowed to read from \'{}\' attribute!'
                                                       .format(self.name))
 
@@ -196,17 +215,7 @@ class TogglField(typing.Generic[T]):
         if instance is None:
             return self
 
-        if not self.name:
-            raise RuntimeError('Name of the field is not defined!')
-
-        try:
-            return instance.__dict__[self.name]
-        except KeyError:
-            if self.default is not NOTSET:
-                # TODO: [Q/Design] Should be callable evaluated every time on only during the initialization?
-                return self.default(getattr(instance, '_config', None)) if callable(self.default) else self.default
-
-            raise AttributeError('Instance of {} has not set \'{}\''.format(instance.__class__.__name__, self.name))
+        return self._get_value(instance)
 
     def __set__(self, instance, value):  # type: (base.Entity, T) -> None
         """
@@ -374,23 +383,24 @@ class PropertyField(TogglField):
     """
     Advanced field that is inspired by @property decorator.
 
-    It allows you to write easily custom fields by defining getter, setter, serialized and formatter.
+    It allows you to write easily custom fields by defining getter, setter, serializer and formatter.
 
     For more info about getter and setter see default_getter() and default_setter() methods which shows the signature
     and default behaviour.
 
-    Serializer is a function that has to serialize into Python primitive, so it can be converted into JSON.
+    Serializer is a function that has to serialize given value into Python primitive, so it can be converted into JSON.
 
     Formatter is a function that has to return string in human-readable format.
     """
 
-    def __init__(self, getter, setter=None, serializer=None, formatter=None, verbose_name=None, admin_only=False):
-        self.getter = getter
+    def __init__(self, getter=None, setter=None, serializer=None, formatter=None, verbose_name=None, admin_only=False):
+        self.getter = getter or self.default_getter
         self.serializer = serializer
         self.formatter = formatter
         self.setter = setter or self.default_setter
 
-        super().__init__(verbose_name=verbose_name, admin_only=admin_only, write=setter is not None)
+        super().__init__(verbose_name=verbose_name, admin_only=admin_only,
+                         write=setter is not None, read=getter is not None)
 
     @staticmethod
     def default_setter(name, instance, value, init=False):
@@ -433,10 +443,7 @@ class PropertyField(TogglField):
     def serialize(self, value):
         return self.serializer(value) if self.serializer else super().serialize(value)
 
-    def __get__(self, instance, owner):
-        if not self.name:
-            raise RuntimeError('Name of the field is not defined!')
-
+    def _get_value(self, instance):
         return self.getter(self.name, instance)
 
     def __set__(self, instance, value):
@@ -444,7 +451,7 @@ class PropertyField(TogglField):
             raise RuntimeError('Name of the field is not defined!')
 
         if not self.write:
-            raise exceptions.TogglException('Attribute \'{}\' is read only!'.format(self.name))
+            raise exceptions.TogglException('You are not allowed to write into \'{}\' attribute!'.format(self.name))
 
         if self.admin_only:
             from .models import WorkspacedEntity, Workspace
@@ -458,7 +465,7 @@ class PropertyField(TogglField):
 
         has_updated_state = self.setter(self.name, instance, value, init=False)
 
-        if has_updated_state is not True and has_updated_state is not False:
+        if not isinstance(has_updated_state, bool):
             raise TypeError('Setter must return bool!')
 
         if has_updated_state is True:
@@ -787,12 +794,7 @@ class MappingField(TogglField[M]):
         instance.__change_dict__[self.mapped_field] = value
         instance.__dict__[self.mapped_field] = value
 
-    def __get__(self, instance, owner):  # type: (typing.Optional['base.Entity'], typing.Any) -> M
-        # When instance is None, then the descriptor is accessed directly from class and not its instance
-        # ==> return the descriptors instance.
-        if instance is None:
-            return self
-
+    def _get_value(self, instance):  # type: (base.Entity) -> M
         if self.cardinality == MappingCardinality.ONE:
             try:
                 id = instance.__dict__[self.mapped_field]

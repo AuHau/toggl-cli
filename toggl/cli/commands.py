@@ -244,14 +244,19 @@ def entry_ls(ctx, fields, use_reports, **conditions):
     for entity in entities:
         row = []
         for field in fields:
+            extra_kwargs = {}
             if field == 'stop':
-                value = str(entity.__fields__[field].format(getattr(entity, field, None), instance=entity,
-                                                            display_running=True))
+                extra_kwargs = {
+                    'instance': entity,
+                    'display_running': True
+                }
             elif field == 'start':
-                value = str(entity.__fields__[field].format(getattr(entity, field, None), instance=entity,
-                                                            only_time_for_same_day=entity.stop))
-            else:
-                value = str(entity.__fields__[field].format(getattr(entity, field, None)))
+                extra_kwargs = {
+                    'instance': entity,
+                    'only_time_for_same_day': entity.stop
+                }
+
+            value = str(entity.__fields__[field].format(getattr(entity, field, None), **extra_kwargs))
             row.append(value)
 
         table.add_row(row)

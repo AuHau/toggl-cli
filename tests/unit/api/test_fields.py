@@ -94,10 +94,13 @@ class TestTogglField:
         field = fields.StringField(read=False)
         field.name = 'field'
 
-        field.__set__(obj, 'asd')
-
+        # Before anything is set to the field, it is not allowed to read from it.
         with pytest.raises(exceptions.TogglNotAllowedException):
             field.__get__(obj, None)
+
+        # After setting something to it, it is allowed to read from it.
+        field.__set__(obj, 'asd')
+        assert field.__get__(obj, None) == 'asd'
 
     def test_get_default(self):
         obj = Entity()
@@ -213,23 +216,27 @@ class TestMappingField:
         c = Entity()
 
         field = fields.MappingField(Entity, 'a', default=b)
+        field.name = 'field'
         assert field.__get__(a, None) is b
 
         mocker.patch.object(base.TogglSet, 'get')
         base.TogglSet.get.return_value = c
 
         field = fields.MappingField(Entity, 'a', default=123)
+        field.name = 'field'
         assert field.__get__(a, None) is c
         base.TogglSet.get.assert_called_with(123)
         base.TogglSet.get.reset_mock()
 
         field = fields.MappingField(Entity, 'a', default=lambda _: 321)
+        field.name = 'field'
         assert field.__get__(a, None) is c
         base.TogglSet.get.assert_called_with(321)
 
         stub = mocker.stub()
         stub.return_value = c
         field = fields.MappingField(Entity, 'a', default=stub)
+        field.name = 'field'
         field.__get__(a, None)
         stub.assert_called_once_with(config)
 

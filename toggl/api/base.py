@@ -501,10 +501,12 @@ class TogglEntity(metaclass=TogglEntityMeta):
         If overloading then don't forget to call super().validate()!
         """
         for field in self.__fields__.values():
-            if isinstance(field, model_fields.MappingField):
-                field.validate(getattr(self, field.mapped_field, None), self)
-            else:
-                field.validate(getattr(self, field.name, None), self)
+            try:
+                value = field._get_value(self)
+            except AttributeError:
+                value = None
+
+            field.validate(value, self)
 
     def to_dict(self, serialized=False, changes_only=False):  # type: (bool, bool) -> typing.Dict
         """
@@ -521,7 +523,10 @@ class TogglEntity(metaclass=TogglEntityMeta):
             except KeyError:
                 field = self.__mapped_fields__[field_name]
 
-            value = getattr(self, field.name, None)
+            try:
+                value = field._get_value(self)
+            except AttributeError:
+                value = None
 
             if serialized:
                 try:
