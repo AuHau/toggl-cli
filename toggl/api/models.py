@@ -517,7 +517,8 @@ def format_duration(value, config=None):  # type: (int, utils.Config) -> str
     Formatting the duration into HOURS:MINUTES:SECOND format.
     """
     if value < 0:
-        value = pendulum.now().int_timestamp + value
+        config = config or utils.Config.factory()
+        value = pendulum.now(tz=config.tz).int_timestamp + value
 
     hours = value // 3600
     minutes = (value - hours * 3600) // 60

@@ -78,8 +78,8 @@ project.save()
 
 Feel free to dive in, contributions are welcomed! [Open an issue](https://github.com/auhau/toggl-cli/issues/new) or submit PRs.
 
-For PRs please see [contribution guideline](./CONTRIBUTING.md).
+For PRs please see [contribution guideline](https://github.com/AuHau/toggl-cli/blob/master/CONTRIBUTING.md).
 
 ## License
 
-[MIT ©  Adam Uhlir & D. Robert Adams](./LICENSE)
+[MIT ©  Adam Uhlir & D. Robert Adams](https://github.com/AuHau/toggl-cli/blob/master/LICENSE)

@@ -654,8 +654,7 @@ def project_users_remove(ctx, spec):
 # TODO: Create workspace
 
 @cli.group('workspaces', short_help='workspaces management')
-@click.pass_context
-def workspaces(_):
+def workspaces():
     """
     Subcommand for management of workspaces.
     """
