@@ -819,7 +819,7 @@ class MappingField(TogglField[M]):
 
                 id = default
 
-            return self.mapped_cls.objects.get(id)
+            return self.mapped_cls.objects.get(id, config=getattr(instance, '_config', None))
 
         elif self.cardinality == MappingCardinality.MANY:
             raise NotImplementedError("Not implemented yet")
