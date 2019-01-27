@@ -454,6 +454,23 @@ class Task(PremiumEntity):
     """
 
 
+class TagSet(base.WorkspaceTogglSet):
+    pass
+
+
+class Tag(WorkspacedEntity):
+    """
+    Tag entity
+    """
+
+    name = fields.StringField(required=True)
+    """
+    Name of tag (Required)
+    """
+
+    objects = TagSet()
+
+
 # Time Entry entity
 
 
