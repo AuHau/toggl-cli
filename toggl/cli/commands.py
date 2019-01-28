@@ -792,7 +792,7 @@ def tags_add(ctx, **kwargs):
     )
 
     tag.save()
-    click.echo("Client '{}' with #{} created.".format(tag.name, tag.id))
+    click.echo("Tag '{}' with #{} created.".format(tag.name, tag.id))
 
 
 @tags.command('update', short_help='update a tag')
