@@ -9,7 +9,8 @@ install:
   - pip install -r test-requirements.txt
   - pip install codecov
 script:
-  - pytest --cov toggl
+  - pytest --cov toggl -m unit
+  - if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then pytest --cov toggl -m integration; fi
 after_success:
   - codecov
 deploy:
