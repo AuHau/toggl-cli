@@ -454,6 +454,17 @@ class Task(PremiumEntity):
     """
 
 
+class Tag(WorkspacedEntity):
+    """
+    Tag entity
+    """
+
+    name = fields.StringField(required=True)
+    """
+    Name of tag (Required)
+    """
+
+
 # Time Entry entity
 
 

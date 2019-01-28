@@ -762,6 +762,87 @@ def workspace_users_update(ctx, spec, **kwargs):
 
 
 # ----------------------------------------------------------------------------
+# Tags
+# ----------------------------------------------------------------------------
+
+@cli.group('tags', short_help='tags management')
+@click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
+              help='Specifies a workspace in which the tags will be managed in. Can be ID or name of the workspace '
+                   '(ENV: TOGGL_WORKSPACE)')
+@click.pass_context
+def tags(ctx, workspace):
+    """
+    Subcommand for management of Tags
+    """
+    ctx.obj['workspace'] = workspace
+
+
+@tags.command('add', short_help='create new tag')
+@click.option('--name', '-n', prompt='Name of the tag',
+              help='Specifies the name of the tag', )
+@click.pass_context
+def tags_add(ctx, **kwargs):
+    """
+    Creates a new tag.
+    """
+    tag = api.Tag(
+        workspace=ctx.obj['workspace'],
+        config=ctx.obj['config'],
+        **kwargs
+    )
+
+    tag.save()
+    click.echo("Tag '{}' with #{} created.".format(tag.name, tag.id))
+
+
+@tags.command('update', short_help='update a tag')
+@click.argument('spec')
+@click.option('--name', '-n', help='Specifies the name of the tag', )
+@click.pass_context
+def tags_update(ctx, spec, **kwargs):
+    """
+    Updates a tag specified by SPEC argument. SPEC can be either ID or Name of the tag.
+
+    If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
+    """
+    tag = helpers.get_entity(api.Tag, spec, field_lookup=('name', 'id'), multiple=True)
+
+    if not tag:
+        click.echo('Tag not found!')
+        exit(44)
+
+    helpers.entity_update(api.Tag, tag[0], obj=ctx.obj, **kwargs)
+
+
+@tags.command('ls', short_help='list tags')
+@click.pass_context
+def tags_ls(ctx):
+    """
+    Lists all tags in the workspace.
+    """
+    helpers.entity_listing(api.Tag, fields=('name', 'id'), obj=ctx.obj)
+
+
+@tags.command('rm', short_help='delete a tag')
+@click.confirmation_option(prompt='Are you sure you want to remove the tag?')
+@click.argument('spec')
+@click.pass_context
+def tags_rm(ctx, spec):
+    """
+    Removes a tag specified by SPEC argument. SPEC can be either ID or Name of the tag.
+
+    If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
+    """
+    tag = helpers.get_entity(api.Tag, spec, field_lookup=('name', 'id'), multiple=True)
+
+    if not tag:
+        click.echo('Tag not found!')
+        exit(44)
+
+    helpers.entity_remove(api.Tag, tag[0], obj=ctx.obj)
+
+
+# ----------------------------------------------------------------------------
 # Tasks
 # ----------------------------------------------------------------------------
 
