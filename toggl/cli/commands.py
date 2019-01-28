@@ -823,18 +823,6 @@ def tags_ls(ctx):
     helpers.entity_listing(api.Tag, fields=('name', 'id'), obj=ctx.obj)
 
 
-@tags.command('get', short_help='retrieve details of a tag')
-@click.argument('spec')
-@click.pass_context
-def tags_get(ctx, spec):
-    """
-    Gets details of a tag specified by SPEC argument. SPEC can be either ID or Name of the Tag.
-
-    If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
-    """
-    helpers.entity_detail(api.Tag, spec, obj=ctx.obj)
-
-
 @tags.command('rm', short_help='delete a tag')
 @click.confirmation_option(prompt='Are you sure you want to remove the tag?')
 @click.argument('spec')
