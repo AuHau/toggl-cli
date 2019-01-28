@@ -61,7 +61,7 @@ def get_entity(cls, org_spec, field_lookup, multiple=False, workspace=None, conf
             if entities is not None:
                 return entities
 
-        return [] if multiple else None
+    return [] if multiple else None
 
 
 def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name', obj=None):
