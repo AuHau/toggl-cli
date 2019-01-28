@@ -805,7 +805,13 @@ def tags_update(ctx, spec, **kwargs):
 
     If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
     """
-    helpers.entity_update(api.Tag, spec, obj=ctx.obj, **kwargs)
+    tag = helpers.get_entity(api.Tag, spec, field_lookup=('name', 'id'), multiple=True)
+
+    if not tag:
+        click.echo('Tag not found!')
+        exit(44)
+
+    helpers.entity_update(api.Tag, tag[0], obj=ctx.obj, **kwargs)
 
 
 @tags.command('ls', short_help='list tags')
@@ -839,7 +845,13 @@ def tags_rm(ctx, spec):
 
     If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
     """
-    helpers.entity_remove(api.Tag, spec, obj=ctx.obj)
+    tag = helpers.get_entity(api.Tag, spec, field_lookup=('name', 'id'), multiple=True)
+
+    if not tag:
+        click.echo('Tag not found!')
+        exit(44)
+
+    helpers.entity_remove(api.Tag, tag[0], obj=ctx.obj)
 
 
 # ----------------------------------------------------------------------------
