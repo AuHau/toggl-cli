@@ -225,13 +225,13 @@ class TestMappingField:
         field = fields.MappingField(Entity, 'a', default=123)
         field.name = 'field'
         assert field.__get__(a, None) is c
-        base.TogglSet.get.assert_called_with(123)
+        base.TogglSet.get.assert_called_with(123, config=mocker.ANY)
         base.TogglSet.get.reset_mock()
 
         field = fields.MappingField(Entity, 'a', default=lambda _: 321)
         field.name = 'field'
         assert field.__get__(a, None) is c
-        base.TogglSet.get.assert_called_with(321)
+        base.TogglSet.get.assert_called_with(321, config=mocker.ANY)
 
         stub = mocker.stub()
         stub.return_value = c

@@ -570,7 +570,7 @@ class TestTogglEntity:
         obj_dict = mapped_obj.to_dict()
         assert obj_dict['string'] == 'asd'
         assert obj_dict['mapping'] is obj
-        base.TogglSet.get.assert_called_with(123)
+        base.TogglSet.get.assert_called_with(123, config=mocker.ANY)
         base.TogglSet.get.reset_mock()
 
         obj_dict = mapped_obj.to_dict(serialized=True)
@@ -582,7 +582,7 @@ class TestTogglEntity:
         change_obj_dict = mapped_obj.to_dict(changes_only=True)
         assert 'string' not in change_obj_dict
         assert change_obj_dict['mapping'] is different_obj
-        base.TogglSet.get.assert_called_with(124)
+        base.TogglSet.get.assert_called_with(124, config=mocker.ANY)
 
     def test_to_dict_changes(self):
         obj = Entity(string='asd', integer=123, boolean=True)
