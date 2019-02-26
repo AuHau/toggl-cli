@@ -833,13 +833,7 @@ def tags_rm(ctx, spec):
 
     If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
     """
-    tag = helpers.get_entity(api.Tag, spec, field_lookup=('name', 'id'), multiple=True)
-
-    if not tag:
-        click.echo('Tag not found!')
-        exit(44)
-
-    helpers.entity_remove(api.Tag, tag[0], obj=ctx.obj)
+    helpers.entity_remove(api.Tag, spec, obj=ctx.obj)
 
 
 # ----------------------------------------------------------------------------
