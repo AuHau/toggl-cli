@@ -121,6 +121,7 @@ class Cleanup:
         Cleanup.project_users(config=config)
         Cleanup.workspace_users(config=config)
         Cleanup.tasks(config=config)
+        Cleanup.tags(config=config)
         Cleanup.projects(config=config)
         Cleanup.clients(config=config)
 
@@ -130,6 +131,13 @@ class Cleanup:
             Cleanup._all_cleanup(api.Client, config=config)
         else:
             Cleanup._ids_cleanup('clients', config, False, *ids)
+
+    @staticmethod
+    def tags(config=None, *ids):
+        if not ids:
+            Cleanup._all_cleanup(api.Tag, config=config)
+        else:
+            Cleanup._ids_cleanup('tags', config, False, *ids)
 
     @staticmethod
     def time_entries(config=None, *ids):

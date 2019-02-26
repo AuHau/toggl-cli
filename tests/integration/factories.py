@@ -63,3 +63,10 @@ class TimeEntryFactory(TogglFactory):
 class PremiumTimeEntryFactory(TogglFactory):
     billable = factory.Faker('pybool')
     task = factory.SubFactory(TaskFactory)
+
+
+class TagFactory(TogglFactory):
+    class Meta:
+        model = api.Tag
+
+    name = factory.Faker('name')
