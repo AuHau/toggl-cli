@@ -1,6 +1,6 @@
 from pbr.version import VersionInfo
 
-VERSION = VersionInfo('toggl').semantic_version()
+VERSION = VersionInfo('togglCli').semantic_version()
 __version__ = VERSION.release_string()
 
 __all__ = (
