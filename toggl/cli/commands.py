@@ -1011,6 +1011,18 @@ def project_users_listing(ctx, fields, workspace):
 
 
 # ----------------------------------------------------------------------------
+# Me information
+# ----------------------------------------------------------------------------
+@cli.command('me', short_help='information about current user')
+@click.pass_context
+def user_config(ctx):
+    """
+    Prints information about current user
+    """
+    config = ctx.obj['config']
+    helpers.entity_detail(api.User, config.user, primary_field='email', obj=ctx.obj)
+
+# ----------------------------------------------------------------------------
 # Configuration manipulation
 # ----------------------------------------------------------------------------
 @cli.group('config', short_help='management of configuration')
