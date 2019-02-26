@@ -6,6 +6,7 @@ Earlier changes were not versioned. Therefore dates of change are used instead t
 
 Features:
  * New Tag model with CLI commands
+ * 'me' command to display current user's info
  
 Fixes:
  * Correct retrieval of package's version 
