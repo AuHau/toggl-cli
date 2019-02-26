@@ -53,6 +53,11 @@ toggl
 │   ├── ls
 │   ├── rm
 │   └── update
+├── tags
+│   ├── add
+│   ├── ls
+│   ├── rm
+│   └── update
 ├── users
 │   ├── get
 │   ├── ls

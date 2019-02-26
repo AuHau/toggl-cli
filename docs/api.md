@@ -11,6 +11,7 @@ They wrappers are placed in `toggl.api` package. There are these classes availab
 * ProjectUser
 * TimeEntry
 * Task
+* Tag
 
 Currently there is no API reference available, for details see directly the code which is well documented and readable
 [here](https://github.com/AuHau/toggl-cli/blob/master/toggl/api/models.py).
