@@ -459,6 +459,8 @@ class Tag(WorkspacedEntity):
     Tag entity
     """
 
+    _can_get_detail = False
+
     name = fields.StringField(required=True)
     """
     Name of tag (Required)
