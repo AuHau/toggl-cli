@@ -2,6 +2,22 @@
 
 Earlier changes were not versioned. Therefore dates of change are used instead there.
 
+## v2.1.0
+
+Features:
+ * New Tag model with CLI commands
+ 
+Fixes:
+ * Correct retrieval of package's version 
+
+## v2.0.2
+
+Fixes for python_required and calculation of duration
+
+## v2.0.1
+
+Fix for required python version
+
 ## v2.0.0
 
 Full rewrite of the tool by [AuHau](https://github.com/AuHau), which implements most of the toggl's API capabilities. 
