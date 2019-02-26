@@ -289,7 +289,7 @@ class User(WorkspacedEntity):
     # TODO: Add possibility to use this value in Config.time_format
     timeofday_format = fields.ChoiceField({
         'H:mm': '24-hour',
-        'h:mm': '12-hour'
+        'h:mm A': '12-hour'
     })
     """
     Format of time used to display time.
