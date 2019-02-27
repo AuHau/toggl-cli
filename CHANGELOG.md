@@ -10,6 +10,7 @@ Features:
  
 Fixes:
  * Correct retrieval of package's version 
+ * Properly working Premium/Non-premium tests
 
 ## v2.0.2
 
