@@ -369,6 +369,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         except AttributeError:
             pass
 
+        # Fallback to the Toggl's configuration
         return self.user.default_workspace
 
     # noinspection PyAttributeOutsideInit

@@ -98,11 +98,12 @@ class TogglField(typing.Generic[T]):
         """
         Validates if the passed value is valid from the perspective of the data type that the field represents.
 
-        Basic implementation validate only 'required' attribute.
+        Basic implementation validate only 'required' and 'premium' attributes.
 
         :param instance: Instance of the TogglEntity which we are validating the value against
         :param value: Any value
         :raises exceptions.TogglValidationException: When the passed value is not valid.
+        :raises exceptions.TogglPremiumException: If the associated Workspace is not premium workspace.
         """
         if self.required and self.default is NOTSET and not value:
             raise exceptions.TogglValidationException('The field \'{}\' is required!'.format(self.name))
@@ -112,10 +113,11 @@ class TogglField(typing.Generic[T]):
             workspace = instance.workspace if isinstance(instance, WorkspacedEntity) else instance  # type: Workspace
 
             if getattr(instance, self.name, False) and not workspace.premium:
-                raise exceptions.TogglPremiumException('You are trying to save object with premium field \'{}.{}\''
+                raise exceptions.TogglPremiumException('You are trying to save object with premium field \'{}.{}\' in non-premium Workspace: {}'
                     .format(
                     instance.__class__.__name__,
-                    self.name
+                    self.name,
+                    workspace
                 ))
 
     def serialize(self, value):  # type: (T) -> typing.Optional[Serializable]

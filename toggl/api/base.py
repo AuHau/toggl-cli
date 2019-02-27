@@ -298,7 +298,7 @@ class WorkspaceTogglSet(TogglSet):
     """
 
     def build_list_url(self, caller, config, conditions):  # type: (str, utils.Config, typing.Dict) -> str
-        if 'workspace' in conditions and conditions['workspace'] is not None:
+        if conditions.get('workspace') is not None:
             wid = conditions['workspace'].id
         else:
             wid = conditions.get('wid') or config.default_workspace.id

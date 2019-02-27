@@ -127,7 +127,7 @@ class TestResourceType:
 
         resource_type = types.ResourceType(instance_mock)
         assert resource_type.convert(10, None, Context({'config': config})) == 'placeholder'
-        instance_mock.objects.get.assert_called_once_with(id=10)
+        instance_mock.objects.get.assert_called_once_with(id=10, config=mocker.ANY)
         instance_mock.reset_mock()
 
         # When nothing is found BadParameter is raised
@@ -136,7 +136,7 @@ class TestResourceType:
             resource_type.convert(10, None, Context({'config': config}))
 
         # Default lookup is ID and Name
-        instance_mock.objects.get.assert_has_calls([call(id=10), call(name=10)])
+        instance_mock.objects.get.assert_has_calls([call(id=10, config=mocker.ANY), call(name=10, config=mocker.ANY)])
 
     def test_custom_lookup(self, mocker, config):
         instance_mock = mocker.Mock()
@@ -144,7 +144,7 @@ class TestResourceType:
 
         resource_type = types.ResourceType(instance_mock, fields=('id', 'email', 'test'))
         assert resource_type.convert('asdf', None, Context({'config': config})) == 'placeholder'
-        instance_mock.objects.get.assert_called_once_with(email='asdf')
+        instance_mock.objects.get.assert_called_once_with(email='asdf', config=mocker.ANY)
         instance_mock.reset_mock()
 
         # When nothing is found BadParameter is raised
@@ -152,4 +152,5 @@ class TestResourceType:
         with pytest.raises(click.BadParameter):
             resource_type.convert(123, None, Context({'config': config}))
 
-        instance_mock.objects.get.assert_has_calls([call(id=123), call(email=123), call(test=123)])
+        instance_mock.objects.get.assert_has_calls([call(id=123, config=mocker.ANY), call(email=123, config=mocker.ANY),
+                                                    call(test=123, config=mocker.ANY)])

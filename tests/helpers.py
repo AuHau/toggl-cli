@@ -1,6 +1,8 @@
 import re
 import typing
+import traceback
 
+from pprint import pformat
 from pathlib import Path
 
 from click.testing import Result
@@ -20,17 +22,38 @@ def inner_cmd(cmd, config=None, simple=True, *args):  # type: (str, str, bool, t
     if simple:
         args.insert(0, '--simple')
 
-    result = CliRunner().invoke(cli, args, obj={'config': config}, catch_exceptions=False)
+    result = CliRunner().invoke(cli, args, obj={'config': config})
+
+    # Lets re-print it so pytest can catch it and show it on fails.
+    print(result.stdout)
+
+    if result.exception and not isinstance(result.exception, SystemExit):
+        raise result.exception
 
     return ParsingResult(result)
 
 
-def get_config(config='default.config'):
+def wrapper_inner_cmd(config=None):
+    suggested_config = config
+
+    def wrapper_func(cmd, config=None, *args, **kwargs):
+        return inner_cmd(cmd, config or get_config(suggested_config), *args, **kwargs)
+
+    return wrapper_func
+
+
+def get_all_configs():
+    config_path = Path(__file__).parent / 'configs'  # type: Path
+
+    for config_file in config_path.iterdir():
+        yield get_config(config_file.name)
+
+
+def get_config(config='non-premium.config'):
     if isinstance(config, utils.Config):
         return config
 
-    config_path = Path(__file__).parent
-    config_path = config_path.joinpath('configs/' + config)
+    config_path = Path(__file__).parent / 'configs' / config
 
     if not config_path.exists():
         raise ValueError('Unknown config path: ' + str(config_path))
@@ -111,6 +134,11 @@ class Cleanup:
         """
         for instance in entities:
             instance.delete()
+
+    @staticmethod
+    def all_configs():
+        for config in get_all_configs():
+            Cleanup.all(config)
 
     @staticmethod
     def all(config=None):

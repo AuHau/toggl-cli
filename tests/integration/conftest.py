@@ -2,6 +2,7 @@ import pytest
 from faker import Faker
 
 from .. import helpers
+from . import factories as factories_module
 
 
 @pytest.fixture()
@@ -36,18 +37,37 @@ def cleanup():
 
 
 @pytest.fixture()
-def cmd():
-    return helpers.inner_cmd
+def cmd(request):
+    node = request.node
+
+    if node.get_closest_marker('premium'):
+        return helpers.wrapper_inner_cmd(config='premium.config')
+    else:
+        return helpers.wrapper_inner_cmd(config='non-premium.config')
 
 
 @pytest.fixture()
-def config():
-    if not hasattr(config, 'default_config'):
-        config.default_config = helpers.get_config()
+def factories(request):
+    node = request.node
 
-    return config.default_config
+    if node.get_closest_marker('premium'):
+        factories_module.module_config = helpers.get_config('premium.config')
+    else:
+        factories_module.module_config = helpers.get_config('non-premium.config')
+
+    return factories_module
+
+
+@pytest.fixture()
+def config(request):
+    node = request.node
+
+    if node.get_closest_marker('premium'):
+        return helpers.get_config('premium.config')
+    else:
+        return helpers.get_config('non-premium.config')
 
 
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_all():
-    helpers.Cleanup.all()
+    helpers.Cleanup.all_configs()

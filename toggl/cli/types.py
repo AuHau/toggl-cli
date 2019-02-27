@@ -116,12 +116,14 @@ class ResourceType(click.ParamType):
                     continue  # If the value is not Integer, no point to try send it to API
 
             try:
-                obj = self._resource_cls.objects.get(**{field_name: value})
+                config = ctx.obj.get('config')
+                obj = self._resource_cls.objects.get(config=config, **{field_name: value})
 
                 if obj is not None:
                     return obj
             except exceptions.TogglMultipleResultsException:
-                pass
+                logger.warning('When fetching entity for parameter {}, we fetched multiple entries!'
+                               .format(param.human_readable_name))
 
         self.fail("Unknown {} under specification \'{}\'!".format(self._resource_cls.get_name(verbose=True), value),
                   param, ctx)

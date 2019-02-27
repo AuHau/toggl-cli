@@ -73,6 +73,7 @@ def cli(ctx, quiet, verbose, debug, simple, header, config=None):
     Known exit codes:
      * 0 - Successful execution
      * 1 - Unknown error
+     * 2 - CLI parameters/syntax error
      * 10 - Command failed because of API throttling
      * 40 - The passed data are not valid
      * 42 - Tries to use Premium features on Non-premium workspace
@@ -805,13 +806,7 @@ def tags_update(ctx, spec, **kwargs):
 
     If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
     """
-    tag = helpers.get_entity(api.Tag, spec, field_lookup=('name', 'id'), multiple=True)
-
-    if not tag:
-        click.echo('Tag not found!')
-        exit(44)
-
-    helpers.entity_update(api.Tag, tag[0], obj=ctx.obj, **kwargs)
+    helpers.entity_update(api.Tag, spec, obj=ctx.obj, **kwargs)
 
 
 @tags.command('ls', short_help='list tags')

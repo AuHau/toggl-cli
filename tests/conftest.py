@@ -23,7 +23,7 @@ def set_default_config(pytestconfig):
     mocker = MockFixture(pytestconfig)
 
     mocker.patch.object(config.IniConfigMixin, 'DEFAULT_CONFIG_PATH')
-    config.IniConfigMixin.DEFAULT_CONFIG_PATH.return_value = str(Path(__file__) / 'configs' / 'default.config')
+    config.IniConfigMixin.DEFAULT_CONFIG_PATH.return_value = str(Path(__file__) / 'configs' / 'non-premium.config')
 
     yield
     mocker.stopall()

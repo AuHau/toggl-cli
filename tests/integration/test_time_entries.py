@@ -5,12 +5,11 @@ import pytest
 from toggl.api import TimeEntry
 from toggl import exceptions
 
-from . import factories
 
 
 class TestTimeEntries:
 
-    def test_ls(self, cmd, fake):
+    def test_ls(self, cmd, fake, factories):
         midpoint = pendulum.now(tz='utc') - pendulum.duration(days=2)
 
         start = fake.date_time_between(start_date="-5d", end_date=midpoint,)
@@ -41,7 +40,7 @@ class TestTimeEntries:
         parsed = result.parse_list()
         assert len(parsed) == 3
 
-    def test_ls_filter(self, cmd, config):
+    def test_ls_filter(self, cmd, config, factories):
         project = factories.ProjectFactory()
         assert not TimeEntry.objects.filter(project=project, config=config)
 
@@ -89,10 +88,11 @@ class TestTimeEntries:
         assert 'some tag' in entry.tags
         assert 'another tag' in entry.tags
 
-    def test_add_project(self, cmd, fake, config):
+    def test_add_project(self, cmd, fake, config, factories):
         project = factories.ProjectFactory()
         start = pendulum.instance(fake.past_datetime(start_date='-9d'))
         end = start + pendulum.duration(hours=2)
+        cmd('projects ls')
         result = cmd('add \'{}\' \'{}\' \'{}\' --project \'{}\''
                      .format(start.format('MMM D HH:mm:ss'), end.format('MMM D HH:mm:ss'), fake.sentence(), project.name))
         assert result.obj.exit_code == 0
@@ -109,7 +109,7 @@ class TestTimeEntries:
         entry = TimeEntry.objects.get(result.created_id(), config=config)  # type: TimeEntry
         assert entry.project == project
 
-    def test_rm(self, cmd):
+    def test_rm(self, cmd, factories):
         obj = factories.TimeEntryFactory()
         result = cmd('rm {}'.format(obj.id))
         assert result.obj.exit_code == 0
@@ -118,7 +118,7 @@ class TestTimeEntries:
         result = cmd('rm \'{}\''.format(obj.description))
         assert result.obj.exit_code == 0
 
-    def test_start(self, cmd, fake, config):
+    def test_start(self, cmd, fake, config, factories):
         project = factories.ProjectFactory()
         current = TimeEntry.objects.current(config=config)
         assert current is None
@@ -142,7 +142,7 @@ class TestTimeEntries:
         current = TimeEntry.objects.current(config=config)
         assert current is None
 
-    def test_now(self, cmd, config):
+    def test_now(self, cmd, config, factories):
         project = factories.ProjectFactory()
         current = TimeEntry.start_and_save(project=project, config=config)
 
@@ -164,14 +164,14 @@ class TestTimeEntries:
         parsed = result.parse_detail()
         assert 'b' not in parsed['tags']
 
-    def test_continue(self, cmd, config):
+    def test_continue(self, cmd, config, factories):
         start = pendulum.now('utc')
         stop = start + pendulum.duration(seconds=10)
         last_entry = factories.TimeEntryFactory(start=start, stop=stop)
 
         result = cmd('continue')
         assert result.obj.exit_code == 0
-        continuing_entry = TimeEntry.objects.current()
+        continuing_entry = TimeEntry.objects.current(config=config)
 
         assert last_entry.description == continuing_entry.description
         assert last_entry.id != continuing_entry.id

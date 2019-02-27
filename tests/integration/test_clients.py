@@ -43,21 +43,21 @@ class TestClients:
         assert name_parsed['notes'] == note
         assert name_parsed['name'] == name
 
-    def test_update(self, cmd, fake):
+    def test_update(self, cmd, fake, config):
         name = fake.name()
         note = fake.sentence()
         result = cmd('clients add --name \'{}\' --notes \'{}\''.format(name, note))
         assert result.obj.exit_code == 0
         created_id = result.created_id()
 
-        assert Client.objects.get(created_id).name == name
+        assert Client.objects.get(created_id, config=config).name == name
 
         new_name = fake.name()
         new_note = fake.sentence()
         result = cmd('clients update --name \'{}\' --notes \'{}\' \'{}\''.format(new_name, new_note, name))
         assert result.obj.exit_code == 0
 
-        client_obj = Client.objects.get(created_id)
+        client_obj = Client.objects.get(created_id, config=config)
         assert client_obj.name == new_name
         assert client_obj.notes == new_note
 

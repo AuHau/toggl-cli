@@ -163,6 +163,7 @@ def toggl(url, method, data=None, headers=None, config=None, address=None):
     exception = None
     for _ in range(tries):
         try:
+            logger.debug('Default workspace: {}'.format(config._default_workspace))
             response = _toggl_request(url, method, data, headers, config.get_auth())
             response_json = response.json()
             logger.debug('Response {}:\n{}'.format(response.status_code, pformat(response_json)))

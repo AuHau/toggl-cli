@@ -4,12 +4,15 @@ import faker
 from toggl import api
 from tests import helpers
 
+# TODO: Do more clean way how to pass config into the Factory
+module_config = None
+
 
 class TogglFactory(factory.Factory):
 
     @classmethod
     def _build(cls, model_class, config=None, *args, **kwargs):
-        config = config or helpers.get_config()
+        config = module_config or config or helpers.get_config()
         return model_class(config=config, *args, **kwargs)
 
     @classmethod
@@ -35,6 +38,7 @@ class ProjectFactory(TogglFactory):
     # client = factory.SubFactory(ClientFactory)
     active = True
     is_private = True
+    billable = False
 
 
 class TaskFactory(TogglFactory):
@@ -61,7 +65,6 @@ class TimeEntryFactory(TogglFactory):
 
 
 class PremiumTimeEntryFactory(TogglFactory):
-    billable = factory.Faker('pybool')
     task = factory.SubFactory(TaskFactory)
 
 
