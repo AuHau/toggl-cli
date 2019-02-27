@@ -56,6 +56,7 @@ CLI will try to migrate it into new format.
 | `file_logging_path` | string | `''` | Specifies path where the logs will be stored. |
 | `retries` | integer | `2` | In case when the HTTP API call is interrupted or the API rejects it because of throttling reasons, the tool will use exponential back-off with number of retries specified by this value. |
 | `tz` | string | `None` | Timezone setting. If 'local' value is used then timezone from system's settings is used. If None, then timezone from Toggl's setting is used. |
+| `default_wid` | integer | `None` | ID of default workspace to be used. If left empty then Toggl's configuration is used. |
 
 
 
