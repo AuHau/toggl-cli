@@ -180,6 +180,6 @@ def toggl(url, method, data=None, headers=None, config=None, address=None):
     raise exception
 
 
-if Config.cache_requests:
+if Config.factory().cache_requests:
     # Manual conditional wrapping of the toggl function
-    toggl = lru_cache(maxsize=Config.cache_size)(toggl)
+    toggl = lru_cache(maxsize=Config.factory().cache_size)(toggl)
