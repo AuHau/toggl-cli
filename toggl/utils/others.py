@@ -149,7 +149,8 @@ def toggl(url, method, data=None, headers=None, config=None, address=None):
     """
     Makes an HTTP request to toggl.com. Returns the parsed JSON as dict.
     Results are cached in an LRU-cache unless disabled through the configuration.
-    Cache can be cleared by calling `api.others.toggl.cache_clear()'
+    Cache can be cleared by calling `api.others.toggl.cache_clear()`.
+    The cache will be cleared automatically on any 'put', 'post' or 'delete'.
     """
     from ..toggl import TOGGL_URL
 

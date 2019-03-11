@@ -86,6 +86,10 @@ class Workspace(base.TogglEntity):
                 raise exceptions.TogglValidationException('Supplied email \'{}\' is not valid email!'.format(email))
 
         emails_json = json.dumps({'emails': emails})
+
+        if self._config.cache_requests:
+            utils.toggl.cache_clear()
+
         data = utils.toggl("/workspaces/{}/invite".format(self.id), "post", emails_json, config=self._config)
 
         if 'notifications' in data and data['notifications']:
@@ -333,6 +337,10 @@ class User(WorkspacedEntity):
             'timezone': timezone,
             'created_with': created_with
         }})
+
+        if config.cache_requests:
+            utils.toggl.cache_clear()
+
         data = utils.toggl("/signups", "post", user_json, config=config)
         return cls.deserialize(config=config, **data['data'])
 

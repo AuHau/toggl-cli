@@ -461,9 +461,10 @@ class TogglEntity(metaclass=TogglEntityMeta):
 
         self.validate()
 
+        if config.cache_requests:
+            utils.toggl.cache_clear()
+
         if self.id is not None:  # Update
-            if config.cache_requests:
-                utils.toggl.cache_clear()
             utils.toggl('/{}/{}'.format(self.get_url(), self.id), 'put', self.json(update=True), config=config)
             self.__change_dict__ = {}  # Reset tracking changes
         else:  # Create
@@ -485,7 +486,12 @@ class TogglEntity(metaclass=TogglEntityMeta):
         if not self.id:
             raise exceptions.TogglException('This instance has not been saved yet!')
 
-        utils.toggl('/{}/{}'.format(self.get_url(), self.id), 'delete', config=config or self._config)
+        config = config or self._config
+
+        if config.cache_requests:
+            utils.toggl.cache_clear()
+
+        utils.toggl('/{}/{}'.format(self.get_url(), self.id), 'delete', config=config)
         self.id = None  # Invalidate the object, so when save() is called after delete a new object is created
 
     def json(self, update=False):  # type: (bool) -> str
