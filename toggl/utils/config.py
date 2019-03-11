@@ -261,6 +261,11 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     """
     tz = None
 
+    """
+    Size of the HTTP API cache. Ignored if cache is disabled.
+    """
+    cache_size = 256
+
     ENV_MAPPING = {
         'api_token': EnvEntry('TOGGL_API_TOKEN', str),
         'user_name': EnvEntry('TOGGL_USERNAME', str),
@@ -282,6 +287,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         'time_format': IniEntry('options', str),
         'default_wid': IniEntry('options', int),
         'retries': IniEntry('options', int),
+        'cache_size': IniEntry('options', int),
     }
 
     def __init__(self, config_path=sentinel, read_env=True, **kwargs):  # type: (str, bool, **typing.Any) -> None

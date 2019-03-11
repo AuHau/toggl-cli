@@ -1,5 +1,6 @@
 import logging
 import json
+from functools import lru_cache
 from pprint import pformat
 from time import sleep
 
@@ -144,6 +145,7 @@ def _toggl_request(url, method, data, headers, auth):
     return response
 
 
+@lru_cache(maxsize=Config.cache_size)
 def toggl(url, method, data=None, headers=None, config=None, address=None):
     """
     Makes an HTTP request to toggl.com. Returns the parsed JSON as dict.
