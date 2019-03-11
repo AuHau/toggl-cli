@@ -145,10 +145,11 @@ def _toggl_request(url, method, data, headers, auth):
     return response
 
 
-@lru_cache(maxsize=Config.cache_size)
 def toggl(url, method, data=None, headers=None, config=None, address=None):
     """
     Makes an HTTP request to toggl.com. Returns the parsed JSON as dict.
+    Results are cached in an LRU-cache unless disabled through the configuration.
+    Cache can be cleared by calling `api.others.toggl.cache_clear()'
     """
     from ..toggl import TOGGL_URL
 
@@ -177,3 +178,8 @@ def toggl(url, method, data=None, headers=None, config=None, address=None):
 
     # If retries failed then 'e' contains the last Exception/Error, lets re-raise it!
     raise exception
+
+
+if Config.cache_requests:
+    # Manual conditional wrapping of the toggl function
+    toggl = lru_cache(maxsize=Config.cache_size)(toggl)
