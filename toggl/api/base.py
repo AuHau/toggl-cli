@@ -462,6 +462,8 @@ class TogglEntity(metaclass=TogglEntityMeta):
         self.validate()
 
         if self.id is not None:  # Update
+            if config.cache_requests:
+                utils.toggl.cache_clear()
             utils.toggl('/{}/{}'.format(self.get_url(), self.id), 'put', self.json(update=True), config=config)
             self.__change_dict__ = {}  # Reset tracking changes
         else:  # Create
