@@ -20,7 +20,7 @@ $ pip install togglCli
 
 ## Usage
 
-For full overview of Toggl CLI capabilities please see [full documentation](https://toggl.adam-uhlir.me).
+For full overview of Toggl CLI capabilities please see [full documentation](https://toggl.uhlir.dev).
 
 ### CLI tool
 
