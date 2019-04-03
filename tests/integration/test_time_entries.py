@@ -165,6 +165,8 @@ class TestTimeEntries:
         assert 'b' not in parsed['tags']
 
     def test_continue(self, cmd, config, factories):
+        some_entry = factories.TimeEntryFactory()
+
         start = pendulum.now('utc')
         stop = start + pendulum.duration(seconds=10)
         last_entry = factories.TimeEntryFactory(start=start, stop=stop)
@@ -176,6 +178,11 @@ class TestTimeEntries:
         assert last_entry.description == continuing_entry.description
         assert last_entry.id != continuing_entry.id
         continuing_entry.stop_and_save()
+
+        result = cmd('continue \'{}\''.format(some_entry.description))
+        assert result.obj.exit_code == 0
+        continuing_entry = TimeEntry.objects.current(config=config)
+        assert continuing_entry.description == some_entry.description
 
 
 
