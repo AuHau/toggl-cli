@@ -367,7 +367,7 @@ def entry_stop(ctx, stop):
 
 
 @cli.command('continue', short_help='continue a time entry')
-@click.argument('descr', required=False, type=types.ResourceType(api.TimeEntry))
+@click.argument('descr', required=False)
 @click.option('--start', '-s', type=types.DateTimeType(), help='Sets a start time.')
 @click.pass_context
 def entry_continue(ctx, descr, start):
