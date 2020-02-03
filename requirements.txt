@@ -1,4 +1,4 @@
-pendulum==2.0.4
+pendulum==2.0.5
 requests>=2.20.0
 click==7.0
 inquirer==2.5.1
