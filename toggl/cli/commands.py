@@ -2,6 +2,7 @@ import logging
 import traceback
 import webbrowser
 import os
+import time
 
 import click
 import click_completion
@@ -27,7 +28,6 @@ def entrypoint(args, obj=None):
 
     If the exceptions should be propagated out of the tool use env. variable: TOGGL_EXCEPTIONS=1
     """
-
     try:
         cli(args, obj=obj or {})
     except exceptions.TogglException as e:
@@ -261,9 +261,170 @@ def entry_ls(ctx, fields, use_reports, **conditions):
             row.append(value)
 
         table.add_row(row)
-
+    
     click.echo(table)
 
+@cli.command('sum', short_help='tracks total worked time')
+@click.option('--use-reports', is_flag=True, help='Will use different API call that will fetch all time entries.')
+@click.option('--start', '-s', type=types.DateTimeType(),
+              help='Defines start of a date range to filter the entries by.')
+@click.option('--stop', '-p', type=types.DateTimeType(), help='Defines stop of a date range to filter the entries by.')
+@click.option('--goal', '-g', type=float,
+              help='Defines work goal of the day in hours.')
+@click.option('--timeoff', '-t', type=float, help='Defines the period of time the alarm rings before end of shift in minutes.')
+@click.option('--project', '-o', type=types.ResourceType(api.Project),
+              help='Filters the entries by project. Can be ID or name of the project.', )
+@click.option('--tags', '-a', type=types.SetType(), help='Filters the entries by list of tags delimited with \',\'')
+@click.option('--fields', '-f', type=types.FieldsType(api.TimeEntry), default='description,duration,start,stop',
+              help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify '
+                   'default set of fields using \'+\' and/or \'-\' characters. Supported values: '
+                   + types.FieldsType.format_fields_for_help(api.TimeEntry))
+@click.pass_context
+def entry_sum(ctx, fields, use_reports, goal, timeoff, **conditions):
+    """
+    tracks total worked time
+    
+    Arguments:
+        goal : float. If specified with the parameter goal it waits for the goal to be completed
+        timeoff: float. The interval for checking for the goal success
+    """
+    if not timeoff:
+        timeoff=0.25
+
+    while True:
+        if use_reports:
+            entities = api.TimeEntry.objects.all_from_reports(config=ctx.obj['config'],
+                                                            start=conditions.get('start'), stop=conditions.get('stop'))
+        else:
+            conditions = {key: condition for key, condition in conditions.items() if condition is not None}
+            if conditions:
+                entities = api.TimeEntry.objects.filter(order='desc', config=ctx.obj['config'], **conditions)
+            else:
+                entities = api.TimeEntry.objects.all(order='desc', config=ctx.obj['config'])
+
+        if not entities:
+            click.echo('No entries were found!')
+            exit(0)
+        entities = sorted(entities, key=lambda x: x.start, reverse=True)
+
+        if ctx.obj.get('simple'):
+            if ctx.obj.get('header'):
+                click.echo('\t'.join([click.style(field.capitalize(), fg='white', dim=1) for field in fields]))
+
+            for entity in entities:
+                click.echo('\t'.join(
+                    [str(entity.__fields__[field].format(getattr(entity, field, ''))) for field in fields]
+                ))
+            return
+
+        timePassed=0.
+        for entity in entities:
+            duration = entity.duration
+            if duration<0:
+                diff=pendulum.now()-pendulum.from_timestamp(-duration)
+                duration=diff.seconds
+            timePassed+=duration
+        
+        timePassed=round(timePassed/3600, 2)
+
+        if not goal:
+            click.echo(f'{timePassed}h')
+            return
+
+        done=timePassed >= goal - timeoff
+        now=pendulum.now().format('HH:mm')
+        click.echo(f'{now} goal:{goal}, timePassed:{timePassed}, timeoff:{timeoff}, done:{done}')
+        if done:
+            diff=int((goal-timePassed)*60)
+            notify('Work is done!', f'Done with {goal} hours of work in {diff} minutes!')
+            return
+        else:
+            time.sleep(timeoff*3600)
+
+@cli.command('day', short_help='tracks total worked time of the current day')
+@click.option('--use-reports', is_flag=True, help='Will use different API call that will fetch all time entries.')
+@click.option('--goal', '-g', type=float,
+              help='Defines work goal of the day in hours.')
+@click.option('--timeoff', '-t', type=int, help='Defines the period of time the alarm rings before end of shift in minutes.')
+@click.option('--project', '-o', type=types.ResourceType(api.Project),
+              help='Filters the entries by project. Can be ID or name of the project.', )
+@click.option('--tags', '-a', type=types.SetType(), help='Filters the entries by list of tags delimited with \',\'')
+@click.option('--fields', '-f', type=types.FieldsType(api.TimeEntry), default='description,duration,start,stop',
+              help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify '
+                   'default set of fields using \'+\' and/or \'-\' characters. Supported values: '
+                   + types.FieldsType.format_fields_for_help(api.TimeEntry))
+@click.pass_context
+def entry_day(ctx, fields, use_reports, goal, timeoff, **conditions):
+    """
+    tracks total worked time of the current day
+    
+    Arguments:
+        goal : float. If specified with the parameter goal it starts an endless loop: waits for the goal to be completed until the next day starts
+        timeoff: float. The interval for checking for the goal success
+    """
+    if not timeoff:
+        timeoff=0.25
+
+    while True:
+        if use_reports:
+            entities = api.TimeEntry.objects.all_from_reports(config=ctx.obj['config'],
+                                                            start=conditions.get('start'), stop=conditions.get('stop'))
+        else:
+            conditions = {key: condition for key, condition in conditions.items() if condition is not None}
+            conditions['start']=pendulum.today()
+            conditions['stop']=pendulum.tomorrow()
+            if conditions:
+                entities = api.TimeEntry.objects.filter(order='desc', config=ctx.obj['config'], **conditions)
+            else:
+                entities = api.TimeEntry.objects.all(order='desc', config=ctx.obj['config'])
+
+        if not entities:
+            click.echo('No entries were found!')
+            exit(0)
+        entities = sorted(entities, key=lambda x: x.start, reverse=True)
+
+        if ctx.obj.get('simple'):
+            if ctx.obj.get('header'):
+                click.echo('\t'.join([click.style(field.capitalize(), fg='white', dim=1) for field in fields]))
+
+            for entity in entities:
+                click.echo('\t'.join(
+                    [str(entity.__fields__[field].format(getattr(entity, field, ''))) for field in fields]
+                ))
+            return
+
+        timePassed=0.
+        for entity in entities:
+            duration = entity.duration
+            if duration<0:
+                diff=pendulum.now()-pendulum.from_timestamp(-duration)
+                duration=diff.seconds
+            timePassed+=duration
+        
+        timePassed=round(timePassed/3600, 2)
+
+        if not goal:
+            click.echo(f'{timePassed}h')
+            return
+
+        done=timePassed >= goal - timeoff
+        now=pendulum.now().format('HH:mm')
+        click.echo(f'{now} goal:{goal}, timePassed:{timePassed}, timeoff:{timeoff}, done:{done}')
+        if done:
+            diff=int((goal-timePassed)*60)
+            notify('Work is done!', f'Done with {goal} hours of work in {diff} minutes!')
+            diff=pendulum.tomorrow()-pendulum.now()
+            diff=diff.seconds+3600*6 # waits until 6AM the next day
+            if pendulum.tomorrow().format('dddd') == 'Saturday': # waits 48h longer on a weekend
+                diff+=3600*48
+            time.sleep(diff)
+        else:
+            time.sleep(timeoff*3600)
+            
+def notify(title, text):
+    os.system("""
+              osascript -e 'display notification "{}" with title "{}"'
+              """.format(text, title))
 
 @cli.command('rm', short_help='delete a time entry')
 @click.argument('spec')
