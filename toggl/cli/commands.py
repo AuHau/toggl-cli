@@ -367,6 +367,7 @@ def entry_day(ctx, fields, use_reports, goal, timeoff, **conditions):
             time.sleep(timeoff*3600)
 
 def getTimePassed(entities):
+    """ sums the passed time from all the entities given """
     timePassed=0.
     running=False
     for entity in entities:
@@ -382,6 +383,9 @@ def getTimePassed(entities):
     return timePassed, running
 
 def notify(title, text):
+    """ this function will only work on OSX and needs to be extended for other OS
+    @title string for notification title
+    @text string for notification content """
     os.system("""
               osascript -e 'display notification "{}" with title "{}"'
               """.format(text, title))
