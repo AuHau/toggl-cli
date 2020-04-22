@@ -178,6 +178,23 @@ def entry_add(ctx, start, stop, descr, **kwargs):
     entry.save()
     click.echo("Time entry '{}' with #{} created.".format(entry.description, entry.id))
 
+def getEntries(ctx, use_reports, **conditions):
+    if use_reports:
+        entities = api.TimeEntry.objects.all_from_reports(config=ctx.obj['config'],
+                                                          start=conditions.get('start'), stop=conditions.get('stop'))
+    else:
+        conditions = {key: condition for key, condition in conditions.items() if condition is not None}
+        if conditions:
+            entities = api.TimeEntry.objects.filter(order='desc', config=ctx.obj['config'], **conditions)
+        else:
+            entities = api.TimeEntry.objects.all(order='desc', config=ctx.obj['config'])
+
+    if not entities:
+        click.echo('No entries were found!')
+        exit(0)
+
+    entities = sorted(entities, key=lambda x: x.start, reverse=True)
+    return entities
 
 # TODO: [Feature/Low] Implement other filtrations for the Report's call
 @cli.command('ls', short_help='list a time entries')
@@ -206,22 +223,8 @@ def entry_ls(ctx, fields, use_reports, **conditions):
     as they developing new version of API and they are able to see in the future
     and also longer into past.
     """
-
-    if use_reports:
-        entities = api.TimeEntry.objects.all_from_reports(config=ctx.obj['config'],
-                                                          start=conditions.get('start'), stop=conditions.get('stop'))
-    else:
-        conditions = {key: condition for key, condition in conditions.items() if condition is not None}
-        if conditions:
-            entities = api.TimeEntry.objects.filter(order='desc', config=ctx.obj['config'], **conditions)
-        else:
-            entities = api.TimeEntry.objects.all(order='desc', config=ctx.obj['config'])
-
-    if not entities:
-        click.echo('No entries were found!')
-        exit(0)
-
-    entities = sorted(entities, key=lambda x: x.start, reverse=True)
+    
+    entities=getEntries(ctx, use_reports, **conditions)
 
     if ctx.obj.get('simple'):
         if ctx.obj.get('header'):
@@ -292,40 +295,10 @@ def entry_sum(ctx, fields, use_reports, goal, timeoff, **conditions):
         timeoff=0.25
 
     while True:
-        if use_reports:
-            entities = api.TimeEntry.objects.all_from_reports(config=ctx.obj['config'],
-                                                            start=conditions.get('start'), stop=conditions.get('stop'))
-        else:
-            conditions = {key: condition for key, condition in conditions.items() if condition is not None}
-            if conditions:
-                entities = api.TimeEntry.objects.filter(order='desc', config=ctx.obj['config'], **conditions)
-            else:
-                entities = api.TimeEntry.objects.all(order='desc', config=ctx.obj['config'])
-
-        if not entities:
-            click.echo('No entries were found!')
-            exit(0)
-        entities = sorted(entities, key=lambda x: x.start, reverse=True)
-
-        if ctx.obj.get('simple'):
-            if ctx.obj.get('header'):
-                click.echo('\t'.join([click.style(field.capitalize(), fg='white', dim=1) for field in fields]))
-
-            for entity in entities:
-                click.echo('\t'.join(
-                    [str(entity.__fields__[field].format(getattr(entity, field, ''))) for field in fields]
-                ))
-            return
-
-        timePassed=0.
-        for entity in entities:
-            duration = entity.duration
-            if duration<0:
-                diff=pendulum.now()-pendulum.from_timestamp(-duration)
-                duration=diff.seconds
-            timePassed+=duration
         
-        timePassed=round(timePassed/3600, 2)
+        entities=getEntries(ctx, use_reports, **conditions)
+
+        timePassed,running=getTimePassed(entities)
 
         if not goal:
             click.echo(f'{timePassed}h')
@@ -333,7 +306,7 @@ def entry_sum(ctx, fields, use_reports, goal, timeoff, **conditions):
 
         done=timePassed >= goal - timeoff
         now=pendulum.now().format('HH:mm')
-        click.echo(f'{now} goal:{goal}, timePassed:{timePassed}, timeoff:{timeoff}, done:{done}')
+        click.echo(f'{now} goal:{goal}, timePassed:{timePassed}, timeoff:{timeoff}, done:{done}, running:{running}')
         if done:
             diff=int((goal-timePassed)*60)
             notify('Work is done!', f'Done with {goal} hours of work in {diff} minutes!')
@@ -359,49 +332,19 @@ def entry_day(ctx, fields, use_reports, goal, timeoff, **conditions):
     tracks total worked time of the current day
     
     Arguments:
-        goal : float. If specified with the parameter goal it starts an endless loop: waits for the goal to be completed until the next day starts
+        goal : float. If specified with the parameter goal it waits for the goal to be completed
         timeoff: float. The interval for checking for the goal success
     """
     if not timeoff:
         timeoff=0.25
 
     while True:
-        if use_reports:
-            entities = api.TimeEntry.objects.all_from_reports(config=ctx.obj['config'],
-                                                            start=conditions.get('start'), stop=conditions.get('stop'))
-        else:
-            conditions = {key: condition for key, condition in conditions.items() if condition is not None}
-            conditions['start']=pendulum.today()
-            conditions['stop']=pendulum.tomorrow()
-            if conditions:
-                entities = api.TimeEntry.objects.filter(order='desc', config=ctx.obj['config'], **conditions)
-            else:
-                entities = api.TimeEntry.objects.all(order='desc', config=ctx.obj['config'])
 
-        if not entities:
-            click.echo('No entries were found!')
-            exit(0)
-        entities = sorted(entities, key=lambda x: x.start, reverse=True)
+        conditions['start']=pendulum.today()
+        conditions['stop']=pendulum.tomorrow()
+        entities=getEntries(ctx, use_reports, **conditions)
 
-        if ctx.obj.get('simple'):
-            if ctx.obj.get('header'):
-                click.echo('\t'.join([click.style(field.capitalize(), fg='white', dim=1) for field in fields]))
-
-            for entity in entities:
-                click.echo('\t'.join(
-                    [str(entity.__fields__[field].format(getattr(entity, field, ''))) for field in fields]
-                ))
-            return
-
-        timePassed=0.
-        for entity in entities:
-            duration = entity.duration
-            if duration<0:
-                diff=pendulum.now()-pendulum.from_timestamp(-duration)
-                duration=diff.seconds
-            timePassed+=duration
-        
-        timePassed=round(timePassed/3600, 2)
+        timePassed,running=getTimePassed(entities)
 
         if not goal:
             click.echo(f'{timePassed}h')
@@ -409,18 +352,35 @@ def entry_day(ctx, fields, use_reports, goal, timeoff, **conditions):
 
         done=timePassed >= goal - timeoff
         now=pendulum.now().format('HH:mm')
-        click.echo(f'{now} goal:{goal}, timePassed:{timePassed}, timeoff:{timeoff}, done:{done}')
+        click.echo(f'{now} goal:{goal}, timePassed:{timePassed}, timeoff:{timeoff}, done:{done}, running:{running}')
         if done:
             diff=int((goal-timePassed)*60)
             notify('Work is done!', f'Done with {goal} hours of work in {diff} minutes!')
-            diff=pendulum.tomorrow()-pendulum.now()
-            diff=diff.seconds+3600*6 # waits until 6AM the next day
-            if pendulum.tomorrow().format('dddd') == 'Saturday': # waits 48h longer on a weekend
-                diff+=3600*48
-            time.sleep(diff)
+            return
+            # the following codebit is the idea to implement an infinite for the same amount of the next day - but actually, I never used it because my goals changed each day
+            # diff=pendulum.tomorrow()-pendulum.now()
+            # diff=diff.seconds+3600*6 # waits until 6AM the next day
+            # if pendulum.tomorrow().format('dddd') == 'Saturday': # waits 48h longer on a weekend
+            #     diff+=3600*48
+            # time.sleep(diff)
         else:
             time.sleep(timeoff*3600)
-            
+
+def getTimePassed(entities):
+    timePassed=0.
+    running=False
+    for entity in entities:
+        duration = entity.duration
+        if duration<0:
+            diff=pendulum.now()-pendulum.from_timestamp(-duration)
+            duration=diff.seconds
+            running=True
+        timePassed+=duration
+    
+    timePassed=round(timePassed/3600, 2)
+
+    return timePassed, running
+
 def notify(title, text):
     os.system("""
               osascript -e 'display notification "{}" with title "{}"'
