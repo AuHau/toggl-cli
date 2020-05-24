@@ -261,6 +261,11 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     retries = 2
 
     """
+    Theme to be used for CLI interface
+    """
+    theme = 'dark'
+
+    """
     Timezone setting.
     If 'local' value is used then timezone from system's settings is used.
     If None, then timezone from Toggl's setting is used.
@@ -289,6 +294,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         'time_format': IniEntry('options', str),
         'default_wid': IniEntry('options', int),
         'retries': IniEntry('options', int),
+        'theme': IniEntry('options', str),
     }
 
     def __init__(self, config_path=sentinel, read_env=True, **kwargs):  # type: (str, bool, **typing.Any) -> None

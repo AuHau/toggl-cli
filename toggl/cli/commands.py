@@ -14,6 +14,7 @@ from notifypy import Notify
 
 from toggl import api, exceptions, utils, __version__
 from toggl.cli import helpers, types
+from toggl.cli.themes import themes
 
 DEFAULT_CONFIG_PATH = '~/.togglrc'
 
@@ -228,6 +229,8 @@ def entry_ls(ctx, fields, today, use_reports, **conditions):
     as they developing new version of API and they are able to see in the future
     and also longer into past.
     """
+    config = ctx.obj.get('config')
+    theme = themes.get(config.theme)
 
     if today:
         if conditions['start'] or conditions['stop']:
@@ -240,7 +243,7 @@ def entry_ls(ctx, fields, today, use_reports, **conditions):
 
     if ctx.obj.get('simple'):
         if ctx.obj.get('header'):
-            click.echo('\t'.join([click.style(field.capitalize(), fg='white', dim=1) for field in fields]))
+            click.echo('\t'.join([click.style(field.capitalize(), **theme.header) for field in fields]))
 
         for entity in entities:
             click.echo('\t'.join(
@@ -249,13 +252,13 @@ def entry_ls(ctx, fields, today, use_reports, **conditions):
         return
 
     table = PrettyTable()
-    table.field_names = [click.style(field.capitalize(), fg='white', dim=1) for field in fields]
+    table.field_names = [click.style(field.capitalize(), **theme.header) for field in fields]
     table.border = False
 
     table.align = 'l'
-    table.align[click.style('Stop', fg='white', dim=1)] = 'r'
-    table.align[click.style('Start', fg='white', dim=1)] = 'r'
-    table.align[click.style('Duration', fg='white', dim=1)] = 'r'
+    table.align[click.style('Stop', **theme.header)] = 'r'
+    table.align[click.style('Start', **theme.header)] = 'r'
+    table.align[click.style('Duration', **theme.header)] = 'r'
 
     for entity in entities:
         row = []
@@ -296,6 +299,7 @@ def entry_sum(ctx, use_reports, today, **conditions):
     Displayed Total time is in format HH:MM:SS
     """
     config = ctx.obj['config']
+    theme = themes.get(config.theme)
 
     if today:
         if conditions['start'] or conditions['stop']:
@@ -308,7 +312,7 @@ def entry_sum(ctx, use_reports, today, **conditions):
     sums_per_day = get_times_based_on_days(entries, config)
 
     table = PrettyTable()
-    table.field_names = [click.style('Day', fg='white', dim=1), click.style('Total time', fg='white', dim=1)]
+    table.field_names = [click.style('Day', **theme.header), click.style('Total time', **theme.header)]
     table.border = False
     table.align = 'l'
 
@@ -338,6 +342,7 @@ def entry_goal(ctx, goal, timeoff, no_notification, **conditions):
     GOAL should be specified in DURATION format. E.g. "1h30m", "30s" etc. See `toggl add --help` for details.
     """
     config = ctx.obj['config']
+    theme = themes.get(config.theme)
 
     if not timeoff:
         timeoff = 5
@@ -365,8 +370,10 @@ def entry_goal(ctx, goal, timeoff, no_notification, **conditions):
 
         if time_passed >= goal.seconds:
             if not no_notification:
-                helpers.notify('Work is done!', 'You have reached your today\'s goal {}!'.format(helpers.format_duration(goal)))
-            click.echo('{} => {}'.format(now, click.style('Goal reached', fg='green')))
+                helpers.notify('Work is done!', 'You have reached your today\'s goal {}!'.format(
+                                helpers.format_duration(goal))
+                               )
+            click.echo('{} => {}'.format(now, click.style('Goal reached', **theme.success)))
             return
         else:
             click.echo('{} => Remaining {} to your goal'.format(
