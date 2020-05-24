@@ -11,7 +11,7 @@ install:
   - pip install codecov
 script:
   - pytest --cov toggl -m unit
-  - if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then pytest --cov toggl -m integration; fi
+#  - if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then pytest --cov toggl -m integration; fi
 after_success:
   - codecov
 deploy:
@@ -33,7 +33,7 @@ deploy:
       python: 3.7
 after_deploy:
   - git config user.name "Adam Uhlir";
-  - git config user.email "hello@adam-uhlir.me";
+  - git config user.email "adam@uhlir.me";
   - git remote add gh-token "https://${GH_TOKEN}@github.com/AuHau/toggl-cli.git";
   - git fetch gh-token && git fetch gh-token gh-pages:gh-pages;
   - mkdocs gh-deploy -v --clean --remote-name gh-token;
