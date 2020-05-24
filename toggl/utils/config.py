@@ -249,13 +249,13 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     file_logging_path = None
 
     """
-    In case when the HTTP API call is interrupted or the API rejects it because of throttling reasons, 
-    the tool will use exponential back-off with number of retries specified by this value. 
+    In case when the HTTP API call is interrupted or the API rejects it because of throttling reasons,
+    the tool will use exponential back-off with number of retries specified by this value.
     """
     retries = 2
 
     """
-    Timezone setting. 
+    Timezone setting.
     If 'local' value is used then timezone from system's settings is used.
     If None, then timezone from Toggl's setting is used.
     """

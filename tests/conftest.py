@@ -1,7 +1,5 @@
 from pathlib import Path
-
 import pytest
-from pytest_mock import MockFixture
 
 from toggl.utils import config
 
@@ -19,11 +17,12 @@ def pytest_collection_modifyitems(items):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def set_default_config(pytestconfig):
-    mocker = MockFixture(pytestconfig)
-
-    mocker.patch.object(config.IniConfigMixin, 'DEFAULT_CONFIG_PATH')
-    config.IniConfigMixin.DEFAULT_CONFIG_PATH.return_value = str(Path(__file__) / 'configs' / 'non-premium.config')
+def set_default_config(session_mocker):
+    session_mocker.patch.object(config.IniConfigMixin, 'DEFAULT_CONFIG_PATH',
+                                new_callable=session_mocker.PropertyMock(
+                                    return_value=str(Path(__file__) / 'configs' / 'non-premium.config')
+                                ))
+    print(config.IniConfigMixin.DEFAULT_CONFIG_PATH)
 
     yield
-    mocker.stopall()
+    session_mocker.stopall()
