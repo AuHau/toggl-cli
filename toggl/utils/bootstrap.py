@@ -8,6 +8,7 @@ import inquirer
 import pendulum
 
 from toggl import exceptions, __version__, utils
+from toggl.cli.themes import themes
 
 logger = logging.getLogger('toggl.utils.bootstrap')
 
@@ -64,6 +65,11 @@ class ConfigBootstrap:
             'api_token': answers['api_token'],
             'file_logging': answers['file_logging'],
         }
+
+        for theme in themes.values():
+            if theme.name == answers['theme']:
+                output['theme'] = theme.code
+                break
 
         if answers['timezone'] == self.SYSTEM_TIMEZONE:
             output['tz'] = 'local'
@@ -126,14 +132,14 @@ class ConfigBootstrap:
         exit(-1)
 
     def _bootstrap_windows(self):
-        click.secho(""" _____                 _   _____  _     _____ 
+        click.secho(""" _____                 _   _____  _     _____
 |_   _|               | | /  __ \| |   |_   _|
-  | | ___   __ _  __ _| | | /  \/| |     | |  
-  | |/ _ \ / _` |/ _` | | | |    | |     | |  
-  | | (_) | (_| | (_| | | | \__/\| |_____| |_ 
-  \_/\___/ \__, |\__, |_|  \____/\_____/\___/ 
-            __/ | __/ |                       
-           |___/ |___/                        
+  | | ___   __ _  __ _| | | /  \/| |     | |
+  | |/ _ \ / _` |/ _` | | | |    | |     | |
+  | | (_) | (_| | (_| | | | \__/\| |_____| |_
+  \_/\___/ \__, |\__, |_|  \____/\_____/\___/
+            __/ | __/ |
+           |___/ |___/
 """, fg="red")
 
         click.echo("Welcome to Toggl CLI!\n"
@@ -154,14 +160,14 @@ class ConfigBootstrap:
         if platform.system() == 'Windows':
             return self._bootstrap_windows()
 
-        click.secho(""" _____                 _   _____  _     _____ 
+        click.secho(""" _____                 _   _____  _     _____
 |_   _|               | | /  __ \| |   |_   _|
-  | | ___   __ _  __ _| | | /  \/| |     | |  
-  | |/ _ \ / _` |/ _` | | | |    | |     | |  
-  | | (_) | (_| | (_| | | | \__/\| |_____| |_ 
-  \_/\___/ \__, |\__, |_|  \____/\_____/\___/ 
-            __/ | __/ |                       
-           |___/ |___/                        
+  | | ___   __ _  __ _| | | /  \/| |     | |
+  | |/ _ \ / _` |/ _` | | | |    | |     | |
+  | | (_) | (_| | (_| | | | \__/\| |_____| |_
+  \_/\___/ \__, |\__, |_|  \____/\_____/\___/
+            __/ | __/ |
+           |___/ |___/
 """, fg="red")
 
         click.echo("Welcome to Toggl CLI!\n"
@@ -186,7 +192,8 @@ class ConfigBootstrap:
                           validate=lambda answers, current: current in pendulum.timezones
                                                             or current == self.SYSTEM_TIMEZONE
                                                             or current == self.TOGGL_TIMEZONE),
-
+            inquirer.List('theme', message='What theme should be used for the CLI interface?',
+                          choices=lambda answers: [theme.name for theme in themes.values()]),
             inquirer.Confirm('file_logging', message="Enable logging of togglCli actions into file?", default=False),
             inquirer.Path('file_logging_path', message="Path to the log file", ignore=lambda x: not x['file_logging'],
                           default='~/.toggl_log'),
@@ -199,11 +206,11 @@ class ConfigBootstrap:
 
         click.echo("""
         Configuration successfully finished!
-        
+
         If you want to enable command completion run: toggl config completion install
-        
+
         Now continuing with your command:
-        
+
         """)
 
         return self._map_answers(api_token=api_token, **answers)

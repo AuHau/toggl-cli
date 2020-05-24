@@ -11,6 +11,7 @@ from notifypy import Notify
 from prettytable import PrettyTable
 
 from toggl.api import base
+from toggl.cli.themes import themes
 
 logger = logging.getLogger('toggl.cli')
 
@@ -18,6 +19,7 @@ logger = logging.getLogger('toggl.cli')
 def entity_listing(cls, fields=('id', 'name',), obj=None):  # type: (typing.Union[typing.Sequence, base.Entity], typing.Sequence, dict) -> None
     config = obj.get('config')
     workspace = obj.get('workspace')
+    theme = themes.get(config.theme)
 
     entities = cls if isinstance(cls, Iterable) else cls.objects.all(config=config, workspace=workspace)
     if not entities:
@@ -26,14 +28,14 @@ def entity_listing(cls, fields=('id', 'name',), obj=None):  # type: (typing.Unio
 
     if obj.get('simple'):
         if obj.get('header'):
-            click.echo('\t'.join([click.style(field.capitalize(), fg='white', dim=1) for field in fields]))
+            click.echo('\t'.join([click.style(field.capitalize(), **theme.header) for field in fields]))
 
         for entity in entities:
             click.echo('\t'.join([str(entity.__fields__[field].format(getattr(entity, field, ''))) for field in fields]))
         return
 
     table = PrettyTable()
-    table.field_names = [click.style(field.capitalize(), fg='white', dim=1) for field in fields]
+    table.field_names = [click.style(field.capitalize(), **theme.header) for field in fields]
     table.header = obj.get('header')
     table.border = False
     table.align = 'l'
@@ -72,11 +74,12 @@ def get_entity(cls, org_spec, field_lookup, multiple=False, workspace=None, conf
 def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name', obj=None):
     config = obj.get('config')
     workspace = obj.get('workspace')
+    theme = themes.get(config.theme)
 
     entity = spec if isinstance(spec, cls) else get_entity(cls, spec, field_lookup, workspace=workspace, config=config)
 
     if entity is None:
-        click.echo('{} not found!'.format(cls.get_name(verbose=True)), color='red')
+        click.echo('{} not found!'.format(cls.get_name(verbose=True)), color=theme.error_color)
         exit(44)
 
     entity_dict = {}
@@ -91,7 +94,7 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name',
     for key, value in sorted(entity_dict.items()):
         if obj.get('header'):
             entity_string += '\n{}: {}'.format(
-                click.style(key.replace('_', ' ').capitalize(), fg='white', dim=1),
+                click.style(key.replace('_', ' ').capitalize(), **theme.header),
                 '' if value is None else value
             )
         else:
@@ -99,26 +102,27 @@ def entity_detail(cls, spec, field_lookup=('id', 'name',), primary_field='name',
 
     click.echo("""{} {}
 {}""".format(
-        click.style(getattr(entity, primary_field, ''), fg='green'),
-        click.style('#' + str(entity.id), fg='green', dim=1),
+        click.style(getattr(entity, primary_field, ''), **theme.title),
+        click.style('#' + str(entity.id),  **theme.title_id),
         entity_string[1:]))
 
 
 def entity_remove(cls, spec, field_lookup=('id', 'name',), obj=None):
     config = obj.get('config')
     workspace = obj.get('workspace')
+    theme = themes.get(config.theme)
 
     entities = get_entity(cls, spec, field_lookup, multiple=True, workspace=workspace, config=config)
 
     if not entities:
-        click.echo('{} not found!'.format(cls.get_name(verbose=True)), color='red')
+        click.echo('{} not found!'.format(cls.get_name(verbose=True)), color=theme.error_color)
         exit(44)
     elif len(entities) == 1:
         entity = entities[0]
         entity.delete()
         click.echo('{} successfully deleted!'.format(cls.get_name(verbose=True)))
     else:
-        click.secho('Your SPEC resulted in {} following entries:'.format(len(entities)), fg='red')
+        click.secho('Your SPEC resulted in {} following entries:'.format(len(entities)), fg=theme.error_color)
         entity_listing(entities, field_lookup, obj=obj)
         click.confirm('Do you really want to to delete all of these entries?', abort=True)
 
@@ -131,11 +135,12 @@ def entity_remove(cls, spec, field_lookup=('id', 'name',), obj=None):
 def entity_update(cls, spec, field_lookup=('id', 'name',), obj=None, **kwargs):
     config = obj.get('config')
     workspace = obj.get('workspace')
+    theme = themes.get(config.theme)
 
     entity = spec if isinstance(spec, base.TogglEntity) else get_entity(cls, spec, field_lookup, workspace=workspace, config=config)
 
     if entity is None:
-        click.echo('{} not found!'.format(cls.get_name(verbose=True)), color='red')
+        click.echo('{} not found!'.format(cls.get_name(verbose=True)), color=theme.error_color)
         exit(44)
 
     updated = False
