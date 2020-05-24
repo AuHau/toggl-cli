@@ -1,8 +1,6 @@
 import re
+import time
 import typing
-import traceback
-
-from pprint import pformat
 from pathlib import Path
 
 from click.testing import Result
@@ -23,6 +21,7 @@ def inner_cmd(cmd, config=None, simple=True, *args):  # type: (str, str, bool, t
         args.insert(0, '--simple')
 
     result = CliRunner().invoke(cli, args, obj={'config': config})
+    time.sleep(1)
 
     # Lets re-print it so pytest can catch it and show it on fails.
     print(result.stdout)

@@ -446,7 +446,7 @@ def clients_ls(ctx):
     """
     Lists all clients in the workspace.
     """
-    helpers.entity_listing(api.Client, fields=('name', 'id', 'notes'), obj=ctx.obj)
+    helpers.entity_listing(api.Client, fields=('name', 'id'), obj=ctx.obj)
 
 
 @clients.command('get', short_help='retrieve details of a client')
@@ -455,6 +455,7 @@ def clients_ls(ctx):
 def clients_get(ctx, spec):
     """
     Gets details of a client specified by SPEC argument. SPEC can be either ID or Name of the client.
+    Be aware that if you use specify SPEC using Name you won't get note for this client.
 
     If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
     """

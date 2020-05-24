@@ -40,7 +40,6 @@ class TestClients:
         name_parsed = result.parse_detail()
 
         assert name_parsed['id'] == id_parsed['id']
-        assert name_parsed['notes'] == note
         assert name_parsed['name'] == name
 
     def test_update(self, cmd, fake, config):

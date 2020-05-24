@@ -1,10 +1,5 @@
 import pendulum
-
-import pytest
-
 from toggl.api import TimeEntry
-from toggl import exceptions
-
 
 
 class TestTimeEntries:

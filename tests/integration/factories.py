@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import factory
 import faker
 
@@ -61,7 +63,7 @@ class TimeEntryFactory(TogglFactory):
     @factory.lazy_attribute
     def stop(self):
         fake = faker.Faker()
-        return fake.past_datetime(start_date=self.start)
+        return fake.date_time_between_dates(self.start, self.start + timedelta(hours=12))
 
 
 class PremiumTimeEntryFactory(TogglFactory):
