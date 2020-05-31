@@ -48,6 +48,7 @@ CLI will try to migrate it into new format.
 
 | Name | Type | Default | Description |
 | --------------|---------- |---------- | ------- |
+| `date_format` | string | `L` | Setting which specifies the format in which all the dates will be printed. For syntax see [Pendulum's doc](https://pendulum.eustace.io/docs/#tokens). |
 | `datetime_format` | string | `LTS L` | Setting which specifies the format in which all the datetimes will be printed. For syntax see [Pendulum's doc](https://pendulum.eustace.io/docs/#tokens). |
 | `time_format` | string | `LTS` | Setting which specifies the format in which all the times will be printed. For syntax see [Pendulum's doc](https://pendulum.eustace.io/docs/#tokens). |
 | `day_first` | bool | `False` | Setting which specifies behaviour for dateutils.parse() behaviour. Whether to interpret the first value in an ambiguous 3-integer date (e.g. 01/05/09) as the day (True) or month (False). |

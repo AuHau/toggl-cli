@@ -216,6 +216,12 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     Setting which specifies the format in which all the datetimes will be printed.
     For syntax see: https://pendulum.eustace.io/docs/#tokens
     """
+    date_format = 'L'
+
+    """
+    Setting which specifies the format in which all the datetimes will be printed.
+    For syntax see: https://pendulum.eustace.io/docs/#tokens
+    """
     datetime_format = 'LTS L'
 
     """
@@ -278,6 +284,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         'tz': IniEntry('options', str),
         'year_first': IniEntry('options', bool),
         'day_first': IniEntry('options', bool),
+        'date_format': IniEntry('options', str),
         'datetime_format': IniEntry('options', str),
         'time_format': IniEntry('options', str),
         'default_wid': IniEntry('options', int),
