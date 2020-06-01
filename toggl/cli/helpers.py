@@ -1,8 +1,13 @@
 import logging
+import os
+import pathlib
+import re
 import typing
 from collections.abc import Iterable
 
 import click
+import pendulum
+from notifypy import Notify
 from prettytable import PrettyTable
 
 from toggl.api import base
@@ -146,3 +151,57 @@ def entity_update(cls, spec, field_lookup=('id', 'name',), obj=None, **kwargs):
     entity.save()
 
     click.echo('{} successfully updated!'.format(cls.get_name(verbose=True)))
+
+
+def notify(title, text):
+    """ this function will only work on OSX and needs to be extended for other OS
+    @title string for notification title
+    @text string for notification content """
+    notification = Notify()
+    notification.title = title
+    notification.message = text
+    notification.icon = os.path.join(os.path.dirname(__file__), '..', 'assets', 'icon.png')
+    notification.send()
+
+"""
+Supported units: d = days, h = hours, m = minutes, s = seconds.
+
+Regex matches unique counts per unit (always the last one, so for '1h1m2h', it will parse 2 hours).
+Examples of successful matches:
+1d 1h 1m 1s
+1h 1d 1s
+1H 1d 1S
+1h1D1s
+1000h
+
+TODO: The regex should validate that no duplicates of units are in the string (example: '10h 5h' should not match)
+"""
+DURATION_SYNTAX_REGEX = r'(?:(\d+)(d|h|m|s)(?!.*\2)\s?)+?'
+
+DURATION_MAPPING = {
+    'd': 'days',
+    'h': 'hours',
+    'm': 'minutes',
+    's': 'seconds',
+}
+
+
+def parse_duration_string(value):
+    matches = re.findall(DURATION_SYNTAX_REGEX, value, re.IGNORECASE)
+
+    if not matches:
+        return False
+
+    base = pendulum.duration()
+    for match in matches:
+        unit = DURATION_MAPPING[match[1].lower()]
+
+        base += pendulum.duration(**{unit: int(match[0])})
+
+    return base
+
+
+def format_duration(duration):
+    if isinstance(duration, int):
+        duration = pendulum.duration(seconds=duration)
+    return '{}:{}:{}'.format(duration.hours, duration.minutes, duration.remaining_seconds)

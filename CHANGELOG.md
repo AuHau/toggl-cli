@@ -2,6 +2,15 @@
 
 Earlier changes were not versioned. Therefore dates of change are used instead there.
 
+## v2.2.0
+
+Features:
+ * Python 3.8 support
+ * new `toggl sum` command that displays sums of time grouped by days
+ * new `toggl goal` command that waits until you reach your defined goal for the day and the send notification
+ * new theming support
+ * `--today` flag for `ls` and `sum` command  
+
 ## v2.1.0
 
 Features:

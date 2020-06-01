@@ -1,12 +1,11 @@
 import logging
-import re
-import typing
 from collections import OrderedDict
 
 import click
 import pendulum
 
 from toggl import utils, exceptions
+from toggl.cli import helpers
 
 logger = logging.getLogger('toggl.cli')
 
@@ -56,42 +55,13 @@ class DateTimeDurationType(DateTimeType):
 
     name = 'datetime|duration'
 
-    """
-    Supported units: d = days, h = hours, m = minutes, s = seconds.
-
-    Regex matches unique counts per unit (always the last one, so for '1h1m2h', it will parse 2 hours).
-    Examples of successful matches:
-    1d 1h 1m 1s
-    1h 1d 1s
-    1H 1d 1S
-    1h1D1s
-    1000h
-
-    TODO: The regex should validate that no duplicates of units are in the string (example: '10h 5h' should not match)
-    """
-    SYNTAX_REGEX = r'(?:(\d+)(d|h|m|s)(?!.*\2)\s?)+?'
-
-    MAPPING = {
-        'd': 'days',
-        'h': 'hours',
-        'm': 'minutes',
-        's': 'seconds',
-    }
-
     def convert(self, value, param, ctx):
-        matches = re.findall(self.SYNTAX_REGEX, value, re.IGNORECASE)
+        duration = helpers.parse_duration_string(value)
 
-        # If nothing matches ==> unknown syntax ==> fallback to DateTime parsing
-        if not matches:
+        if duration is False:
             return super().convert(value, param, ctx)
 
-        base = pendulum.duration()
-        for match in matches:
-            unit = self.MAPPING[match[1].lower()]
-
-            base += pendulum.duration(**{unit: int(match[0])})
-
-        return base
+        return duration
 
 
 class ResourceType(click.ParamType):

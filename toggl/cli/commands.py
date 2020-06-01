@@ -3,12 +3,14 @@ import traceback
 import webbrowser
 import os
 import time
+from functools import reduce
 
 import click
 import click_completion
 
 import pendulum
 from prettytable import PrettyTable
+from notifypy import Notify
 
 from toggl import api, exceptions, utils, __version__
 from toggl.cli import helpers, types
@@ -178,7 +180,8 @@ def entry_add(ctx, start, stop, descr, **kwargs):
     entry.save()
     click.echo("Time entry '{}' with #{} created.".format(entry.description, entry.id))
 
-def getEntries(ctx, use_reports, **conditions):
+
+def get_entries(ctx, use_reports, **conditions):
     if use_reports:
         entities = api.TimeEntry.objects.all_from_reports(config=ctx.obj['config'],
                                                           start=conditions.get('start'), stop=conditions.get('stop'))
@@ -196,12 +199,14 @@ def getEntries(ctx, use_reports, **conditions):
     entities = sorted(entities, key=lambda x: x.start, reverse=True)
     return entities
 
+
 # TODO: [Feature/Low] Implement other filtrations for the Report's call
 @cli.command('ls', short_help='list a time entries')
 @click.option('--use-reports', is_flag=True, help='Will use different API call that will fetch all time entries.')
 @click.option('--start', '-s', type=types.DateTimeType(),
               help='Defines start of a date range to filter the entries by.')
 @click.option('--stop', '-p', type=types.DateTimeType(), help='Defines stop of a date range to filter the entries by.')
+@click.option('--today', '-t', is_flag=True, help='Scopes the time to the current day')
 @click.option('--project', '-o', type=types.ResourceType(api.Project),
               help='Filters the entries by project. Can be ID or name of the project.', )
 @click.option('--tags', '-a', type=types.SetType(), help='Filters the entries by list of tags delimited with \',\'')
@@ -210,7 +215,7 @@ def getEntries(ctx, use_reports, **conditions):
                    'default set of fields using \'+\' and/or \'-\' characters. Supported values: '
                    + types.FieldsType.format_fields_for_help(api.TimeEntry))
 @click.pass_context
-def entry_ls(ctx, fields, use_reports, **conditions):
+def entry_ls(ctx, fields, today, use_reports, **conditions):
     """
     Lists time entries the user has access to.
 
@@ -223,8 +228,15 @@ def entry_ls(ctx, fields, use_reports, **conditions):
     as they developing new version of API and they are able to see in the future
     and also longer into past.
     """
-    
-    entities=getEntries(ctx, use_reports, **conditions)
+
+    if today:
+        if conditions['start'] or conditions['stop']:
+            click.echo('You can\'t use --start or --stop parameters with --today parameter!', err=True)
+            exit(2)
+        conditions['start'] = pendulum.today()
+        conditions['stop'] = pendulum.tomorrow()
+
+    entities = get_entries(ctx, use_reports, **conditions)
 
     if ctx.obj.get('simple'):
         if ctx.obj.get('header'):
@@ -264,131 +276,124 @@ def entry_ls(ctx, fields, use_reports, **conditions):
             row.append(value)
 
         table.add_row(row)
-    
+
     click.echo(table)
 
-@cli.command('sum', short_help='tracks total worked time')
+
+@cli.command('sum', short_help='shows total worked time')
 @click.option('--use-reports', is_flag=True, help='Will use different API call that will fetch all time entries.')
 @click.option('--start', '-s', type=types.DateTimeType(),
               help='Defines start of a date range to filter the entries by.')
 @click.option('--stop', '-p', type=types.DateTimeType(), help='Defines stop of a date range to filter the entries by.')
-@click.option('--goal', '-g', type=float,
-              help='Defines work goal of the day in hours.')
-@click.option('--timeoff', '-t', type=float, help='Defines the period of time the alarm rings before end of shift in minutes.')
+@click.option('--today', '-t', is_flag=True, help='Scopes the time to the current day')
 @click.option('--project', '-o', type=types.ResourceType(api.Project),
               help='Filters the entries by project. Can be ID or name of the project.', )
 @click.option('--tags', '-a', type=types.SetType(), help='Filters the entries by list of tags delimited with \',\'')
-@click.option('--fields', '-f', type=types.FieldsType(api.TimeEntry), default='description,duration,start,stop',
-              help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify '
-                   'default set of fields using \'+\' and/or \'-\' characters. Supported values: '
-                   + types.FieldsType.format_fields_for_help(api.TimeEntry))
 @click.pass_context
-def entry_sum(ctx, fields, use_reports, goal, timeoff, **conditions):
+def entry_sum(ctx, use_reports, today, **conditions):
     """
-    tracks total worked time
-    
-    Arguments:
-        goal : float. If specified with the parameter goal it waits for the goal to be completed
-        timeoff: float. The interval for checking for the goal success
+    Shows summary of totally tracked time based on days.
+    Displayed Total time is in format HH:MM:SS
     """
-    if not timeoff:
-        timeoff=0.25
+    config = ctx.obj['config']
 
-    while True:
-        
-        entities=getEntries(ctx, use_reports, **conditions)
+    if today:
+        if conditions['start'] or conditions['stop']:
+            click.echo('You can\'t use --start or --stop parameters with --today parameter!', err=True)
+            exit(2)
+        conditions['start'] = pendulum.today()
+        conditions['stop'] = pendulum.tomorrow()
 
-        timePassed,running=getTimePassed(entities)
+    entries = get_entries(ctx, use_reports, **conditions)
+    sums_per_day = get_times_based_on_days(entries, config)
 
-        if not goal:
-            click.echo(f'{timePassed}h')
-            return
+    table = PrettyTable()
+    table.field_names = [click.style('Day', fg='white', dim=1), click.style('Total time', fg='white', dim=1)]
+    table.border = False
+    table.align = 'l'
 
-        done=timePassed >= goal - timeoff
-        now=pendulum.now().format('HH:mm')
-        click.echo(f'{now} goal:{goal}, timePassed:{timePassed}, timeoff:{timeoff}, done:{done}, running:{running}')
-        if done:
-            diff=int((goal-timePassed)*60)
-            notify('Work is done!', f'Done with {goal} hours of work in {diff} minutes!')
-            return
-        else:
-            time.sleep(timeoff*3600)
+    for date, duration in sums_per_day:
+        if date == pendulum.today().format(config.date_format):
+            date = 'today'
+        elif date == (pendulum.today() - pendulum.duration(days=1)).format(config.date_format):
+            date = 'yesterday'
 
-@cli.command('day', short_help='tracks total worked time of the current day')
-@click.option('--use-reports', is_flag=True, help='Will use different API call that will fetch all time entries.')
-@click.option('--goal', '-g', type=float,
-              help='Defines work goal of the day in hours.')
-@click.option('--timeoff', '-t', type=int, help='Defines the period of time the alarm rings before end of shift in minutes.')
+        table.add_row([date, helpers.format_duration(duration)])
+    click.echo(table)
+
+
+@cli.command('goal', short_help='runs until goal is reached')
+@click.option('--timeoff', '-t', type=float,
+              help='Defines the period of time the alarm rings before end of shift in minutes.')
 @click.option('--project', '-o', type=types.ResourceType(api.Project),
               help='Filters the entries by project. Can be ID or name of the project.', )
 @click.option('--tags', '-a', type=types.SetType(), help='Filters the entries by list of tags delimited with \',\'')
-@click.option('--fields', '-f', type=types.FieldsType(api.TimeEntry), default='description,duration,start,stop',
-              help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify '
-                   'default set of fields using \'+\' and/or \'-\' characters. Supported values: '
-                   + types.FieldsType.format_fields_for_help(api.TimeEntry))
+@click.option('--no-notification', is_flag=True, help='Specifies that no notifications should be triggered.')
+@click.argument('goal')
 @click.pass_context
-def entry_day(ctx, fields, use_reports, goal, timeoff, **conditions):
+def entry_goal(ctx, goal, timeoff, no_notification, **conditions):
     """
-    tracks total worked time of the current day
-    
-    Arguments:
-        goal : float. If specified with the parameter goal it waits for the goal to be completed
-        timeoff: float. The interval for checking for the goal success
+    Continuously runs until GOAL is reached for today's entries. When GOAL is reached OS notification is triggered.
+
+    GOAL should be specified in DURATION format. E.g. "1h30m", "30s" etc. See `toggl add --help` for details.
     """
+    config = ctx.obj['config']
+
     if not timeoff:
-        timeoff=0.25
+        timeoff = 5
+
+    conditions['start'] = pendulum.today()
+    conditions['stop'] = pendulum.tomorrow()
+    today = pendulum.today().format(config.date_format)
+    goal = helpers.parse_duration_string(goal)
+
+    if goal is False:
+        click.echo('GOAL is not valid duration!', err=True)
+        exit(2)
 
     while True:
+        entities = get_entries(ctx, False, **conditions)
+        sums_per_day = get_times_based_on_days(entities, config)
 
-        conditions['start']=pendulum.today()
-        conditions['stop']=pendulum.tomorrow()
-        entities=getEntries(ctx, use_reports, **conditions)
-
-        timePassed,running=getTimePassed(entities)
-
-        if not goal:
-            click.echo(f'{timePassed}h')
-            return
-
-        done=timePassed >= goal - timeoff
-        now=pendulum.now().format('HH:mm')
-        click.echo(f'{now} goal:{goal}, timePassed:{timePassed}, timeoff:{timeoff}, done:{done}, running:{running}')
-        if done:
-            diff=int((goal-timePassed)*60)
-            notify('Work is done!', f'Done with {goal} hours of work in {diff} minutes!')
-            return
-            # the following codebit is the idea to implement an infinite for the same amount of the next day - but actually, I never used it because my goals changed each day
-            # diff=pendulum.tomorrow()-pendulum.now()
-            # diff=diff.seconds+3600*6 # waits until 6AM the next day
-            # if pendulum.tomorrow().format('dddd') == 'Saturday': # waits 48h longer on a weekend
-            #     diff+=3600*48
-            # time.sleep(diff)
+        # Today have to be first otherwise there is nothing recorded today
+        if today != sums_per_day[0][0]:
+            time_passed = 0
         else:
-            time.sleep(timeoff*3600)
+            time_passed = sums_per_day[0][1]
 
-def getTimePassed(entities):
-    """ sums the passed time from all the entities given """
-    timePassed=0.
-    running=False
-    for entity in entities:
-        duration = entity.duration
-        if duration<0:
-            diff=pendulum.now()-pendulum.from_timestamp(-duration)
-            duration=diff.seconds
-            running=True
-        timePassed+=duration
-    
-    timePassed=round(timePassed/3600, 2)
+        now = pendulum.now(tz=config.tz).format(config.time_format)
 
-    return timePassed, running
+        if time_passed >= goal.seconds:
+            if not no_notification:
+                helpers.notify('Work is done!', 'You have reached your today\'s goal {}!'.format(helpers.format_duration(goal)))
+            click.echo('{} => {}'.format(now, click.style('Goal reached', fg='green')))
+            return
+        else:
+            click.echo('{} => Remaining {} to your goal'.format(
+                now,
+                helpers.format_duration(goal - pendulum.duration(seconds=time_passed))
+            ))
+            time.sleep(timeoff * 60)
 
-def notify(title, text):
-    """ this function will only work on OSX and needs to be extended for other OS
-    @title string for notification title
-    @text string for notification content """
-    os.system("""
-              osascript -e 'display notification "{}" with title "{}"'
-              """.format(text, title))
+
+def get_times_based_on_days(entries, config):
+    """ sums the passed time grouped by days """
+
+    def reducer(previous, current):
+        duration = current.duration
+        if duration < 0:
+            duration = pendulum.now(tz=config.tz).int_timestamp + duration
+
+        date = current.start.format(config.date_format)
+        if date in previous:
+            previous[date] = previous[date] + duration
+        else:
+            previous[date] = duration
+        return previous
+
+    days = reduce(reducer, entries, dict()).items()
+    return sorted(days, key=lambda day: day[0], reverse=True)
+
 
 @cli.command('rm', short_help='delete a time entry')
 @click.argument('spec')
@@ -1143,6 +1148,7 @@ def user_config(ctx):
     config = ctx.obj['config']
     helpers.entity_detail(api.User, config.user, primary_field='email', obj=ctx.obj)
 
+
 # ----------------------------------------------------------------------------
 # Configuration manipulation
 # ----------------------------------------------------------------------------
@@ -1266,5 +1272,3 @@ def install(append, case_insensitive, shell, path):
     extra_env = {'_TOGGL_CASE_INSENSITIVE_COMPLETE': 'ON'} if case_insensitive else {}
     shell, path = click_completion.core.install(shell=shell, path=path, append=append, extra_env=extra_env)
     click.echo('%s completion installed in %s' % (shell, path))
-
-

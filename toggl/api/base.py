@@ -17,7 +17,7 @@ Entity = typing.TypeVar('Entity', bound='TogglEntity')
 def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dict, Entity, bool) -> bool
     """
     Will compare conditions dict and entity.
-    Condition's keys and values must match the entities attributes, but not the other way around.
+    Condition's keys and values must match the entries attributes, but not the other way around.
 
     :param contain: If True, then string fields won't be tested on equality but on partial match.
     :param entity: TogglEntity
@@ -92,7 +92,7 @@ class TogglSet(object):
     """
     Class that is mainly responsible for fetching objects from the API.
 
-    It is always binded to an entity class that represents entities which will be fetched from the API. The binding is
+    It is always binded to an entity class that represents entries which will be fetched from the API. The binding is
     done either passing the Entity's class to constructor or later on calling method bind_to_class. Without
     binded Entity the class can not perform any action.
     """
@@ -294,7 +294,7 @@ class TogglSet(object):
 
 class WorkspaceTogglSet(TogglSet):
     """
-    Specialized TogglSet for Workspaced entities.
+    Specialized TogglSet for Workspaced entries.
     """
 
     def build_list_url(self, caller, config, conditions):  # type: (str, utils.Config, typing.Dict) -> str

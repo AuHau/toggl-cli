@@ -30,6 +30,7 @@ toggl
 │       ├── show --- displays what will be added to your shell's rc file
 │       └── install --- enable commands completion for your shell
 ├── continue --- continue existing/last time entry
+├── goal --- tracks today's time until your goal is reached
 ├── ls --- lists last time entries
 ├── now --- show/update currently runnig time entry
 ├── project_users --- list all project users in workspace
@@ -47,6 +48,7 @@ toggl
 ├── rm --- delete a time entry
 ├── start --- starts new time entry
 ├── stop --- stops running time entry
+├── sum --- shows summary of totally tracked time based on days
 ├── tasks
 │   ├── add
 │   ├── get
