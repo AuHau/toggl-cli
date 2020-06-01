@@ -75,6 +75,15 @@ toggl
 └── www --- opens web client
 ``` 
 
+### Themes
+
+Toggl CLI supports themes in order to be readable in all terminal settings. You can configure it as part of config file
+using `theme` option. The possible values are:
+
+ - `plain` for plain theme without any colors
+ - `light` for light based theme
+ - `dark` for dark based theme
+
 ### Shell completion
 
 Toggl CLI supports commands/options completion for `bash`, `zsh`, `PowerShell` and `fish` shells. 
