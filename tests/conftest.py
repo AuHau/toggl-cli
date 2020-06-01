@@ -1,8 +1,6 @@
 from pathlib import Path
 import pytest
 
-from toggl.utils import config
-
 
 def pytest_collection_modifyitems(items):
     for item in items:
@@ -18,6 +16,8 @@ def pytest_collection_modifyitems(items):
 
 @pytest.fixture(scope="session", autouse=True)
 def set_default_config(session_mocker):
+    from toggl.utils import config
+
     session_mocker.patch.object(config.IniConfigMixin, 'DEFAULT_CONFIG_PATH',
                                 new_callable=session_mocker.PropertyMock(
                                     return_value=str(Path(__file__) / 'configs' / 'non-premium.config')
