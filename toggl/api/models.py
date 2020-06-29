@@ -515,7 +515,7 @@ def set_duration(name, instance, value, init=False):  # type: (str, base.Entity,
     if value is None:
         return
 
-    if value > 0:
+    if value >= 0:
         instance.is_running = False
         instance.stop = instance.start + pendulum.duration(seconds=value)
     else:
