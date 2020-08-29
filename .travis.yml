@@ -32,7 +32,7 @@ deploy:
       python: 3.7
 after_deploy:
   - git config user.name "Adam Uhlir";
-  - git config user.email "adam@uhlir.me";
+  - git config user.email "adam@uhlir.dev";
   - git remote add gh-token "https://${GH_TOKEN}@github.com/AuHau/toggl-cli.git";
   - git fetch gh-token && git fetch gh-token gh-pages:gh-pages;
   - mkdocs gh-deploy -v --clean --remote-name gh-token;
