@@ -8,7 +8,6 @@ import inquirer
 import pendulum
 
 from toggl import exceptions, __version__, utils
-from toggl.cli.themes import themes
 
 logger = logging.getLogger('toggl.utils.bootstrap')
 
@@ -60,6 +59,8 @@ class ConfigBootstrap:
         """
         Creates dict which follows the ConfigParser convention from the provided user's answers.
         """
+        from toggl.cli.themes import themes
+
         output = {
             'version': __version__,
             'api_token': answers['api_token'],
@@ -157,6 +158,8 @@ class ConfigBootstrap:
         The process will gather required information for configuration and then return those information in dict which
         follows the utils.config.Config attribute's naming.
         """
+        from toggl.cli.themes import themes
+
         if platform.system() == 'Windows':
             return self._bootstrap_windows()
 
