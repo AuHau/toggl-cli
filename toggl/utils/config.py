@@ -10,7 +10,7 @@ import requests
 from pbr import version
 
 from toggl.utils import metas, bootstrap, migrations
-from toggl import exceptions, api
+from toggl import exceptions
 
 logger = logging.getLogger('toggl.utils.config')
 
