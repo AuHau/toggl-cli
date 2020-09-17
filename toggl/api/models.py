@@ -649,7 +649,7 @@ class TimeEntrySet(base.TogglSet):
             if not returned.get('data'):
                 return
 
-            for entity in returned.get("data"):
+            for entity in returned.get('data'):
                 yield self._deserialize_from_reports(config, entity, wid)
 
             if not self._should_fetch_more(page, returned):
