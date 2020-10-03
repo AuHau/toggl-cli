@@ -596,7 +596,7 @@ class TimeEntrySet(base.TogglSet):
     def _should_fetch_more(self, page, returned):  # type: (int, typing.Dict) -> bool
         return page * returned['per_page'] < returned['total_count']
 
-    def _deserialize_from_reports(self, config, entity_dict):
+    def _deserialize_from_reports(self, config, entity_dict, wid):
         entity = {
             'id': entity_dict['id'],
             'start': entity_dict['start'],
@@ -606,6 +606,8 @@ class TimeEntrySet(base.TogglSet):
             'tags': entity_dict['tags'],
             'pid': entity_dict['pid'],
             'tid': entity_dict['tid'],
+            'uid': entity_dict['uid'],
+            'wid': wid,
             'billable': entity_dict['billable'],
         }
 
@@ -623,15 +625,21 @@ class TimeEntrySet(base.TogglSet):
         :return: Generator that yields TimeEntry
         """
         from .. import toggl
+
         config = config or utils.Config.factory()
         page = 1
 
-        try:
+        if workspace is None:
+            wid = config.default_workspace.id
+        elif isinstance(workspace, Workspace):
             wid = workspace.id
-        except AttributeError:
+        elif isinstance(workspace, int):
+            wid = workspace
+        else:
             try:
                 wid = int(workspace)
             except (ValueError, TypeError):
+                logger.exception("Couldn't infer workspace, falling back to default")
                 wid = config.default_workspace.id
 
         while True:
@@ -642,7 +650,7 @@ class TimeEntrySet(base.TogglSet):
                 return
 
             for entity in returned.get('data'):
-                yield self._deserialize_from_reports(config, entity)
+                yield self._deserialize_from_reports(config, entity, wid)
 
             if not self._should_fetch_more(page, returned):
                 return
