@@ -188,6 +188,11 @@ class Project(WorkspacedEntity):
     Id of the color selected for the project
     """
 
+    hex_color = fields.StringField()
+    """
+    Hex code of the color selected for the project
+    """
+
     rate = fields.FloatField(premium=True)
     """
     Hourly rate of the project.
