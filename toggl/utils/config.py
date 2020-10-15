@@ -428,7 +428,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
             pass
 
         try:
-            return requests.auth.HTTPBasicAuth(self.username, self.password)
+            return requests.auth.HTTPBasicAuth(self.user_name, self.password)
         except AttributeError:
             raise exceptions.TogglConfigException("There is no authentication configuration!")
 
