@@ -221,7 +221,7 @@ def entry_ls(ctx, fields, today, use_reports, **conditions):
     Lists time entries the user has access to.
 
     By default the command uses API call that has limited number of time entries fetched  with 1000 entries in
-    last 9 days. If you want to overcome this limitation use --user-reports flag, that will use different
+    last 9 days. If you want to overcome this limitation use --use-reports flag, that will use different
     API call, which overcomes this limitations but currently support only --start/--stop filtration.
 
     The list visible
