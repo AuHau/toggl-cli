@@ -209,4 +209,5 @@ def parse_duration_string(value):
 def format_duration(duration):
     if isinstance(duration, int):
         duration = pendulum.duration(seconds=duration)
-    return '{}:{}:{}'.format(duration.in_hours(), duration.minutes, duration.remaining_seconds)
+
+    return '{}:{:02d}:{:02d}'.format(duration.in_hours(), duration.minutes, duration.remaining_seconds)
