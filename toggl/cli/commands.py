@@ -10,7 +10,6 @@ import click_completion
 
 import pendulum
 from prettytable import PrettyTable
-from notifypy import Notify
 
 from toggl import api, exceptions, utils, __version__
 from toggl.cli import helpers, types
@@ -142,6 +141,7 @@ def visit_www():
 @click.argument('start', type=types.DateTimeType(allow_now=True))
 @click.argument('stop', type=types.DateTimeDurationType())
 @click.argument('descr')
+@click.option('--billable', '-b', is_flag=True, help="Sets the Entry to be Billable")
 @click.option('--tags', '-a', type=types.SetType(), help='List of tags delimited with \',\'')
 @click.option('--project', '-o', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
@@ -424,6 +424,7 @@ def entry_rm(ctx, spec):
 @click.argument('descr', required=False)
 @click.option('--start', '-s', type=types.DateTimeType(allow_now=True), help='Specifies start of the time entry. '
                                                                              'If left empty \'now\' is assumed.')
+@click.option('--billable', '-b', is_flag=True, help="Sets the Entry to be Billable")
 @click.option('--tags', '-a', type=types.SetType(), help='List of tags delimited with \',\'')
 @click.option('--project', '-o', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )

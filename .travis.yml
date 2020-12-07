@@ -25,7 +25,7 @@ deploy:
       repo: AuHau/toggl-cli
       python: 3.7
   - provider: releases
-    api_key: ${GH_TOKEN}
+    api_key: ${GH_TOKEN} # This is not available because the GH_TOKEN is scoped to master which deploys triggered by tag name is not set to the branch name but tag name
     on:
       tags: true
       repo: AuHau/toggl-cli
