@@ -274,13 +274,13 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
 
     ENV_MAPPING = {
         'api_token': EnvEntry('TOGGL_API_TOKEN', str),
-        'user_name': EnvEntry('TOGGL_USERNAME', str),
+        'username': EnvEntry('TOGGL_USERNAME', str),
         'password': EnvEntry('TOGGL_PASSWORD', str),
     }
 
     INI_MAPPING = {
         'api_token': IniEntry('auth', str),
-        'user_name': IniEntry('auth', str),
+        'username': IniEntry('auth', str),
         'password': IniEntry('auth', str),
 
         'file_logging': IniEntry('logging', bool),
@@ -428,7 +428,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
             pass
 
         try:
-            return requests.auth.HTTPBasicAuth(self.user_name, self.password)
+            return requests.auth.HTTPBasicAuth(self.username, self.password)
         except AttributeError:
             raise exceptions.TogglConfigException("There is no authentication configuration!")
 
