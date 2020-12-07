@@ -289,11 +289,12 @@ def entry_ls(ctx, fields, today, use_reports, **conditions):
               help='Defines start of a date range to filter the entries by.')
 @click.option('--stop', '-p', type=types.DateTimeType(), help='Defines stop of a date range to filter the entries by.')
 @click.option('--today', '-t', is_flag=True, help='Scopes the time to the current day')
+@click.option('--show-total', '-st', is_flag=True, help='Shows total aggregation.')
 @click.option('--project', '-o', type=types.ResourceType(api.Project),
               help='Filters the entries by project. Can be ID or name of the project.', )
 @click.option('--tags', '-a', type=types.SetType(), help='Filters the entries by list of tags delimited with \',\'')
 @click.pass_context
-def entry_sum(ctx, use_reports, today, **conditions):
+def entry_sum(ctx, use_reports, today, show_total, **conditions):
     """
     Shows summary of totally tracked time based on days.
     Displayed Total time is in format HH:MM:SS
@@ -310,6 +311,10 @@ def entry_sum(ctx, use_reports, today, **conditions):
 
     entries = get_entries(ctx, use_reports, **conditions)
     sums_per_day = get_times_based_on_days(entries, config)
+
+    if show_total:
+        sums_per_day.insert(0, ["total",
+                                reduce((lambda x, y: x + y), [duration for _, duration in sums_per_day])])
 
     table = PrettyTable()
     table.field_names = [click.style('Day', **theme.header), click.style('Total time', **theme.header)]
