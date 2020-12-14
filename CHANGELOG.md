@@ -2,6 +2,8 @@
 
 Earlier changes were not versioned. Therefore dates of change are used instead there.
 
+For new releases see [Github Release page](https://github.com/AuHau/toggl-cli)
+
 ## v2.2.0
 
 Features:

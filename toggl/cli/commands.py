@@ -424,7 +424,7 @@ def entry_rm(ctx, spec):
 @click.argument('descr', required=False)
 @click.option('--start', '-s', type=types.DateTimeType(allow_now=True), help='Specifies start of the time entry. '
                                                                              'If left empty \'now\' is assumed.')
-@click.option('--billable', '-b', is_flag=True, help="Sets the Entry to be Billable")
+@click.option('--billable', '-b', is_flag=True, default=None, help="Sets the Entry to be Billable (Premium only)")
 @click.option('--tags', '-a', type=types.SetType(), help='List of tags delimited with \',\'')
 @click.option('--project', '-o', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
@@ -436,6 +436,14 @@ def entry_start(ctx, descr, **kwargs):
     Starts a new time entry with description DESCR (it can be left out). If there is another currently running entry,
     the entry will be stopped and new entry started.
     """
+
+    # We have to remove the billable from the kwargs if user did not ask for it
+    # because otherwise it will get setattr() in start_and_save() and if not-premium
+    # workspace is used then it will fail.
+    # When using normal constructor and save() this is not issue.
+    if kwargs['billable'] is None:
+        kwargs.pop('billable')
+
     api.TimeEntry.start_and_save(
         config=ctx.obj['config'],
         description=descr,

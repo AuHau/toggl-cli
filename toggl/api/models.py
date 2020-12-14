@@ -47,7 +47,7 @@ class Workspace(base.TogglEntity):
     rounding = fields.IntegerField()
     """
     Type of rounding:
-    
+
     * round down: -1
     * nearest: 0
     * round up: 1
@@ -60,7 +60,7 @@ class Workspace(base.TogglEntity):
 
     default_hourly_rate = fields.FloatField()
     """
-    Default hourly rate for workspace, won't be shown to non-admins 
+    Default hourly rate for workspace, won't be shown to non-admins
     if the only_admins_see_billable_rates flag is set to true
     """
 
@@ -163,23 +163,23 @@ class Project(WorkspacedEntity):
 
     billable = fields.BooleanField(premium=True)
     """
-    Whether the project is billable or not. 
-    
+    Whether the project is billable or not.
+
     (Available only for Premium workspaces)
     """
 
     auto_estimates = fields.BooleanField(default=False, premium=True)
     """
-    Whether the estimated hours are automatically calculated based on task estimations or manually 
-    fixed based on the value of 'estimated_hours'. 
-    
+    Whether the estimated hours are automatically calculated based on task estimations or manually
+    fixed based on the value of 'estimated_hours'.
+
     (Available only for Premium workspaces)
     """
 
     estimated_hours = fields.IntegerField(premium=True)
     """
     If auto_estimates is true then the sum of task estimations is returned, otherwise user inserted hours.
-    
+
     (Available only for Premium workspaces)
     """
 
@@ -196,7 +196,7 @@ class Project(WorkspacedEntity):
     rate = fields.FloatField(premium=True)
     """
     Hourly rate of the project.
-    
+
     (Available only for Premium workspaces)
     """
 
@@ -238,7 +238,7 @@ class User(WorkspacedEntity):
     api_token = fields.StringField()
     """
     API token to use for API calls.
-    
+
     (Returned only for User.objects.current_user() call.)
     """
 
@@ -247,7 +247,7 @@ class User(WorkspacedEntity):
     default_workspace = fields.MappingField(Workspace, 'default_wid')  # type: Workspace
     """
     Default workspace for calls that does not specify Workspace.
-    
+
     (Returned only for User.objects.current_user() call.)
     """
 
@@ -286,8 +286,8 @@ class User(WorkspacedEntity):
 
     timezone = fields.StringField()
     """
-    Timezone which is used to convert the times into. 
-    
+    Timezone which is used to convert the times into.
+
     May differ from one used in this tool, see toggl.utils.Config().
     """
 
@@ -374,7 +374,7 @@ class WorkspaceUser(WorkspacedEntity):
 
     admin = fields.BooleanField(admin_only=True)
     """
-    Weather user has admin privilege in the Workspace. 
+    Weather user has admin privilege in the Workspace.
     """
 
     user = fields.MappingField(User, 'uid', write=False)
@@ -398,13 +398,13 @@ class ProjectUser(WorkspacedEntity):
     rate = fields.FloatField(admin_only=True)
     """
     Hourly rate for the project user in the currency of the project's client or in workspace default currency.
-    
+
     (Available only for Premium workspaces)
     """
 
     manager = fields.BooleanField(default=False)
     """
-    Admin rights for this project    
+    Admin rights for this project
     """
 
     project = fields.MappingField(Project, 'pid', write=False)
@@ -684,7 +684,7 @@ class TimeEntry(WorkspacedEntity):
     billable = fields.BooleanField(default=False, premium=True)
     """
     If available to be billed. (Default: False)
-    
+
     (Available only for Premium workspaces)
     """
 
@@ -700,10 +700,10 @@ class TimeEntry(WorkspacedEntity):
 
     duration = fields.PropertyField(get_duration, set_duration, formatter=format_duration)
     """
-    Dynamic field of entry's duration in seconds. 
-    
-    If the time entry is currently running, the duration attribute contains a negative value, 
-    denoting the start of the time entry in seconds since epoch (Jan 1 1970). The correct duration can be 
+    Dynamic field of entry's duration in seconds.
+
+    If the time entry is currently running, the duration attribute contains a negative value,
+    denoting the start of the time entry in seconds since epoch (Jan 1 1970). The correct duration can be
     calculated as current_time + duration, where current_time is the current time in seconds since epoch.
     """
 
