@@ -1,0 +1,19 @@
+version: 2
+updates:
+- package-ecosystem: pip
+  directory: "/"
+  schedule:
+    interval: monthly
+    time: "04:00"
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: mkdocs-material
+    versions:
+    - 6.2.3
+    - 6.2.7
+  - dependency-name: pytest
+    versions:
+    - 6.2.1
+  - dependency-name: pytest-mock
+    versions:
+    - 3.4.0
