@@ -1,2 +1,25 @@
 *.swp
 .DS_Store
+*.pyc
+*.pyproj
+.idea
+
+# Direnv
+.direnv
+.envrc
+
+.pytest_cache/
+__pycache__/
+.tox
+*.egg-info
+.coverage
+htmlcov
+.eggs
+.mypy_cache
+build
+dist
+AUTHORS
+ChangeLog
+
+# Docs
+site/

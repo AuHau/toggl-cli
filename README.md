@@ -1,81 +1,85 @@
-Overview
---------
+# Toggl CLI
 
-toggl-cli is a command-line interface for toggl.com.
+[![PyPI version](https://badge.fury.io/py/togglCli.svg)](https://badge.fury.io/py/togglCli) 
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/togglCli.svg)](https://pypi.org/project/togglCli)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/togglCli.svg)](https://pypi.org/project/togglCli/) 
+[![codecov](https://codecov.io/gh/AuHau/toggl-cli/branch/master/graph/badge.svg)](https://codecov.io/gh/AuHau/toggl-cli) 
+[![Build Status](https://travis-ci.org/AuHau/toggl-cli.svg?branch=master)](https://travis-ci.org/AuHau/toggl-cli)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/869d787a75dd4e259b824fb8754d3388)](https://app.codacy.com/app/AuHau/toggl-cli?utm_source=github.com&utm_medium=referral&utm_content=AuHau/toggl-cli&utm_campaign=Badge_Grade_Dashboard)
+[![Updates](https://pyup.io/repos/github/AuHau/toggl-cli/shield.svg)](https://pyup.io/repos/github/AuHau/toggl-cli/)
 
-It certainly does not implement the full toggl API, but rather some core
-functions. The goal is to make using toggl quicker and more efficient for those
-already familiar with command-line tools.
+> Command line tool and set of Python wrapper classes for interacting with toggl's API
 
-toggl-cli is written in Python and uses version 8 of the [toggl
-API](https://github.com/toggl/toggl_api_docs) (thanks to beauraines for the
-help).
+## Install
 
-Latest Update
--------------
+Easiest way to install this package is through PyPi:
 
-**30 Oct 2014**: Added a feature that starting, stopping, and continuing an
-entry prints out the time it started or stopped. This requires a new option in
-~/.togglrc: `time_format = %I:%M%p` is the default.  See
-[strftime()](https://docs.python.org/2/library/datetime.html#strftime-and-strptime-behavior)
-for more options.
+```shell
+$ pip install togglCli
+```
 
-Requirements
-------------
+## Usage
 
-* iso8601 module
-* pytz module
+For full overview of Toggl CLI capabilities please see [full documentation](https://toggl.uhlir.dev).
 
-Configuration
--------------
+### CLI tool
 
-Upon first running the program, a configuration file `~/.togglrc` will be
-automatically created. 
+With first run of the command you will be asked several questions to bootstrap default config file 
+(only UNIX-like system are supported; for Window's users there is created dummy config file, which you have to setup manually).
 
-1. Update that file with your toggl username and password. If you are using the API token, enter that as your username and `api_token` for the password.
-2. Update the timezone entry (e.g. US/Pacific).
+To get overview of all commands and options please use `--help` option. Check out also help pages of the subcommands!
 
-Limitations
------------
+Several examples of commands:
 
-* When creating a time entry for a given project, the project must already
-  exist.
-* Project users, tasks, tags, and users aren't supported.
-* Only the default workspace is supported.
+```shell
+# Starts tracking new time entry
+$ toggl start
 
-Roadmap
--------
+# Displays/enable modifications of currently running time entry
+$ toggl now
 
-See the [issues tracker](https://github.com/drobertadams/toggl-cli/issues)
+# Lists all projects
+$ toggl projects ls
+```
 
-Usage
------
-	Usage: toggl [OPTIONS] [ACTION]
+### API wrappers
 
-	Options:
-	  -h, --help       show this help message and exit
-	  -v, --verbose    print debugging output
+Toggl CLI comes with set of Python's class wrappers which follow similar pattern like Django ORM. 
 
-	Actions:
-	  add DESCR [@PROJECT] START_DATETIME ('d'DURATION | END_DATETIME)
-		creates a completed time entry
-	  clients
-		lists all clients
-	  continue DESCR
-		restarts the given entry
-	  ls
-		list recent time entries
-	  now
-		print what you're working on now
-	  projects
-		lists all projects
-	  rm ID
-		delete a time entry by id
-	  start DESCR [@PROJECT] [DATETIME]
-		starts a new entry
-	  stop [DATETIME]
-		stops the current entry
-	  www
-		visits toggl.com
+The wrappers depends on config object which if not provided, the default config file (eq. `~/.togglrc`) is used. 
 
-	  DURATION = [[Hours:]Minutes:]Seconds
+Toggl CLI uses `pendulum` for datetime management, but it is compatible with Python's native datetime, so you can use that if you want to.
+
+```python
+from toggl import api, utils
+import pendulum
+
+new_entry = api.TimeEntry(description='Some new time entry', start=pendulum.now() - pendulum.duration(minutes=15), stop=pendulum.now())
+new_entry.save()
+
+list_of_all_entries = api.TimeEntry.objects.all()
+
+current_time_entry = api.TimeEntry.objects.current()
+
+# Custom config from existing file
+config = utils.Config.factory('./some.config')
+
+# Custom config without relying on any existing config file 
+config = utils.Config.factory(None)  # Without None it will load the default config file
+config.api_token = 'your token'
+config.timezone = 'utc'  # Custom timezone
+
+project = api.Project.object.get(123, config=config)
+project.name = 'Some new name'
+project.save()
+```
+
+## Contributing
+
+Feel free to dive in, contributions are welcomed! [Open an issue](https://github.com/auhau/toggl-cli/issues/new) or submit PRs.
+
+For PRs please see [contribution guideline](https://github.com/AuHau/toggl-cli/blob/master/CONTRIBUTING.md).
+
+## License
+
+[MIT ©  Adam Uhlir & D. Robert Adams](https://github.com/AuHau/toggl-cli/blob/master/LICENSE)
