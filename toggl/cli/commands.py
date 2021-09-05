@@ -396,7 +396,7 @@ def get_times_based_on_days(entries, config):
         if duration < 0:
             duration = pendulum.now(tz=config.tz).int_timestamp + duration
 
-        date = current.start.format(config.date_format)
+        date = current.start.in_timezone(config.tz).format(config.date_format)
         if date in previous:
             previous[date] = previous[date] + duration
         else:
