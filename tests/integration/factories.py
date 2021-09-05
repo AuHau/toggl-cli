@@ -47,7 +47,7 @@ class TaskFactory(TogglFactory):
     class Meta:
         model = api.Task
 
-    name = factory.Faker('sentace')
+    name = factory.Faker('sentence')
     project = factory.SubFactory(ProjectFactory)
     estimated_seconds = factory.Faker('pydecimal', positive=True)
 

@@ -1,4 +1,6 @@
 import pendulum
+import pytest
+
 from toggl.api import TimeEntry
 
 
@@ -127,6 +129,21 @@ class TestTimeEntries:
         assert current.description == descr
         assert current.tags == {'a', 'b', 'c'}
         assert current.project == project
+
+    @pytest.mark.premium
+    def test_start_task(self, cmd, fake, config, factories):
+        task = factories.TaskFactory()
+        current = TimeEntry.objects.current(config=config)
+        assert current is None
+
+        descr = fake.sentence()
+        result = cmd('start --task \'{}\' \'{}\''.format(task.id, descr))
+        assert result.obj.exit_code == 0
+
+        current = TimeEntry.objects.current(config=config)
+        assert current is not None
+        assert current.description == descr
+        assert current.task == task
 
     def test_stop(self, cmd, fake, config):
         TimeEntry.start_and_save()
