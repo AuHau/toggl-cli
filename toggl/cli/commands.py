@@ -426,6 +426,8 @@ def entry_rm(ctx, spec):
                                                                              'If left empty \'now\' is assumed.')
 @click.option('--billable', '-b', is_flag=True, default=None, help="Sets the Entry to be Billable (Premium only)")
 @click.option('--tags', '-a', type=types.SetType(), help='List of tags delimited with \',\'')
+@click.option('--task', '-t', envvar="TOGGL_TASK", type=types.ResourceType(api.Task),
+              help='Link the entry with specific task. Can be ID or name of the task (ENV: TOGGL_TASK)', )
 @click.option('--project', '-o', envvar="TOGGL_PROJECT", type=types.ResourceType(api.Project),
               help='Link the entry with specific project. Can be ID or name of the project (ENV: TOGGL_PROJECT)', )
 @click.option('--workspace', '-w', envvar="TOGGL_WORKSPACE", type=types.ResourceType(api.Workspace),
