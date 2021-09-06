@@ -24,6 +24,9 @@ class DateTimeType(click.ParamType):
         self._allow_now = allow_now
 
     def convert(self, value, param, ctx):
+        if isinstance(value, pendulum.DateTime):
+            return value
+
         if value is None:
             return None
 
@@ -56,6 +59,9 @@ class DateTimeDurationType(DateTimeType):
     name = 'datetime|duration'
 
     def convert(self, value, param, ctx):
+        if isinstance(value, pendulum.DateTime) or isinstance(value, pendulum.Duration):
+            return value
+
         duration = helpers.parse_duration_string(value)
 
         if duration is False:
@@ -78,6 +84,9 @@ class ResourceType(click.ParamType):
         self._fields_lookup = fields
 
     def convert(self, value, param, ctx):
+        if not isinstance(value, str):
+            return value
+
         for field_name in self._fields_lookup:
             if field_name == 'id':
                 try:
@@ -107,6 +116,9 @@ class SetType(click.ParamType):
     name = 'set'
 
     def convert(self, value, param, ctx):
+        if isinstance(value, list):
+            return value
+
         if value is None:
             return None
 
@@ -212,6 +224,9 @@ class FieldsType(click.ParamType):
         return out.keys()
 
     def convert(self, value, param, ctx):
+        if isinstance(value, list):
+            return value
+
         if '-' in value or '+' in value:
             return self._diff_mode(value, param, ctx)
 
