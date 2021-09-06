@@ -1,11 +1,7 @@
-from pbr.version import VersionInfo
-
-VERSION = VersionInfo('togglCli').semantic_version()
-__version__ = VERSION.release_string()
+__version__ = '2.4.2'
 
 __all__ = (
     '__version__',
-    'VERSION',
     'api',
     'utils',
     'exceptions',

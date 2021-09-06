@@ -1,0 +1,31 @@
+name: Publish to PyPi
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - uses: actions/cache@v2
+        with:
+          path: ${{ env.pythonLocation }}
+          key: ${{ env.pythonLocation }}-${{ hashFiles('setup.py') }}-${{ hashFiles('test-requirements.txt') }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Install requirements
+        run: |
+          pip install --upgrade --upgrade-strategy eager -r test-requirements.txt -e .
+
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Publish documentation
+        run: mkdocs gh-deploy --force

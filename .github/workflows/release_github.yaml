@@ -1,0 +1,19 @@
+# On each new commit to master, create/update a PR with release
+# automatically bumps version and creates changelog as per conventional commits
+name: Release Github
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: GoogleCloudPlatform/release-please-action@v2
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release-type: python
+          package-name: togglCli
