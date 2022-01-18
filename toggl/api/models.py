@@ -502,7 +502,7 @@ def get_duration(name, instance):  # type: (str, base.Entity) -> int
     """
     Getter for Duration Property field.
 
-    Handles correctly the conversion of of negative running duration (for more refer to the Toggl API doc).
+    Handles correctly the conversion of negative running duration (for more refer to the Toggl API doc).
     """
     if instance.is_running:
         return instance.start.int_timestamp * -1
@@ -523,6 +523,8 @@ def set_duration(name, instance, value, init=False):  # type: (str, base.Entity,
     if value > 0:
         instance.is_running = False
         instance.stop = instance.start + pendulum.duration(seconds=value)
+    elif value == 0:
+        instance.is_running = False
     else:
         instance.is_running = True
         instance.stop = None
@@ -572,7 +574,7 @@ class TimeEntrySet(base.TogglSet):
 
         return url
 
-    def current(self, config=None):  # type: (utils.Config) -> TimeEntry
+    def current(self, config=None):  # type: (utils.Config) -> typing.Optional[TimeEntry]
         """
         Method that returns currently running TimeEntry or None if there is no currently running time entry.
 
