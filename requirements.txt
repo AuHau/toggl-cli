@@ -1,6 +1,6 @@
 pendulum==2.1.2
 requests>=2.23.0
-click==8.0.3
+click==8.0.4
 inquirer==2.9.1
 PTable==0.9.2
 validate_email==1.3
