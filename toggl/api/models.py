@@ -176,7 +176,7 @@ class Project(WorkspacedEntity):
     (Available only for Premium workspaces)
     """
 
-    estimated_hours = fields.IntegerField(default=0,premium=True)
+    estimated_hours = fields.IntegerField(default=0, premium=True)
     """
     If auto_estimates is true then the sum of task estimations is returned, otherwise user inserted hours.
 
