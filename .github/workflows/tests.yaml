@@ -19,19 +19,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 1
 
       - name: Use Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
+          cache: 'pip'
           python-version: ${{ matrix.python-version }}
-
-      - uses: actions/cache@v2
-        with:
-          path: ${{ env.pythonLocation }}
-          key: ${{ env.pythonLocation }}-${{ hashFiles('setup.py') }}-${{ hashFiles('test-requirements.txt') }}-${{ hashFiles('requirements.txt') }}
 
       - name: Install requirements
         run: |
