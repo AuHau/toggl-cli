@@ -4,6 +4,13 @@ Earlier changes were not versioned. Therefore dates of change are used instead t
 
 For new releases see [Github Release page](https://github.com/AuHau/toggl-cli)
 
+## [2.4.5](https://github.com/AuHau/toggl-cli/compare/v2.4.4...v2.4.5) (2023-02-12)
+
+
+### Miscellaneous Chores
+
+* trigger release ([2cd15d9](https://github.com/AuHau/toggl-cli/commit/2cd15d9397c98c3d6a4bcfd562552a0d80faf5a1))
+
 ## [2.4.4](https://github.com/AuHau/toggl-cli/compare/v2.4.3...v2.4.4) (2023-02-12)
 
 
