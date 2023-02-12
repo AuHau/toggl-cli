@@ -13,7 +13,7 @@ jobs:
         with:
           python-version: 3.9
           cache: 'pip'
-gs
+
       - name: Install requirements
         run: |
           pip install --upgrade --upgrade-strategy eager -r test-requirements.txt -e .
