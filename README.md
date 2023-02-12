@@ -5,8 +5,6 @@
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/togglCli.svg)](https://pypi.org/project/togglCli/) 
 [![codecov](https://codecov.io/gh/AuHau/toggl-cli/branch/master/graph/badge.svg)](https://codecov.io/gh/AuHau/toggl-cli) 
 [![Build Status](https://travis-ci.org/AuHau/toggl-cli.svg?branch=master)](https://travis-ci.org/AuHau/toggl-cli)
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/869d787a75dd4e259b824fb8754d3388)](https://app.codacy.com/app/AuHau/toggl-cli?utm_source=github.com&utm_medium=referral&utm_content=AuHau/toggl-cli&utm_campaign=Badge_Grade_Dashboard)
-[![Updates](https://pyup.io/repos/github/AuHau/toggl-cli/shield.svg)](https://pyup.io/repos/github/AuHau/toggl-cli/)
 
 > Command line tool and set of Python wrapper classes for interacting with toggl's API
 
