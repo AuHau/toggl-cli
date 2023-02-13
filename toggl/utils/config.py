@@ -14,6 +14,8 @@ from toggl import exceptions
 
 logger = logging.getLogger('toggl.utils.config')
 
+DEFAULT_CONFIG_PATH = '$XDG_CONFIG_HOME/.togglrc'
+
 # Defines which attrs of all parents will be merged into the new config class -> related to ConfigMeta
 MERGE_ATTRS = ('INI_MAPPING', 'ENV_MAPPING')
 
