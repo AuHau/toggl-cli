@@ -4,6 +4,13 @@ Earlier changes were not versioned. Therefore dates of change are used instead t
 
 For new releases see [Github Release page](https://github.com/AuHau/toggl-cli)
 
+## [2.4.5](https://github.com/AuHau/toggl-cli/compare/v2.4.4...v2.4.5) (2023-02-14)
+
+
+### Continuous Integration
+
+* debug release workflow ([0927ec4](https://github.com/AuHau/toggl-cli/commit/0927ec45271f127b6839960cc418260384a5f795))
+
 ## [2.4.4](https://github.com/AuHau/toggl-cli/compare/v2.4.3...v2.4.4) (2023-02-12)
 
 
