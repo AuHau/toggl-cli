@@ -24,6 +24,9 @@ jobs:
     if: needs.release-please.outputs.release_created == 'true'
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # We need the whole Git history in order for the PBR to pick up correctly the tag
+
       - uses: actions/setup-python@v4
         with:
           python-version: 3.9
@@ -38,7 +41,7 @@ jobs:
           python setup.py sdist bdist_wheel
 
       - name: Publish distribution 📦 to PyPI
-        uses: pypa/gh-action-pypi-publish@master
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
