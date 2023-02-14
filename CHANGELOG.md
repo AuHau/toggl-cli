@@ -4,6 +4,18 @@ Earlier changes were not versioned. Therefore dates of change are used instead t
 
 For new releases see [Github Release page](https://github.com/AuHau/toggl-cli)
 
+## [2.4.4](https://github.com/AuHau/toggl-cli/compare/v2.4.3...v2.4.4) (2023-02-14)
+
+
+### Miscellaneous Chores
+
+* release trigger commit ([#287](https://github.com/AuHau/toggl-cli/issues/287)) ([6b4b8fa](https://github.com/AuHau/toggl-cli/commit/6b4b8fae50195d398b5a7241dc2bb0fa432dcdc6))
+
+
+### Documentation
+
+* cleanup badges ([#290](https://github.com/AuHau/toggl-cli/issues/290)) ([fe99cc0](https://github.com/AuHau/toggl-cli/commit/fe99cc0d1ca4801e8043a1e72a66d19a1fb53519))
+
 ## v2.2.0
 
 Features:
