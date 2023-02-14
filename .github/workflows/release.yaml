@@ -18,6 +18,12 @@ jobs:
           release-type: python
           package-name: togglCli
 
+  debug:
+    runs-on: ubuntu-latest
+    needs: release-please
+    steps:
+      - run: echo "${{ needs.release-please.outputs.release_created }}"
+
   publish:
     runs-on: ubuntu-latest
     needs: release-please
