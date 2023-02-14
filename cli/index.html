@@ -1,0 +1,621 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Command line tool and set of Python wrapper classes for interacting with toggl's API">
+      
+      
+        <meta name="author" content="Adam Uhlíř">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-8.1.7">
+    
+    
+      
+        <title>Command Line Interface - Toggl CLI - Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.cd566b2a.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.e6a45f82.min.css">
+        
+          
+          
+          <meta name="theme-color" content="#ffc105">
+        
+      
+    
+    
+    
+      
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700%7CRoboto+Mono&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="" data-md-color-primary="amber" data-md-color-accent="amber">
+  
+    
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#command-line-interface" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Toggl CLI - Documentation" class="md-header__button md-logo" aria-label="Toggl CLI - Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16.56 5.44-1.45 1.45A5.969 5.969 0 0 1 18 12a6 6 0 0 1-6 6 6 6 0 0 1-6-6c0-2.17 1.16-4.06 2.88-5.12L7.44 5.44A7.961 7.961 0 0 0 4 12a8 8 0 0 0 8 8 8 8 0 0 0 8-8c0-2.72-1.36-5.12-3.44-6.56M13 3h-2v10h2"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Toggl CLI - Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Command Line Interface
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/auhau/toggl-cli" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    auhau/toggl-cli
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Toggl CLI - Documentation" class="md-nav__button md-logo" aria-label="Toggl CLI - Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16.56 5.44-1.45 1.45A5.969 5.969 0 0 1 18 12a6 6 0 0 1-6 6 6 6 0 0 1-6-6c0-2.17 1.16-4.06 2.88-5.12L7.44 5.44A7.961 7.961 0 0 0 4 12a8 8 0 0 0 8 8 8 8 0 0 0 8-8c0-2.72-1.36-5.12-3.44-6.56M13 3h-2v10h2"/></svg>
+
+    </a>
+    Toggl CLI - Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/auhau/toggl-cli" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    auhau/toggl-cli
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        About
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Command Line Interface
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        Command Line Interface
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#commands-overview" class="md-nav__link">
+    Commands overview
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#themes" class="md-nav__link">
+    Themes
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shell-completion" class="md-nav__link">
+    Shell completion
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#datetime-formats" class="md-nav__link">
+    Date/time formats
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#duration-formats" class="md-nav__link">
+    Duration formats
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environmental-variables" class="md-nav__link">
+    Environmental variables
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        API Wrappers
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#commands-overview" class="md-nav__link">
+    Commands overview
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#themes" class="md-nav__link">
+    Themes
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shell-completion" class="md-nav__link">
+    Shell completion
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#datetime-formats" class="md-nav__link">
+    Date/time formats
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#duration-formats" class="md-nav__link">
+    Duration formats
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environmental-variables" class="md-nav__link">
+    Environmental variables
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          <div class="md-content" data-md-component="content">
+            <article class="md-content__inner md-typeset">
+              
+                
+<a href="https://github.com/auhau/toggl-cli/edit/master/docs/cli.md" title="Edit this page" class="md-content__button md-icon">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"/></svg>
+</a>
+
+
+<h1 id="command-line-interface">Command Line Interface<a class="headerlink" href="#command-line-interface" title="Permanent link">&para;</a></h1>
+<p>Upon installation of Toggl CLI with pip, it exposes the command line interface under binary <code>toggl</code>. </p>
+<p>This section will explain the high-level overview of the CLI and several features. For detailed 
+overview of all options for each command, please use <code>--help</code> parameter.</p>
+<div class="admonition warning">
+<p class="admonition-title">Virtualenv and other modifications of Python environment</p>
+<p>As the <code>toggl</code> binary depends on the Python's environment, any action which would modify this environment, such as
+usage of virtualenv etc. might disable access to this binary. It depends on which environment you have installed <code>toggl</code> in.</p>
+</div>
+<h3 id="commands-overview">Commands overview<a class="headerlink" href="#commands-overview" title="Permanent link">&para;</a></h3>
+<p>The CLI is designed to have several sub-commends which each corresponds to adequate section of the API. Here is presented 
+brief overview of the hierarchy.</p>
+<div class="codehilite"><pre><span></span><code>toggl
+├── add --- adds new time entry
+├── clients
+│   ├── add
+│   ├── get
+│   ├── ls
+│   ├── rm
+│   └── update
+├── config
+│   ├── timezone --- sets/display timezone setting
+│   ├── workspace --- sets/display default workspace setting
+│   └── completion
+│       ├── show --- displays what will be added to your shell&#39;s rc file
+│       └── install --- enable commands completion for your shell
+├── continue --- continue existing/last time entry
+├── goal --- tracks today&#39;s time until your goal is reached
+├── ls --- lists last time entries
+├── now --- show/update currently runnig time entry
+├── project_users --- list all project users in workspace
+├── projects
+│   ├── add
+│   ├── get
+│   ├── ls
+│   ├── rm
+│   ├── update
+│   └── users
+│       ├── add
+│       ├── ls
+│       ├── rm
+│       └── update
+├── rm --- delete a time entry
+├── start --- starts new time entry
+├── stop --- stops running time entry
+├── sum --- shows summary of totally tracked time based on days
+├── tasks
+│   ├── add
+│   ├── get
+│   ├── ls
+│   ├── rm
+│   └── update
+├── tags
+│   ├── add
+│   ├── ls
+│   ├── rm
+│   └── update
+├── users
+│   ├── get
+│   ├── ls
+│   └── signup --- creates new user
+├── workspaces
+│   ├── get
+│   ├── ls
+│   └── users
+│       ├── invite --- invites user into the current workspace
+│       ├── ls
+│       ├── rm
+│       └── update
+└── www --- opens web client
+</code></pre></div>
+
+<h3 id="themes">Themes<a class="headerlink" href="#themes" title="Permanent link">&para;</a></h3>
+<p>Toggl CLI supports themes in order to be readable in all terminal settings. You can configure it as part of config file
+using <code>theme</code> option. The possible values are:</p>
+<ul>
+<li><code>plain</code> for plain theme without any colors</li>
+<li><code>light</code> for light based theme</li>
+<li><code>dark</code> for dark based theme</li>
+</ul>
+<h3 id="shell-completion">Shell completion<a class="headerlink" href="#shell-completion" title="Permanent link">&para;</a></h3>
+<p>Toggl CLI supports commands/options completion for <code>bash</code>, <code>zsh</code>, <code>PowerShell</code> and <code>fish</code> shells. </p>
+<p>To enable the completion run <code>toggl config completion install</code>. </p>
+<p>This command will install completion based on your current shell, it mostly consist of adding 
+<code>_TOGGL_COMPLETE</code> variable to your <code>rc</code> file. If you want to inspect details you can
+run <code>toggl config completion show</code>.</p>
+<h3 id="datetime-formats">Date/time formats<a class="headerlink" href="#datetime-formats" title="Permanent link">&para;</a></h3>
+<p>Important part of the CLI is parsing of times &amp; dates. Toggl CLI uses in background of <code>dateutil</code> library and it best-effort
+function <code>dateutil.parse()</code>. This function aims to guess the format of your time or date on best-effort bases. </p>
+<p>It is possible to influence behaviour of this parser through <code>day_first</code> and <code>year_first</code> settings in config file. See 
+<a href="../#possible-settings">possible settings</a>.</p>
+<p>Examples:</p>
+<div class="codehilite"><pre><span></span><code>10:10 ==&gt; &lt;current date&gt; 10:10
+14:10 ==&gt; current date&gt; 14:10
+2:10 PM ==&gt; current date&gt; 14:10
+
+Nov 12 10:11 AM ==&gt; &lt;current year&gt;-11-12 10:11
+
+# For only day/month dates the first is always day and second is always month
+12.11 10:11 ==&gt; &lt;current year&gt;-11-12 10:11  
+11.12 10:11 ==&gt; &lt;current year&gt;-12-11 10:11
+
+# For ful date (day/month/year) the day_first/year_first setting is applied
+12.11.18 10:11 ==&gt; 2018-12-11 10:11
+12.11.18 10:11 ==&gt; 2018-11-12 10:11 # When day_first=True
+12.11.18 10:11 ==&gt; 2012-11-18 10:11 # When year_first=True
+</code></pre></div>
+
+<p>More examples can be found at <a href="https://pendulum.eustace.io/docs/#rfc-3339">pendulum's documentation</a></p>
+<h3 id="duration-formats">Duration formats<a class="headerlink" href="#duration-formats" title="Permanent link">&para;</a></h3>
+<p>Another important part of the CLI is duration syntax for specifying time entries durations if desired. 
+Example: 5h2m10s - 5 hours 2 minutes 10 seconds.</p>
+<p>Syntax is as follow:</p>
+<ul>
+<li>'d' : days</li>
+<li>'h' : hours</li>
+<li>'m' : minutes</li>
+<li>'s' : seconds</li>
+</ul>
+<h3 id="environmental-variables">Environmental variables<a class="headerlink" href="#environmental-variables" title="Permanent link">&para;</a></h3>
+<p>It is possible to specify several options for the CLI commands through environmental variables. This can for example nicely
+play out for directory specific settings (for example for projects) with <a href="https://github.com/direnv/direnv">direnv</a> tool. 
+Generally this mechanism is available for commands that create new entities. Values specified through this way have
+priority over config values.</p>
+<p>You can see which options can be specified in command's help page where at the option's help is
+used <code>(ENV: &lt;name of variable&gt;)</code> syntax. Bellow you can see general overview of the variables:</p>
+<ul>
+<li><strong>TOGGL_CONFIG</strong> - Defines which config file should be used. Should be absolute path. By default <code>~/.togglrc</code> is used.</li>
+<li><strong>TOGGL_WORKSPACE</strong> - Defines workspace to be used for the command, can be ID or Name of the Workspace.</li>
+<li><strong>TOGGL_TASK</strong> - Defines task to be used, can be ID or Name of the Task.</li>
+<li><strong>TOGGL_PROJECT</strong> - Defines project to be used, can be ID or Name of the Project.</li>
+<li><strong>TOGGL_API_TOKEN</strong> - Defines Toggl's account which will be used for the API calls.</li>
+<li><strong>TOGGL_USERNAME</strong> - Defines Toggl's account which will be used for the API calls.</li>
+<li><strong>TOGGL_PASSWORD</strong> - Defines Toggl's account which will be used for the API calls.</li>
+</ul>
+
+              
+            </article>
+          </div>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    <nav class="md-footer__inner md-grid" aria-label="Footer">
+      
+        
+        <a href=".." class="md-footer__link md-footer__link--prev" aria-label="Previous: About" rel="prev">
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+          </div>
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              About
+            </div>
+          </div>
+        </a>
+      
+      
+        
+        <a href="../api/" class="md-footer__link md-footer__link--next" aria-label="Next: API Wrappers" rel="next">
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              API Wrappers
+            </div>
+          </div>
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4z"/></svg>
+          </div>
+        </a>
+      
+    </nav>
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2023 <a href="https://uhlir.dev">Adam Uhlíř</a>
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.22074ed6.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.01de222e.min.js"></script>
+      
+    
+  </body>
+</html>
