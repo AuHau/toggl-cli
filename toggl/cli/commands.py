@@ -15,8 +15,6 @@ from toggl import api, exceptions, utils, __version__
 from toggl.cli import helpers, types
 from toggl.cli.themes import themes
 
-DEFAULT_CONFIG_PATH = '~/.togglrc'
-
 logger = logging.getLogger('toggl.cli.commands')
 click_completion.init()
 
