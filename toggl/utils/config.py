@@ -8,6 +8,7 @@ from collections import namedtuple
 import click
 import requests
 from pbr import version
+from pathlib import Path
 
 from toggl.utils import metas, bootstrap, migrations
 from toggl import exceptions
@@ -62,7 +63,7 @@ class IniConfigMixin:
         'version': IniEntry('version', str),
     }
 
-    DEFAULT_CONFIG_PATH = os.path.expanduser('~/.togglrc')
+    DEFAULT_CONFIG_PATH = Path.expanduser(Path('~/.togglrc'))
 
     def __init__(self, config_path=sentinel, **kwargs):  # type: (typing.Optional[str], **typing.Any) -> None
         self._config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path
