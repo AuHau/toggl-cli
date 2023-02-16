@@ -63,7 +63,10 @@ class IniConfigMixin:
         'version': IniEntry('version', str),
     }
 
-    DEFAULT_CONFIG_PATH = Path.expanduser(Path('~/.togglrc'))
+    if "XDG_CONFIG_HOME" in os.environ:
+        DEFAULT_CONFIG_PATH = Path(os.environ["XDG_CONFIG_HOME"]).joinpath(".togglrc")
+    else:
+        DEFAULT_CONFIG_PATH = Path.expanduser(Path('~/.togglrc'))
 
     def __init__(self, config_path=sentinel, **kwargs):  # type: (typing.Optional[str], **typing.Any) -> None
         self._config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path
