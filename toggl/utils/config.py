@@ -8,6 +8,7 @@ from collections import namedtuple
 import click
 import requests
 from pbr import version
+from pathlib import Path
 
 from toggl.utils import metas, bootstrap, migrations
 from toggl import exceptions
@@ -62,7 +63,18 @@ class IniConfigMixin:
         'version': IniEntry('version', str),
     }
 
-    DEFAULT_CONFIG_PATH = os.path.expanduser('~/.togglrc')
+    _old_file_path = Path.expanduser(Path('~/.togglrc'))
+    
+    if "XDG_CONFIG_HOME" in os.environ:
+        _new_file_path = Path(os.environ["XDG_CONFIG_HOME"]).joinpath(".togglrc")
+        
+        if _new_file_path.exists() or not _old_file_path.exists():
+            DEFAULT_CONFIG_PATH = _new_file_path
+        else:
+            DEFAULT_CONFIG_PATH = _old_file_path
+            
+    else:
+        DEFAULT_CONFIG_PATH = _old_file_path
 
     def __init__(self, config_path=sentinel, **kwargs):  # type: (typing.Optional[str], **typing.Any) -> None
         self._config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path
