@@ -656,7 +656,7 @@ def projects(ctx, workspace):
               help='Specifies whether the estimated hours should be automatically calculated based on task estimations '
                    '(Premium only)')
 @click.option('--rate', '-r', type=click.FLOAT, help='Hourly rate of the project (Premium only)')
-@click.option('--color', type=click.INT, help='ID of color used for the project')
+@click.option('--color', type=click.INT, default=1, help='ID of color used for the project')
 @click.pass_context
 def projects_add(ctx, public=None, **kwargs):
     """
