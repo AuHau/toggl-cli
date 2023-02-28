@@ -125,7 +125,7 @@ class TogglSet(object):
         if self.entity_cls is None:
             raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
 
-        return self.entity_cls.get_url()
+        return self.entity_cls.get_name() + 's'
 
     def build_list_url(self, caller, config, conditions):  # type: (str, utils.Config, typing.Dict) -> str
         """
@@ -195,10 +195,10 @@ class TogglSet(object):
             if self.can_get_detail:
                 try:
                     fetched_entity = utils.toggl(self.build_detail_url(id, config), 'get', config=config)
-                    if fetched_entity['data'] is None:
+                    if fetched_entity is None:
                         return None
 
-                    return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
+                    return self.entity_cls.deserialize(config=config, **fetched_entity)
                 except exceptions.TogglNotFoundException:
                     return None
             else:
@@ -300,10 +300,12 @@ class WorkspaceTogglSet(TogglSet):
     def build_list_url(self, caller, config, conditions):  # type: (str, utils.Config, typing.Dict) -> str
         if conditions.get('workspace') is not None:
             wid = conditions['workspace'].id
+        elif conditions.get('workspace_id') is not None:
+            wid = conditions['workspace_id']
         else:
             wid = conditions.get('wid') or config.default_workspace.id
 
-        return '/workspaces/{}/{}'.format(wid, self.base_url)
+        return f'/workspaces/{wid}/{self.base_url}'
 
 
 class TogglEntityMeta(ABCMeta):
@@ -337,7 +339,7 @@ class TogglEntityMeta(ABCMeta):
         for key, field in attrs.items():
             if isinstance(field, model_fields.TogglField):
                 if key in fields:
-                    logger.warning('Field \'{}\' is being overridden'.format(key))
+                    logger.warning(f'Field \'{key}\' is being overridden')
 
                 field.name = key
                 fields[key] = field
@@ -466,7 +468,7 @@ class TogglEntity(metaclass=TogglEntityMeta):
             self.__change_dict__ = {}  # Reset tracking changes
         else:  # Create
             data = utils.toggl('/{}'.format(self.get_url()), 'post', self.json(), config=config)
-            self.id = data['data']['id']  # Store the returned ID
+            self.id = data['id']  # Store the returned ID
 
     def delete(self, config=None):  # type: (utils.Config) -> None
         """
@@ -492,7 +494,7 @@ class TogglEntity(metaclass=TogglEntityMeta):
 
         :param update: Specifies if the resulted JSON should contain only changed fields (for PUT call) or whole entity.
         """
-        return json.dumps({self.get_name(): self.to_dict(serialized=True, changes_only=update)})
+        return json.dumps(self.to_dict(serialized=True, changes_only=update))
 
     def validate(self):  # type: () -> None
         """
@@ -569,9 +571,8 @@ class TogglEntity(metaclass=TogglEntityMeta):
 
         return name
 
-    @classmethod
-    def get_url(cls):  # type: () -> str
-        return cls.get_name() + 's'
+    def get_url(self):  # type: () -> str
+        return self.get_name() + 's'
 
     @classmethod
     def deserialize(cls, config=None, **kwargs):  # type: (utils.Config, **typing.Any) -> typing.Generic[Entity]
