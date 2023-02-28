@@ -39,9 +39,19 @@ class Workspace(base.TogglEntity):
     Whether only the admins can create projects or everybody
     """
 
+    only_admins_may_create_tags = fields.BooleanField()
+    """
+    Whether only the admins can create tags or everybody
+    """
+
     only_admins_see_billable_rates = fields.BooleanField()
     """
     Whether only the admins can see billable rates or everybody
+    """
+
+    only_admins_see_team_dashboard = fields.BooleanField()
+    """
+    Whether only the admins can see team dashboard or everybody
     """
 
     rounding = fields.IntegerField()
@@ -69,6 +79,10 @@ class Workspace(base.TogglEntity):
     Default currency for workspace
     """
 
+    ical_enabled = fields.BooleanField()
+    ical_url = fields.StringField()
+    logo_url = fields.StringField()
+
     # As TogglEntityMeta is by default adding WorkspaceTogglSet to TogglEntity,
     # but we want vanilla TogglSet so defining it here explicitly.
     objects = base.TogglSet()
@@ -83,7 +97,7 @@ class Workspace(base.TogglEntity):
         """
         for email in emails:
             if not validate_email(email):
-                raise exceptions.TogglValidationException('Supplied email \'{}\' is not valid email!'.format(email))
+                raise exceptions.TogglValidationException(f'Supplied email \'{email}\' is not valid email!')
 
         emails_json = json.dumps({'emails': emails})
         data = utils.toggl("/workspaces/{}/invite".format(self.id), "post", emails_json, config=self._config)
@@ -97,11 +111,14 @@ class WorkspacedEntity(base.TogglEntity):
     Abstract entity which has linked Workspace
     """
 
-    workspace = fields.MappingField(Workspace, 'wid', write=False,
-                                               default=lambda config: config.default_workspace)
+    workspace = fields.MappingField(Workspace, 'workspace_id', write=False,
+                                               default=lambda config: config.default_workspace) # type: Workspace
     """
     Workspace to which the resource is linked to.
     """
+
+    def get_url(self):  # type: () -> str
+        return f'workspaces/{self.workspace.id}/{self.get_name()}s'
 
 
 # Premium Entity
@@ -112,7 +129,7 @@ class PremiumEntity(WorkspacedEntity):
 
     def save(self, config=None):  # type: (utils.Config) -> None
         if not self.workspace.premium:
-            raise exceptions.TogglPremiumException('The entity {} requires to be associated with Premium workspace!')
+            raise exceptions.TogglPremiumException(f'The entity {self.get_name()} requires to be associated with Premium workspace!')
 
         super().save(config)
 
@@ -128,11 +145,6 @@ class Client(WorkspacedEntity):
     name = fields.StringField(required=True)
     """
     Name of client (Required)
-    """
-
-    notes = fields.StringField()
-    """
-    Notes about the client
     """
 
 
@@ -222,7 +234,7 @@ class UserSet(base.WorkspaceTogglSet):
         Fetches details about the current user.
         """
         fetched_entity = utils.toggl('/me', 'get', config=config)
-        return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
+        return self.entity_cls.deserialize(config=config, **fetched_entity)
 
 
 class User(WorkspacedEntity):
@@ -242,9 +254,13 @@ class User(WorkspacedEntity):
     (Returned only for User.objects.current_user() call.)
     """
 
-    send_timer_notifications = fields.BooleanField()
+    has_password = fields.BooleanField()
+    country_id = fields.StringField()
+    intercom_hash = fields.StringField()
+    openid_email = fields.StringField()
+    openid_enabled = fields.BooleanField()
 
-    default_workspace = fields.MappingField(Workspace, 'default_wid')  # type: Workspace
+    default_workspace = fields.MappingField(Workspace, 'default_workspace_id')  # type: Workspace
     """
     Default workspace for calls that does not specify Workspace.
 
@@ -291,23 +307,6 @@ class User(WorkspacedEntity):
     May differ from one used in this tool, see toggl.utils.Config().
     """
 
-    # TODO: Add possibility to use this value in Config.time_format
-    timeofday_format = fields.ChoiceField({
-        'H:mm': '24-hour',
-        'h:mm A': '12-hour'
-    })
-    """
-    Format of time used to display time.
-    """
-
-    # TODO: Add possibility to use this value in Config.datetime_format
-    date_format = fields.ChoiceField(
-        ["YYYY-MM-DD", "DD.MM.YYYY", "DD-MM-YYYY", "MM/DD/YYYY", "DD/MM/YYYY", "MM-DD-YYYY"]
-    )
-    """
-    Format of date used to display dates.
-    """
-
     objects = UserSet()
 
     @classmethod
@@ -339,7 +338,7 @@ class User(WorkspacedEntity):
             'created_with': created_with
         }})
         data = utils.toggl("/signups", "post", user_json, config=config)
-        return cls.deserialize(config=config, **data['data'])
+        return cls.deserialize(config=config, **data)
 
     def is_admin(self, workspace):
         wid = workspace.id if isinstance(workspace, Workspace) else workspace
@@ -587,7 +586,7 @@ class TimeEntrySet(base.TogglSet):
         if fetched_entity.get('data') is None:
             return None
 
-        return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
+        return self.entity_cls.deserialize(config=config, **fetched_entity)
 
     def _build_reports_url(self, start, stop, page, wid):
         url = '/details?user_agent=toggl_cli&workspace_id={}&page={}'.format(wid, page)
@@ -731,7 +730,7 @@ class TimeEntry(WorkspacedEntity):
         super().__init__(start=start, stop=stop, duration=duration, **kwargs)
 
     @classmethod
-    def get_url(cls):
+    def get_url(self):
         return 'time_entries'
 
     def to_dict(self, serialized=False, changes_only=False):
