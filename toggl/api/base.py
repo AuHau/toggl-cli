@@ -222,7 +222,10 @@ class TogglSet(object):
         Helper method that fetches all objects from given URL and deserialize them.
         """
         fetched_entities = utils.toggl(url, 'get', config=config)
-
+        
+        if isinstance(fetched_entities, dict):
+            fetched_entities = fetched_entities.get('data')
+        
         if fetched_entities is None:
             return []
 

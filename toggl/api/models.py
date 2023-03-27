@@ -195,7 +195,7 @@ class Project(WorkspacedEntity):
     (Available only for Premium workspaces)
     """
 
-    color = fields.IntegerField()
+    color = fields.StringField()
     """
     Id of the color selected for the project
     """
