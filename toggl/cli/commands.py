@@ -213,8 +213,9 @@ def get_entries(ctx, use_reports, **conditions):
               help='Defines a set of fields of time entries, which will be displayed. It is also possible to modify '
                    'default set of fields using \'+\' and/or \'-\' characters. Supported values: '
                    + types.FieldsType.format_fields_for_help(api.TimeEntry))
+@click.option('--limit', '-n', type=int, help='The number of entries to display')
 @click.pass_context
-def entry_ls(ctx, fields, today, use_reports, **conditions):
+def entry_ls(ctx, fields, today, use_reports, limit, **conditions):
     """
     Lists time entries the user has access to.
 
@@ -238,6 +239,9 @@ def entry_ls(ctx, fields, today, use_reports, **conditions):
         conditions['stop'] = pendulum.tomorrow()
 
     entities = get_entries(ctx, use_reports, **conditions)
+
+    if limit:
+        entities = entities[:limit]
 
     if ctx.obj.get('simple'):
         if ctx.obj.get('header'):
