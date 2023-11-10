@@ -450,6 +450,8 @@ def entry_start(ctx, descr, **kwargs):
         **kwargs
     )
 
+    click.echo('Started {}'.format(descr))
+
 
 @cli.command('now', short_help='manage current time entry')
 @click.option('--description', '-d', help='Sets description')
