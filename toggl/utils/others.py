@@ -87,7 +87,7 @@ def convert_credentials_to_api_token(username, password):
     config.password = password
 
     data = toggl("/me", "get", config=config)
-    return data['data']['api_token']
+    return data['api_token']
 
 
 def handle_error(response):
