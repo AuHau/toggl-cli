@@ -97,7 +97,7 @@ class Migration200b1(MigrationBase):
     @staticmethod
     def migrate_timezone(parser):  # type: (configparser.ConfigParser) -> None
         tz = parser.get('options', 'timezone')
-        if tz not in pendulum.timezones:
+        if tz not in pendulum.timezones():
             click.echo('We have not recognized your timezone!')
             new_tz = inquirer.shortcuts.text(
                 'Please enter valid timezone. Default is your system\'s timezone.',
