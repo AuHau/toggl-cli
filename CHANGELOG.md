@@ -4,6 +4,20 @@ Earlier changes were not versioned. Therefore dates of change are used instead t
 
 For new releases see [Github Release page](https://github.com/AuHau/toggl-cli)
 
+## [2.5.0](https://github.com/AuHau/toggl-cli/compare/v2.4.4...v2.5.0) (2024-01-24)
+
+
+### Features
+
+* add limit option to ls ([#314](https://github.com/AuHau/toggl-cli/issues/314)) ([c1d5ede](https://github.com/AuHau/toggl-cli/commit/c1d5edef5c8dbc94c5d55d11bcb863a6af29b237))
+* print description for toggl start ([#316](https://github.com/AuHau/toggl-cli/issues/316)) ([6693dfe](https://github.com/AuHau/toggl-cli/commit/6693dfe2af72fed7af481cabd0d7527307c2a841))
+* respect XDG spec for configuration files ([#300](https://github.com/AuHau/toggl-cli/issues/300)) ([5086039](https://github.com/AuHau/toggl-cli/commit/5086039e6392523fad5ef3de2326eca7bf8b6832))
+
+
+### Bug Fixes
+
+* Set default color to toggl's default 1 ([#302](https://github.com/AuHau/toggl-cli/issues/302)) ([7ee7aa8](https://github.com/AuHau/toggl-cli/commit/7ee7aa8ace000a88035c00a0de7842dbbf83d293))
+
 ## [2.4.4](https://github.com/AuHau/toggl-cli/compare/v2.4.3...v2.4.4) (2023-02-14)
 
 
