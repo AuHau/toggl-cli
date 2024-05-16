@@ -431,7 +431,7 @@ class User(WorkspacedEntity):
             'timezone': timezone,
             'created_with': created_with
         }})
-        data = utils.toggl("/signups", "post", user_json, config=config)
+        data = utils.toggl("/signup", "post", user_json, config=config)
         return cls.deserialize(config=config, **data)
 
     def is_admin(self, workspace):
