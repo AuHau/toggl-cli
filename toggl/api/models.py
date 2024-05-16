@@ -14,6 +14,118 @@ from toggl import utils, exceptions
 logger = logging.getLogger('toggl.api.models')
 
 
+# Organization entity
+class Organization(base.TogglEntity):
+    _can_create = False  # TODO: check
+    _can_delete = False  # TODO: check
+
+    name = fields.StringField(required=True)
+    """
+    Name of the organization
+    """
+
+    admin = fields.BooleanField()
+    """
+    Shows whether the current request user is an admin of the organization
+    """
+
+    at = fields.StringField()
+    """
+    Organization's last modification date
+    """
+
+    created_at = fields.StringField()
+    """
+    Organization's creation date
+    """
+
+    is_multi_workspace_enabled = fields.BooleanField()
+    """
+    Is true when the organization option is_multi_workspace_enabled is set
+    """
+
+    is_unified = fields.BooleanField()
+
+    max_data_retention_days = fields.IntegerField()
+    """
+    How far back free workspaces in this org can access data.
+    """
+
+    max_workspaces = fields.IntegerField()
+    """
+    Maximum number of workspaces allowed for the organization
+    """
+
+    owner = fields.BooleanField()
+    """
+    Whether the requester is a the owner of the organization
+    """
+
+    payment_methods = fields.StringField()
+    """
+    Organization's subscription payment methods. Omitted if empty.
+    """
+
+    permissions = fields.StringField()
+
+    pricing_plan_enterprise = fields.BooleanField()
+    """
+    The subscription plan is an enterprise plan
+    """
+
+    pricing_plan_id = fields.IntegerField()  # TODO: map entity?
+    """
+    Organization plan ID
+    """
+
+    pricing_plan_name = fields.StringField()
+    """
+    The subscription plan name the org is currently on. Free or any plan name coming from payment provider
+    """
+
+    server_deleted_at = fields.StringField()
+    """
+    Organization's delete date
+    """
+
+    suspended_at = fields.StringField()
+    """
+    Whether the organization is currently suspended
+    """
+
+    user_count = fields.IntegerField()
+    """
+    Number of organization users
+    """
+
+    def invite(self, workspace, *emails, admin=False, role=None):  # type: (Workspace, typing.Collection[str], bool, typing.Optional[str]) -> None
+        """
+        Invites users defined by email addresses. The users does not have to have account in Toggl, in that case after
+        accepting the invitation, they will go through process of creating the account in the Toggl web.
+
+        :param workspace: The workspace to invite users to.
+        :param emails: List of emails to invite.
+        :param admin: Whether the invited users should be admins.
+        :param role: Role of the invited users.
+        :return: None
+        """
+        for email in emails:
+            if not validate_email(email):
+                raise exceptions.TogglValidationException(f'Supplied email \'{email}\' is not valid email!')
+
+        workspace_invite_data = {'workspace_id': workspace.id, 'admin': admin}
+        if role:
+            workspace_invite_data['role'] = role
+        emails_json = json.dumps({'emails': emails, 'workspaces': [workspace_invite_data]})
+        data = utils.toggl("/organizations/{}/invitations".format(self.id), "post", emails_json, config=self._config)
+
+        # FIXME: remove, error handling is done by status code
+        # if 'messages' in data and data['messages']:
+        #     raise exceptions.TogglException(data['messages'])
+
+        # TODO: return something?
+
+
 # Workspace entity
 class Workspace(base.TogglEntity):
     _can_create = False
@@ -86,24 +198,6 @@ class Workspace(base.TogglEntity):
     # As TogglEntityMeta is by default adding WorkspaceTogglSet to TogglEntity,
     # but we want vanilla TogglSet so defining it here explicitly.
     objects = base.TogglSet()
-
-    def invite(self, *emails):  # type: (str) -> None
-        """
-        Invites users defined by email addresses. The users does not have to have account in Toggl, in that case after
-        accepting the invitation, they will go through process of creating the account in the Toggl web.
-
-        :param emails: List of emails to invite.
-        :return: None
-        """
-        for email in emails:
-            if not validate_email(email):
-                raise exceptions.TogglValidationException(f'Supplied email \'{email}\' is not valid email!')
-
-        emails_json = json.dumps({'emails': emails})
-        data = utils.toggl("/workspaces/{}/invite".format(self.id), "post", emails_json, config=self._config)
-
-        if 'notifications' in data and data['notifications']:
-            raise exceptions.TogglException(data['notifications'])
 
 
 class WorkspacedEntity(base.TogglEntity):

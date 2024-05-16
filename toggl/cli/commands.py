@@ -856,6 +856,7 @@ def workspace_users(ctx, workspace):
     ctx.obj['workspace'] = workspace or ctx.obj['config'].default_workspace
 
 
+# TODO: fix with newer organization API
 @workspace_users.command('invite', short_help='invite an user into workspace')
 @click.option('--email', '-e', help='Email address of the user to invite into the workspace',
               prompt='Email address of the user to invite into the workspace')
