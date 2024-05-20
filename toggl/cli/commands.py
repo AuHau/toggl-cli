@@ -656,7 +656,7 @@ def projects(ctx, workspace):
               help='Specifies whether the estimated hours should be automatically calculated based on task estimations '
                    '(Premium only)')
 @click.option('--rate', '-r', type=click.FLOAT, help='Hourly rate of the project (Premium only)')
-@click.option('--color', type=click.INT, default=1, help='ID of color used for the project')
+@click.option('--color', type=click.STRING, default="#0b83d9", help='Hex code of color used for the project')
 @click.pass_context
 def projects_add(ctx, public=None, **kwargs):
     """
@@ -687,7 +687,7 @@ def projects_add(ctx, public=None, **kwargs):
               help='Specifies whether the estimated hours are automatically calculated based on task estimations or'
                    ' manually fixed based on the value of \'estimated_hours\' (Premium only)')
 @click.option('--rate', '-r', type=click.FLOAT, help='Hourly rate of the project (Premium only)')
-@click.option('--color', type=click.INT, help='ID of color used for the project')
+@click.option('--color', type=click.STRING, default="#0b83d9", help='Hex code of color used for the project')
 @click.pass_context
 def projects_update(ctx, spec, **kwargs):
     """

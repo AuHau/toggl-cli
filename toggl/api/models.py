@@ -270,7 +270,7 @@ class Project(WorkspacedEntity):
     Name of the project. (Required)
     """
 
-    client = fields.MappingField(Client, 'cid')
+    client = fields.MappingField(Client, 'client_id')
     """
     Client associated to the project.
     """
@@ -308,11 +308,6 @@ class Project(WorkspacedEntity):
     """
 
     color = fields.StringField()
-    """
-    Id of the color selected for the project
-    """
-
-    hex_color = fields.StringField()
     """
     Hex code of the color selected for the project
     """
