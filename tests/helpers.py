@@ -176,7 +176,7 @@ class Cleanup:
         if not ids:
             return
 
-        Cleanup._ids_cleanup('time_entries', config, True, *ids)
+        Cleanup._ids_cleanup('time_entries', config, False, *ids)
 
     @staticmethod
     def project_users(config=None, *ids):
@@ -195,7 +195,7 @@ class Cleanup:
         if not ids:
             return
 
-        Cleanup._ids_cleanup('projects', config, True, *ids)
+        Cleanup._ids_cleanup('projects', config, False, *ids)
 
     @staticmethod
     def tasks(config=None, *ids):
