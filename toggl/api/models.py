@@ -16,6 +16,7 @@ logger = logging.getLogger('toggl.api.models')
 
 # Organization entity
 class Organization(base.TogglEntity):
+    _endpoints_name = "organizations"
     _can_create = False  # TODO: check
     _can_delete = False  # TODO: check
 
@@ -126,8 +127,18 @@ class Organization(base.TogglEntity):
         # TODO: return something?
 
 
+class WorkspaceToggleSet(base.TogglSet):
+    """
+    Specialized TogglSet for workspace entities (not to be confused with :class:`base.WorkspacedTogglSet`
+    """
+
+    def build_detail_url(self, eid, config, conditions):  # type: (int, utils.Config, typing.Dict) -> str
+        return '/{}/{}'.format(self.entity_endpoints_name, eid)
+
+
 # Workspace entity
 class Workspace(base.TogglEntity):
+    _endpoints_name = "workspaces"
     _can_create = False
     _can_delete = False
 
@@ -195,9 +206,9 @@ class Workspace(base.TogglEntity):
     ical_url = fields.StringField()
     logo_url = fields.StringField()
 
-    # As TogglEntityMeta is by default adding WorkspaceTogglSet to TogglEntity,
-    # but we want vanilla TogglSet so defining it here explicitly.
-    objects = base.TogglSet()
+    # As TogglEntityMeta is by default adding WorkspacedTogglSet to TogglEntity,
+    # but we want WorkspaceToggleSet so defining it here explicitly.
+    objects = WorkspaceToggleSet()
 
 
 class WorkspacedEntity(base.TogglEntity):
@@ -212,7 +223,7 @@ class WorkspacedEntity(base.TogglEntity):
     """
 
     def get_url(self):  # type: () -> str
-        return f'workspaces/{self.workspace.id}/{self.get_name()}s'
+        return f'workspaces/{self.workspace.id}/{self.get_endpoints_name()}'
 
 
 # Premium Entity
@@ -223,7 +234,7 @@ class PremiumEntity(WorkspacedEntity):
 
     def save(self, config=None):  # type: (utils.Config) -> None
         if not self.workspace.premium:
-            raise exceptions.TogglPremiumException(f'The entity {self.get_name()} requires to be associated with Premium workspace!')
+            raise exceptions.TogglPremiumException(f'The entity {self.get_name(verbose=True)} requires to be associated with Premium workspace!')
 
         super().save(config)
 
@@ -236,6 +247,8 @@ class Client(WorkspacedEntity):
     Client entity
     """
 
+    _endpoints_name = "clients"
+
     name = fields.StringField(required=True)
     """
     Name of client (Required)
@@ -246,6 +259,8 @@ class Project(WorkspacedEntity):
     """
     Project entity
     """
+
+    _endpoints_name = "projects"
 
     name = fields.StringField(required=True)
     """
@@ -321,7 +336,7 @@ class Project(WorkspacedEntity):
         return project_user
 
 
-class UserSet(base.WorkspaceTogglSet):
+class UserSet(base.WorkspacedTogglSet):
 
     def current_user(self, config=None):  # type: (utils.Config) -> 'User'
         """
@@ -336,6 +351,7 @@ class User(WorkspacedEntity):
     User entity.
     """
 
+    _endpoints_name = "users"
     _can_create = False
     _can_update = False
     _can_delete = False
@@ -452,6 +468,7 @@ class WorkspaceUser(WorkspacedEntity):
     It additionally configures access rights and several other things.
     """
 
+    _endpoints_name = "workspace_users"
     _can_get_detail = False
     _can_create = False
 
@@ -486,6 +503,8 @@ class ProjectUser(WorkspacedEntity):
     Similarly to WorkspaceUser, it is entity which represents assignment of specific User into Project.
     It additionally configures access rights and several other things.
     """
+
+    _endpoints_name = "project_users"
     _can_get_detail = False
 
     rate = fields.FloatField(admin_only=True)
@@ -520,6 +539,8 @@ class Task(PremiumEntity):
 
     This entity is available only for Premium workspaces.
     """
+
+    _endpoints_name = "tasks"
 
     name = fields.StringField(required=True)
     """
@@ -557,6 +578,7 @@ class Tag(WorkspacedEntity):
     Tag entity
     """
 
+    _endpoints_name = "tags"
     _can_get_detail = False
 
     name = fields.StringField(required=True)
@@ -643,14 +665,14 @@ def format_duration(value, config=None):  # type: (int, utils.Config) -> str
 datetime_type = typing.Union[datetime.datetime, pendulum.DateTime]
 
 
-class TimeEntrySet(base.TogglSet):
+class TimeEntrySet(base.WorkspacedTogglSet):
     """
     TogglSet which is extended by current() method which returns the currently running TimeEntry.
     Moreover it extends the filtrating mechanism by native filtering according start and/or stop time.
     """
 
     def build_list_url(self, caller, config, conditions):  # type: (str, utils.Config, typing.Dict) -> str
-        url = '/{}'.format(self.base_url)
+        url = '/me/{}'.format(self.entity_endpoints_name)
 
         if caller == 'filter':
             start = conditions.pop('start', None)
@@ -667,6 +689,10 @@ class TimeEntrySet(base.TogglSet):
 
         return url
 
+    def build_detail_url(self, eid, config, conditions):  # type: (int, utils.Config, typing.Dict) -> str
+        return '/me/{}/{}'.format(self.entity_endpoints_name, eid)
+
+
     def current(self, config=None):  # type: (utils.Config) -> typing.Optional[TimeEntry]
         """
         Method that returns currently running TimeEntry or None if there is no currently running time entry.
@@ -675,7 +701,7 @@ class TimeEntrySet(base.TogglSet):
         :return:
         """
         config = config or utils.Config.factory()
-        fetched_entity = utils.toggl('/time_entries/current', 'get', config=config)
+        fetched_entity = utils.toggl('/me/time_entries/current', 'get', config=config)
 
         if fetched_entity is None:
             return None
@@ -759,6 +785,8 @@ class TimeEntrySet(base.TogglSet):
 
 
 class TimeEntry(WorkspacedEntity):
+    _endpoints_name = "time_entries"
+
     description = fields.StringField()
     """
     Description of the entry.
@@ -822,10 +850,6 @@ class TimeEntry(WorkspacedEntity):
             )
 
         super().__init__(start=start, stop=stop, duration=duration, **kwargs)
-
-    @classmethod
-    def get_url(self):
-        return 'time_entries'
 
     def to_dict(self, serialized=False, changes_only=False):
         # Enforcing serialize duration when start or stop changes

@@ -114,11 +114,13 @@ class Cleanup:
     def _ids_cleanup(base, config=None, batch=False, *ids):
         config = config or get_config()
 
+        wid = config.default_workspace.id
+        workspace_url = '/workspaces/{}'.format(wid)
         if batch:
-            utils.toggl('/{}/{}'.format(base, ','.join([str(eid) for eid in ids])), 'delete', config=config)
+            utils.toggl('{}/{}/{}'.format(workspace_url, base, ','.join([str(eid) for eid in ids])), 'delete', config=config)
         else:
             for entity_id in ids:
-                utils.toggl('/{}/{}'.format(base, entity_id), 'delete', config=config)
+                utils.toggl('{}/{}/{}'.format(workspace_url, base, entity_id), 'delete', config=config)
 
     @staticmethod
     def _all_cleanup(cls, config=None):

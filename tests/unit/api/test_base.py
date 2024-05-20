@@ -11,6 +11,8 @@ from ... import helpers
 
 
 class RandomEntity(base.TogglEntity):
+    _endpoints_name = 'random_entities'
+
     some_field = fields.StringField()
 
 
@@ -149,14 +151,14 @@ class TestTogglSet:
             tset.filter()
 
         with pytest.raises(exceptions.TogglException):
-            tset.base_url
+            tset.entity_endpoints_name
 
     def test_url(self):
         tset = base.TogglSet(url='http://some-url.com')
-        assert tset.base_url == 'http://some-url.com'
+        assert tset.entity_endpoints_name == 'http://some-url.com'
 
         tset = base.TogglSet(RandomEntity)
-        assert tset.base_url == 'random_entitys'
+        assert tset.entity_endpoints_name == 'random_entities'
 
     def test_can_get_detail(self):
         tset = base.TogglSet(can_get_detail=False)
@@ -474,6 +476,8 @@ class TestTogglEntityMeta:
 ## TogglEntity
 
 class Entity(base.TogglEntity):
+    _endpoints_name = "entities"
+
     string = fields.StringField()
     integer = fields.IntegerField()
     boolean = fields.BooleanField()
