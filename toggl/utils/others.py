@@ -91,6 +91,7 @@ def convert_credentials_to_api_token(username, password):
 
 
 def handle_error(response):
+    logger.debug(f"Handling error for {response.status_code}: {response.text}")
     if response.status_code == 402:
         raise exceptions.TogglPremiumException(
             "Request tried to utilized Premium functionality on workspace which is not Premium!"
@@ -165,7 +166,7 @@ def toggl(url, method, data=None, headers=None, config=None, address=None):
         try:
             logger.debug('Default workspace: {}'.format(config._default_workspace))
             response = _toggl_request(url, method, data, headers, config.get_auth())
-            response_json = response.json()
+            response_json = response.json() if response.text else None
             logger.debug('Response {}:\n{}'.format(response.status_code, pformat(response_json)))
             return response_json
         except (exceptions.TogglThrottlingException, requests.exceptions.ConnectionError) as e:

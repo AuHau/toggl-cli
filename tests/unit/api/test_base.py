@@ -189,9 +189,8 @@ class TestTogglSet:
     def test_get_detail_basic(self, mocker):
         mocker.patch.object(utils, 'toggl')
         utils.toggl.return_value = {
-            'data': {
-                'some_field': 'asdf'
-            }
+            'id': 123,
+            'some_field': 'asdf'
         }
 
         tset = base.TogglSet(RandomEntity)
@@ -202,9 +201,7 @@ class TestTogglSet:
 
     def test_get_detail_none(self, mocker):
         mocker.patch.object(utils, 'toggl')
-        utils.toggl.return_value = {
-            'data': None
-        }
+        utils.toggl.return_value = None
 
         tset = base.TogglSet(RandomEntity)
         obj = tset.get(id=123)
@@ -616,9 +613,7 @@ class TestTogglEntity:
     def test_save_create(self, mocker):
         mocker.patch.object(utils, 'toggl')
         utils.toggl.return_value = {
-            'data': {
-                'id': 333
-            }
+            'id': 333
         }
 
         obj = Entity(string='asd', integer=123)

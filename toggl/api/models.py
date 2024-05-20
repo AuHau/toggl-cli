@@ -677,7 +677,7 @@ class TimeEntrySet(base.TogglSet):
         config = config or utils.Config.factory()
         fetched_entity = utils.toggl('/time_entries/current', 'get', config=config)
 
-        if fetched_entity.get('data') is None:
+        if fetched_entity is None:
             return None
 
         return self.entity_cls.deserialize(config=config, **fetched_entity)
