@@ -254,6 +254,9 @@ class Client(WorkspacedEntity):
     Name of client (Required)
     """
 
+    notes = fields.StringField()
+
+
 
 class Project(WorkspacedEntity):
     """
