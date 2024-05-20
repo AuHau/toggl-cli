@@ -218,9 +218,11 @@ def entry_ls(ctx, fields, today, use_reports, **conditions):
     """
     Lists time entries the user has access to.
 
-    By default the command uses API call that has limited number of time entries fetched  with 1000 entries in
-    last 9 days. If you want to overcome this limitation use --use-reports flag, that will use different
-    API call, which overcomes this limitations but currently support only --start/--stop filtration.
+    By default the entries of the last 9 days are fetched, to keep compatibility with older API versions.
+    If you want to select a different time range, use --start and --stop flags.
+    In general, the --start/--stop API is limited to entries from the last 3 months,  # TODO check
+    if you want to overcome this limitation use --use-reports flag, that will use different
+    API call.
 
     The list visible
     through this utility and on toggl's web client might differ in the range
@@ -236,6 +238,11 @@ def entry_ls(ctx, fields, today, use_reports, **conditions):
             exit(2)
         conditions['start'] = pendulum.today()
         conditions['stop'] = pendulum.tomorrow()
+
+    if not conditions.get('start'):
+        conditions['start'] = pendulum.now() - pendulum.duration(days=9)
+    if not conditions.get("stop"):
+        conditions['stop'] = pendulum.now()
 
     entities = get_entries(ctx, use_reports, **conditions)
 

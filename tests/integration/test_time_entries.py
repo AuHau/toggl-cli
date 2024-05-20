@@ -69,7 +69,7 @@ class TestTimeEntries:
         assert result.obj.exit_code == 0
 
         entry = TimeEntry.objects.get(result.created_id(), config=config)  # type: TimeEntry
-        assert entry.start == start
+        assert entry.start == start.replace(microsecond=0)
         assert (entry.stop - entry.start).seconds == 3722
 
     def test_add_tags(self, cmd, fake, config):

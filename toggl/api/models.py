@@ -620,7 +620,7 @@ def get_duration(name, instance):  # type: (str, base.Entity) -> int
     if instance.is_running:
         return instance.start.int_timestamp * -1
 
-    return int((instance.stop - instance.start).in_seconds())
+    return int((instance.stop.replace(microsecond=0) - instance.start.replace(microsecond=0)).in_seconds())
 
 
 def set_duration(name, instance, value, init=False):  # type: (str, base.Entity, typing.Optional[int], bool) -> typing.Optional[bool]
@@ -790,7 +790,7 @@ class TimeEntry(WorkspacedEntity):
     Description of the entry.
     """
 
-    project = fields.MappingField(Project, 'pid')
+    project = fields.MappingField(Project, 'project_id')
     """
     Project to which the Time entry is linked to.
     """

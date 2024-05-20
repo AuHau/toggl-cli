@@ -175,7 +175,7 @@ class TogglSet(object):
 
         return True
 
-    def get(self, id=None, config=None, **conditions):  # type: (typing.Any, utils.Config, **typing.Any) -> Entity
+    def get(self, id=None, config=None, **conditions):  # type: (typing.Any, utils.Config, **typing.Any) -> typing.Optional[Entity]
         """
         Method for fetching detail object of the entity. it fetches the object based on specified conditions.
 
