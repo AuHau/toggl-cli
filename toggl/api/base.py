@@ -535,6 +535,10 @@ class TogglEntity(metaclass=TogglEntityMeta):
         :param serialized: If True, the returned dict contains only Python primitive types and no objects (eq. so JSON serialization could happen)
         :param changes_only: If True, the returned dict contains only changes to the instance since last call of save() method.
         """
+        from .models import WorkspacedEntity
+        workspace = self.workspace if isinstance(self, WorkspacedEntity) else self
+        allow_premium = getattr(workspace, "premium", False)
+
         source_dict = self.__change_dict__ if changes_only else self.__fields__
         entity_dict = {}
         for field_name in source_dict.keys():
@@ -542,6 +546,9 @@ class TogglEntity(metaclass=TogglEntityMeta):
                 field = self.__fields__[field_name]
             except KeyError:
                 field = self.__mapped_fields__[field_name]
+
+            if field.premium and not allow_premium:
+                continue
 
             try:
                 value = field._get_value(self)
