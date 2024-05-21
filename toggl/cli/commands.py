@@ -534,12 +534,15 @@ def entry_continue(ctx, descr, start):
 
     The underhood behaviour of Toggl is that it actually creates a new entry with the same description.
     """
+    config = ctx.obj['config']
     entry = None
     try:
         if descr is None:
-            entry = api.TimeEntry.objects.all(order='desc', config=ctx.obj['config'])[0]
+            entry = api.TimeEntry.objects.current(config=config)
+            if entry is None:
+                entry = api.TimeEntry.objects.all(order='desc', config=config)[0]
         else:
-            entry = api.TimeEntry.objects.filter(contain=True, description=descr, config=ctx.obj['config'])[0]
+            entry = api.TimeEntry.objects.filter(contain=True, description=descr, config=config)[0]
     except IndexError:
         click.echo('You don\'t have any time entries in past 9 days!')
         exit(1)

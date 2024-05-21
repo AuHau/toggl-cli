@@ -230,16 +230,9 @@ class TogglSet(object):
         if fetched_entities is None:
             return []
 
-        output = []
-        i = 0 if order == 'asc' else len(fetched_entities) - 1
-        while 0 <= i < len(fetched_entities):
-            output.append(self.entity_cls.deserialize(config=config, **fetched_entities[i]))
-
-            if order == 'asc':
-                i += 1
-            else:
-                i -= 1
-
+        output = [self.entity_cls.deserialize(config=config, **entry) for entry in fetched_entities]
+        if order == 'desc':
+            return output[::-1]
         return output
 
     def filter(self, order='asc', config=None, contain=False, **conditions):  # type: (str, utils.Config, bool, **typing.Any) -> typing.List[Entity]

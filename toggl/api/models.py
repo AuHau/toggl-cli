@@ -690,6 +690,10 @@ class TimeEntrySet(base.WorkspacedTogglSet):
     def build_detail_url(self, eid, config, conditions):  # type: (int, utils.Config, typing.Dict) -> str
         return '/me/{}/{}'.format(self.entity_endpoints_name, eid)
 
+    def _fetch_all(self, url, order, config):  # type: (str, str, utils.Config) -> typing.List[base.Entity]
+        output = super()._fetch_all(url, order, config)
+        output.sort(key=lambda e: e.start, reverse=(order == 'desc'))
+        return output
 
     def current(self, config=None):  # type: (utils.Config) -> typing.Optional[TimeEntry]
         """

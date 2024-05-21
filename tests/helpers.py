@@ -173,6 +173,10 @@ class Cleanup:
         if not ids:
             config = config or get_config()
             entities = api.TimeEntry.objects.all(config=config)
+            current_entry = api.TimeEntry.objects.current(config=config)
+            if current_entry is not None:
+                current_entry.stop_and_save()
+                entities.append(current_entry)
             ids = [entity.id for entity in entities]
 
         if not ids:
