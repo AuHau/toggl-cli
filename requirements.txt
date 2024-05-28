@@ -10,5 +10,5 @@ pbr==5.8.0
 notify-py==0.3.42
 pytest-cov==2.12.1
 Faker==25.2.0
-factory-boy==3.3.0
+factory-boy==3.2.1
 pytest-mock==3.10.0
