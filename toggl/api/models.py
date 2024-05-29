@@ -2,6 +2,7 @@ import json
 import logging
 import typing
 from copy import copy
+from typing import TypedDict
 from urllib.parse import quote_plus
 from validate_email import validate_email
 
@@ -12,6 +13,18 @@ from toggl.api import base, fields
 from toggl import utils, exceptions
 
 logger = logging.getLogger('toggl.api.models')
+
+
+class InvitationResult(TypedDict):
+    """
+    API result for creating new invitations
+    """
+    email: str
+    invitation_id: int
+    invite_url: str
+    organization_id: int
+    recipient_id: int
+    sender_id: int
 
 
 # Organization entity
@@ -99,7 +112,7 @@ class Organization(base.TogglEntity):
     Number of organization users
     """
 
-    def invite(self, workspace, *emails, admin=False, role=None):  # type: (Workspace, typing.Collection[str], bool, typing.Optional[str]) -> None
+    def invite(self, workspace, *emails, admin=False, role=None):  # type: (Workspace, typing.Collection[str], bool, typing.Optional[str]) -> list[InvitationResult]
         """
         Invites users defined by email addresses. The users does not have to have account in Toggl, in that case after
         accepting the invitation, they will go through process of creating the account in the Toggl web.
@@ -117,14 +130,10 @@ class Organization(base.TogglEntity):
         workspace_invite_data = {'workspace_id': workspace.id, 'admin': admin}
         if role:
             workspace_invite_data['role'] = role
-        emails_json = json.dumps({'emails': emails, 'workspaces': [workspace_invite_data]})
-        data = utils.toggl("/organizations/{}/invitations".format(self.id), "post", emails_json, config=self._config)
+        json_data = json.dumps({'emails': emails, 'workspaces': [workspace_invite_data]})
 
-        # FIXME: remove, error handling is done by status code
-        # if 'messages' in data and data['messages']:
-        #     raise exceptions.TogglException(data['messages'])
-
-        # TODO: return something?
+        result = utils.toggl("/organizations/{}/invitations".format(self.id), "post", json_data, config=self._config)
+        return [InvitationResult(**invite) for invite in result['data']]
 
 
 class WorkspaceToggleSet(base.TogglSet):
@@ -177,6 +186,8 @@ class Workspace(base.TogglEntity):
     Whether only the admins can see team dashboard or everybody
     """
 
+    organization = fields.MappingField(Organization, 'organization_id')  # type: Organization
+
     rounding = fields.IntegerField()
     """
     Type of rounding:
@@ -209,6 +220,18 @@ class Workspace(base.TogglEntity):
     # As TogglEntityMeta is by default adding WorkspacedTogglSet to TogglEntity,
     # but we want WorkspaceToggleSet so defining it here explicitly.
     objects = WorkspaceToggleSet()
+
+    def invite(self, *emails, admin=False, role=None):  # type: (Workspace, typing.Collection[str], bool, typing.Optional[str]) -> list[InvitationResult]
+        """
+        Invites users defined by email addresses. The users does not have to have account in Toggl, in that case after
+        accepting the invitation, they will go through process of creating the account in the Toggl web.
+
+        :param emails: List of emails to invite.
+        :param admin: Whether the invited users should be admins.
+        :param role: Role of the invited users.
+        :return: None
+        """
+        return self.organization.invite(self, *emails, admin=admin, role=role)
 
 
 class WorkspacedEntity(base.TogglEntity):

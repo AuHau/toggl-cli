@@ -868,10 +868,9 @@ def workspace_users(ctx, workspace):
 
 # TODO: fix with newer organization API
 @workspace_users.command('invite', short_help='invite an user into workspace')
-@click.option('--email', '-e', help='Email address of the user to invite into the workspace',
-              prompt='Email address of the user to invite into the workspace')
+@click.argument('emails', nargs=-1)
 @click.pass_context
-def workspace_users_invite(ctx, email):
+def workspace_users_invite(ctx, emails):
     """
     Invites an user into the workspace.
 
@@ -879,9 +878,19 @@ def workspace_users_invite(ctx, email):
     After the invitation is sent, the user needs to accept invitation to be fully part of the workspace.
     """
     workspace = ctx.obj['workspace']
-    workspace.invite(email)
+    invitations = workspace.invite(*emails)
 
-    click.echo("User '{}' was successfully invited! He needs to accept the invitation now.".format(email))
+    click.echo(
+        "Invites successfully sent! Invited users need to accept the invitation now."
+    )
+    click.echo(
+        "Created invites IDs:\n{}".format(
+            "\n".join(
+                "- #{}: email {}".format(invite["invitation_id"], invite["email"])
+                for invite in invitations
+            )
+        )
+    )
 
 
 @workspace_users.command('ls', short_help='list workspace\'s users')
