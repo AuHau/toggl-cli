@@ -39,8 +39,8 @@ class InvitationResult(TypedDict):
 # Organization entity
 class Organization(base.TogglEntity):
     _endpoints_name = "organizations"
-    _can_create = False  # TODO: check
-    _can_delete = False  # TODO: check
+    _can_create = False  # TODO: implement
+    _can_delete = False  # TODO: implement
 
     name = fields.StringField(required=True)
     """
