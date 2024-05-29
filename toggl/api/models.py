@@ -15,6 +15,15 @@ from toggl import utils, exceptions
 logger = logging.getLogger('toggl.api.models')
 
 
+class OrganizationToggleSet(base.TogglSet):
+    """
+    Specialized TogglSet for organization entities
+    """
+
+    def build_detail_url(self, eid, config, conditions):  # type: (int, utils.Config, typing.Dict) -> str
+        return '/{}/{}'.format(self.entity_endpoints_name, eid)
+
+
 class InvitationResult(TypedDict):
     """
     API result for creating new invitations
@@ -111,6 +120,8 @@ class Organization(base.TogglEntity):
     """
     Number of organization users
     """
+
+    objects = OrganizationToggleSet()
 
     def invite(self, workspace, *emails, admin=False, role=None):  # type: (Workspace, typing.Collection[str], bool, typing.Optional[str]) -> list[InvitationResult]
         """
