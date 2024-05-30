@@ -70,7 +70,7 @@ class TogglField(typing.Generic[T]):
     read = True  # type: bool
     """
     Attribute 'read' specifies if user can get value from the field.
-    
+
     It represents fields that are not returned from server, but you can only pass value to them.
     It is allowed to read from the field once you set some value to it, but not before
     """
@@ -212,7 +212,7 @@ class TogglField(typing.Generic[T]):
             raise exceptions.TogglNotAllowedException('You are not allowed to read from \'{}\' attribute!'
                                                       .format(self.name))
 
-        # When instance is None, then the descriptor as accessed directly from class and not its instance 
+        # When instance is None, then the descriptor as accessed directly from class and not its instance
         # ==> return the descriptors instance.
         if instance is None:
             return self
@@ -332,6 +332,9 @@ class DateTimeField(TogglField[typing.Union[datetime.datetime, pendulum.DateTime
         super().__set__(instance, value)
 
     def parse(self, value, instance):  # type: (str, base.Entity) -> pendulum.DateTime
+        if value is None:
+            return super().parse(value, instance)
+
         config = getattr(instance, '_config', None) or utils.Config.factory()
 
         if isinstance(value, datetime.datetime):

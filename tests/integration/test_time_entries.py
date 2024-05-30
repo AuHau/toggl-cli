@@ -69,7 +69,7 @@ class TestTimeEntries:
         assert result.obj.exit_code == 0
 
         entry = TimeEntry.objects.get(result.created_id(), config=config)  # type: TimeEntry
-        assert entry.start == start
+        assert entry.start == start.replace(microsecond=0)
         assert (entry.stop - entry.start).seconds == 3722
 
     def test_add_tags(self, cmd, fake, config):
@@ -179,8 +179,16 @@ class TestTimeEntries:
     def test_continue(self, cmd, config, factories):
         some_entry = factories.TimeEntryFactory()
 
-        start = pendulum.now('utc')
-        stop = start + pendulum.duration(seconds=10)
+        # Stop and remove any running and recent time entries first
+        pre_running_entry = TimeEntry.objects.current(config=config)
+        if pre_running_entry is not None:
+            pre_running_entry.stop_and_save()
+        recent_entries = TimeEntry.objects.filter(order="desc", config=config, start=pendulum.now('utc') - pendulum.duration(minutes=2), stop=pendulum.now('utc'))
+        for to_delete_entry in recent_entries:
+            to_delete_entry.delete(config=config)
+
+        stop = pendulum.now('utc') - pendulum.duration(seconds=1)
+        start = stop - pendulum.duration(seconds=10)
         last_entry = factories.TimeEntryFactory(start=start, stop=stop)
 
         result = cmd('continue')

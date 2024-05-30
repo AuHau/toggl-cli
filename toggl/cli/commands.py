@@ -219,9 +219,11 @@ def entry_ls(ctx, fields, today, use_reports, limit, **conditions):
     """
     Lists time entries the user has access to.
 
-    By default the command uses API call that has limited number of time entries fetched  with 1000 entries in
-    last 9 days. If you want to overcome this limitation use --use-reports flag, that will use different
-    API call, which overcomes this limitations but currently support only --start/--stop filtration.
+    By default the entries of the last 9 days are fetched, to keep compatibility with older API versions.
+    If you want to select a different time range, use --start and --stop flags.
+    In general, the --start/--stop API is limited to entries from the last 3 months,  # TODO check
+    if you want to overcome this limitation use --use-reports flag, that will use different
+    API call.
 
     The list visible
     through this utility and on toggl's web client might differ in the range
@@ -237,6 +239,11 @@ def entry_ls(ctx, fields, today, use_reports, limit, **conditions):
             exit(2)
         conditions['start'] = pendulum.today()
         conditions['stop'] = pendulum.tomorrow()
+
+    if not conditions.get('start'):
+        conditions['start'] = pendulum.now() - pendulum.duration(days=9)
+    if not conditions.get("stop"):
+        conditions['stop'] = pendulum.now()
 
     entities = get_entries(ctx, use_reports, **conditions)
 
@@ -533,12 +540,15 @@ def entry_continue(ctx, descr, start):
 
     The underhood behaviour of Toggl is that it actually creates a new entry with the same description.
     """
+    config = ctx.obj['config']
     entry = None
     try:
         if descr is None:
-            entry = api.TimeEntry.objects.all(order='desc', config=ctx.obj['config'])[0]
+            entry = api.TimeEntry.objects.current(config=config)
+            if entry is None:
+                entry = api.TimeEntry.objects.all(order='desc', config=config)[0]
         else:
-            entry = api.TimeEntry.objects.filter(contain=True, description=descr, config=ctx.obj['config'])[0]
+            entry = api.TimeEntry.objects.filter(contain=True, description=descr, config=config)[0]
     except IndexError:
         click.echo('You don\'t have any time entries in past 9 days!')
         exit(1)
@@ -662,7 +672,7 @@ def projects(ctx, workspace):
               help='Specifies whether the estimated hours should be automatically calculated based on task estimations '
                    '(Premium only)')
 @click.option('--rate', '-r', type=click.FLOAT, help='Hourly rate of the project (Premium only)')
-@click.option('--color', type=click.INT, default=1, help='ID of color used for the project')
+@click.option('--color', type=click.STRING, default="#0b83d9", help='Hex code of color used for the project')
 @click.pass_context
 def projects_add(ctx, public=None, **kwargs):
     """
@@ -693,7 +703,7 @@ def projects_add(ctx, public=None, **kwargs):
               help='Specifies whether the estimated hours are automatically calculated based on task estimations or'
                    ' manually fixed based on the value of \'estimated_hours\' (Premium only)')
 @click.option('--rate', '-r', type=click.FLOAT, help='Hourly rate of the project (Premium only)')
-@click.option('--color', type=click.INT, help='ID of color used for the project')
+@click.option('--color', type=click.STRING, default="#0b83d9", help='Hex code of color used for the project')
 @click.pass_context
 def projects_update(ctx, spec, **kwargs):
     """
@@ -862,11 +872,11 @@ def workspace_users(ctx, workspace):
     ctx.obj['workspace'] = workspace or ctx.obj['config'].default_workspace
 
 
+# TODO: fix with newer organization API
 @workspace_users.command('invite', short_help='invite an user into workspace')
-@click.option('--email', '-e', help='Email address of the user to invite into the workspace',
-              prompt='Email address of the user to invite into the workspace')
+@click.argument('emails', nargs=-1)
 @click.pass_context
-def workspace_users_invite(ctx, email):
+def workspace_users_invite(ctx, emails):
     """
     Invites an user into the workspace.
 
@@ -874,9 +884,19 @@ def workspace_users_invite(ctx, email):
     After the invitation is sent, the user needs to accept invitation to be fully part of the workspace.
     """
     workspace = ctx.obj['workspace']
-    workspace.invite(email)
+    invitations = workspace.invite(*emails)
 
-    click.echo("User '{}' was successfully invited! He needs to accept the invitation now.".format(email))
+    click.echo(
+        "Invites successfully sent! Invited users need to accept the invitation now."
+    )
+    click.echo(
+        "Created invites IDs:\n{}".format(
+            "\n".join(
+                "- #{}: email {}".format(invite["invitation_id"], invite["email"])
+                for invite in invitations
+            )
+        )
+    )
 
 
 @workspace_users.command('ls', short_help='list workspace\'s users')

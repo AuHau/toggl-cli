@@ -2,6 +2,7 @@ import json
 import logging
 import typing
 from copy import copy
+from typing import TypedDict
 from urllib.parse import quote_plus
 from validate_email import validate_email
 
@@ -14,8 +15,150 @@ from toggl import utils, exceptions
 logger = logging.getLogger('toggl.api.models')
 
 
+class OrganizationToggleSet(base.TogglSet):
+    """
+    Specialized TogglSet for organization entities
+    """
+
+    def build_detail_url(self, eid, config, conditions):  # type: (int, utils.Config, typing.Dict) -> str
+        return '/{}/{}'.format(self.entity_endpoints_name, eid)
+
+
+class InvitationResult(TypedDict):
+    """
+    API result for creating new invitations
+    """
+    email: str
+    invitation_id: int
+    invite_url: str
+    organization_id: int
+    recipient_id: int
+    sender_id: int
+
+
+# Organization entity
+class Organization(base.TogglEntity):
+    _endpoints_name = "organizations"
+    _can_create = False  # TODO: implement
+    _can_delete = False  # TODO: implement
+
+    name = fields.StringField(required=True)
+    """
+    Name of the organization
+    """
+
+    admin = fields.BooleanField()
+    """
+    Shows whether the current request user is an admin of the organization
+    """
+
+    at = fields.StringField()
+    """
+    Organization's last modification date
+    """
+
+    created_at = fields.StringField()
+    """
+    Organization's creation date
+    """
+
+    is_multi_workspace_enabled = fields.BooleanField()
+    """
+    Is true when the organization option is_multi_workspace_enabled is set
+    """
+
+    is_unified = fields.BooleanField()
+
+    max_data_retention_days = fields.IntegerField()
+    """
+    How far back free workspaces in this org can access data.
+    """
+
+    max_workspaces = fields.IntegerField()
+    """
+    Maximum number of workspaces allowed for the organization
+    """
+
+    owner = fields.BooleanField()
+    """
+    Whether the requester is a the owner of the organization
+    """
+
+    payment_methods = fields.StringField()
+    """
+    Organization's subscription payment methods. Omitted if empty.
+    """
+
+    permissions = fields.StringField()
+
+    pricing_plan_enterprise = fields.BooleanField()
+    """
+    The subscription plan is an enterprise plan
+    """
+
+    pricing_plan_id = fields.IntegerField()  # TODO: map entity?
+    """
+    Organization plan ID
+    """
+
+    pricing_plan_name = fields.StringField()
+    """
+    The subscription plan name the org is currently on. Free or any plan name coming from payment provider
+    """
+
+    server_deleted_at = fields.StringField()
+    """
+    Organization's delete date
+    """
+
+    suspended_at = fields.StringField()
+    """
+    Whether the organization is currently suspended
+    """
+
+    user_count = fields.IntegerField()
+    """
+    Number of organization users
+    """
+
+    objects = OrganizationToggleSet()
+
+    def invite(self, workspace, *emails, admin=False, role=None):  # type: (Workspace, typing.Collection[str], bool, typing.Optional[str]) -> list[InvitationResult]
+        """
+        Invites users defined by email addresses. The users does not have to have account in Toggl, in that case after
+        accepting the invitation, they will go through process of creating the account in the Toggl web.
+
+        :param workspace: The workspace to invite users to.
+        :param emails: List of emails to invite.
+        :param admin: Whether the invited users should be admins.
+        :param role: Role of the invited users.
+        :return: None
+        """
+        for email in emails:
+            if not validate_email(email):
+                raise exceptions.TogglValidationException(f'Supplied email \'{email}\' is not valid email!')
+
+        workspace_invite_data = {'workspace_id': workspace.id, 'admin': admin}
+        if role:
+            workspace_invite_data['role'] = role
+        json_data = json.dumps({'emails': emails, 'workspaces': [workspace_invite_data]})
+
+        result = utils.toggl("/organizations/{}/invitations".format(self.id), "post", json_data, config=self._config)
+        return [InvitationResult(**invite) for invite in result['data']]
+
+
+class WorkspaceToggleSet(base.TogglSet):
+    """
+    Specialized TogglSet for workspace entities (not to be confused with :class:`base.WorkspacedTogglSet`
+    """
+
+    def build_detail_url(self, eid, config, conditions):  # type: (int, utils.Config, typing.Dict) -> str
+        return '/{}/{}'.format(self.entity_endpoints_name, eid)
+
+
 # Workspace entity
 class Workspace(base.TogglEntity):
+    _endpoints_name = "workspaces"
     _can_create = False
     _can_delete = False
 
@@ -54,6 +197,8 @@ class Workspace(base.TogglEntity):
     Whether only the admins can see team dashboard or everybody
     """
 
+    organization = fields.MappingField(Organization, 'organization_id')  # type: Organization
+
     rounding = fields.IntegerField()
     """
     Type of rounding:
@@ -83,27 +228,21 @@ class Workspace(base.TogglEntity):
     ical_url = fields.StringField()
     logo_url = fields.StringField()
 
-    # As TogglEntityMeta is by default adding WorkspaceTogglSet to TogglEntity,
-    # but we want vanilla TogglSet so defining it here explicitly.
-    objects = base.TogglSet()
+    # As TogglEntityMeta is by default adding WorkspacedTogglSet to TogglEntity,
+    # but we want WorkspaceToggleSet so defining it here explicitly.
+    objects = WorkspaceToggleSet()
 
-    def invite(self, *emails):  # type: (str) -> None
+    def invite(self, *emails, admin=False, role=None):  # type: (Workspace, typing.Collection[str], bool, typing.Optional[str]) -> list[InvitationResult]
         """
         Invites users defined by email addresses. The users does not have to have account in Toggl, in that case after
         accepting the invitation, they will go through process of creating the account in the Toggl web.
 
         :param emails: List of emails to invite.
+        :param admin: Whether the invited users should be admins.
+        :param role: Role of the invited users.
         :return: None
         """
-        for email in emails:
-            if not validate_email(email):
-                raise exceptions.TogglValidationException(f'Supplied email \'{email}\' is not valid email!')
-
-        emails_json = json.dumps({'emails': emails})
-        data = utils.toggl("/workspaces/{}/invite".format(self.id), "post", emails_json, config=self._config)
-
-        if 'notifications' in data and data['notifications']:
-            raise exceptions.TogglException(data['notifications'])
+        return self.organization.invite(self, *emails, admin=admin, role=role)
 
 
 class WorkspacedEntity(base.TogglEntity):
@@ -118,7 +257,7 @@ class WorkspacedEntity(base.TogglEntity):
     """
 
     def get_url(self):  # type: () -> str
-        return f'workspaces/{self.workspace.id}/{self.get_name()}s'
+        return f'workspaces/{self.workspace.id}/{self.get_endpoints_name()}'
 
 
 # Premium Entity
@@ -129,7 +268,7 @@ class PremiumEntity(WorkspacedEntity):
 
     def save(self, config=None):  # type: (utils.Config) -> None
         if not self.workspace.premium:
-            raise exceptions.TogglPremiumException(f'The entity {self.get_name()} requires to be associated with Premium workspace!')
+            raise exceptions.TogglPremiumException(f'The entity {self.get_name(verbose=True)} requires to be associated with Premium workspace!')
 
         super().save(config)
 
@@ -142,10 +281,15 @@ class Client(WorkspacedEntity):
     Client entity
     """
 
+    _endpoints_name = "clients"
+
     name = fields.StringField(required=True)
     """
     Name of client (Required)
     """
+
+    notes = fields.StringField()
+
 
 
 class Project(WorkspacedEntity):
@@ -153,12 +297,14 @@ class Project(WorkspacedEntity):
     Project entity
     """
 
+    _endpoints_name = "projects"
+
     name = fields.StringField(required=True)
     """
     Name of the project. (Required)
     """
 
-    client = fields.MappingField(Client, 'cid')
+    client = fields.MappingField(Client, 'client_id')
     """
     Client associated to the project.
     """
@@ -197,11 +343,6 @@ class Project(WorkspacedEntity):
 
     color = fields.StringField()
     """
-    Id of the color selected for the project
-    """
-
-    hex_color = fields.StringField()
-    """
     Hex code of the color selected for the project
     """
 
@@ -227,7 +368,7 @@ class Project(WorkspacedEntity):
         return project_user
 
 
-class UserSet(base.WorkspaceTogglSet):
+class UserSet(base.WorkspacedTogglSet):
 
     def current_user(self, config=None):  # type: (utils.Config) -> 'User'
         """
@@ -242,6 +383,7 @@ class User(WorkspacedEntity):
     User entity.
     """
 
+    _endpoints_name = "users"
     _can_create = False
     _can_update = False
     _can_delete = False
@@ -337,7 +479,7 @@ class User(WorkspacedEntity):
             'timezone': timezone,
             'created_with': created_with
         }})
-        data = utils.toggl("/signups", "post", user_json, config=config)
+        data = utils.toggl("/signup", "post", user_json, config=config)
         return cls.deserialize(config=config, **data)
 
     def is_admin(self, workspace):
@@ -358,6 +500,7 @@ class WorkspaceUser(WorkspacedEntity):
     It additionally configures access rights and several other things.
     """
 
+    _endpoints_name = "workspace_users"
     _can_get_detail = False
     _can_create = False
 
@@ -392,6 +535,8 @@ class ProjectUser(WorkspacedEntity):
     Similarly to WorkspaceUser, it is entity which represents assignment of specific User into Project.
     It additionally configures access rights and several other things.
     """
+
+    _endpoints_name = "project_users"
     _can_get_detail = False
 
     rate = fields.FloatField(admin_only=True)
@@ -426,6 +571,8 @@ class Task(PremiumEntity):
 
     This entity is available only for Premium workspaces.
     """
+
+    _endpoints_name = "tasks"
 
     name = fields.StringField(required=True)
     """
@@ -463,6 +610,7 @@ class Tag(WorkspacedEntity):
     Tag entity
     """
 
+    _endpoints_name = "tags"
     _can_get_detail = False
 
     name = fields.StringField(required=True)
@@ -506,7 +654,7 @@ def get_duration(name, instance):  # type: (str, base.Entity) -> int
     if instance.is_running:
         return instance.start.int_timestamp * -1
 
-    return int((instance.stop - instance.start).in_seconds())
+    return int((instance.stop.replace(microsecond=0) - instance.start.replace(microsecond=0)).in_seconds())
 
 
 def set_duration(name, instance, value, init=False):  # type: (str, base.Entity, typing.Optional[int], bool) -> typing.Optional[bool]
@@ -549,14 +697,14 @@ def format_duration(value, config=None):  # type: (int, utils.Config) -> str
 datetime_type = typing.Union[datetime.datetime, pendulum.DateTime]
 
 
-class TimeEntrySet(base.TogglSet):
+class TimeEntrySet(base.WorkspacedTogglSet):
     """
     TogglSet which is extended by current() method which returns the currently running TimeEntry.
     Moreover it extends the filtrating mechanism by native filtering according start and/or stop time.
     """
 
     def build_list_url(self, caller, config, conditions):  # type: (str, utils.Config, typing.Dict) -> str
-        url = '/{}'.format(self.base_url)
+        url = '/me/{}'.format(self.entity_endpoints_name)
 
         if caller == 'filter':
             start = conditions.pop('start', None)
@@ -573,6 +721,14 @@ class TimeEntrySet(base.TogglSet):
 
         return url
 
+    def build_detail_url(self, eid, config, conditions):  # type: (int, utils.Config, typing.Dict) -> str
+        return '/me/{}/{}'.format(self.entity_endpoints_name, eid)
+
+    def _fetch_all(self, url, order, config):  # type: (str, str, utils.Config) -> typing.List[base.Entity]
+        output = super()._fetch_all(url, order, config)
+        output.sort(key=lambda e: e.start, reverse=(order == 'desc'))
+        return output
+
     def current(self, config=None):  # type: (utils.Config) -> typing.Optional[TimeEntry]
         """
         Method that returns currently running TimeEntry or None if there is no currently running time entry.
@@ -581,9 +737,9 @@ class TimeEntrySet(base.TogglSet):
         :return:
         """
         config = config or utils.Config.factory()
-        fetched_entity = utils.toggl('/time_entries/current', 'get', config=config)
+        fetched_entity = utils.toggl('/me/time_entries/current', 'get', config=config)
 
-        if fetched_entity.get('data') is None:
+        if fetched_entity is None:
             return None
 
         return self.entity_cls.deserialize(config=config, **fetched_entity)
@@ -665,12 +821,14 @@ class TimeEntrySet(base.TogglSet):
 
 
 class TimeEntry(WorkspacedEntity):
+    _endpoints_name = "time_entries"
+
     description = fields.StringField()
     """
     Description of the entry.
     """
 
-    project = fields.MappingField(Project, 'pid')
+    project = fields.MappingField(Project, 'project_id')
     """
     Project to which the Time entry is linked to.
     """
@@ -728,10 +886,6 @@ class TimeEntry(WorkspacedEntity):
             )
 
         super().__init__(start=start, stop=stop, duration=duration, **kwargs)
-
-    @classmethod
-    def get_url(self):
-        return 'time_entries'
 
     def to_dict(self, serialized=False, changes_only=False):
         # Enforcing serialize duration when start or stop changes
