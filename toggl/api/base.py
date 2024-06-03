@@ -24,6 +24,8 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dic
     :param conditions: dict
     :return:
     """
+    logger.debug(f'EvaluatingConditions: Filtering based on conditions: {conditions}')
+
     for key, value in conditions.items():
         try:
             field = entity.__fields__[key]
@@ -31,6 +33,7 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dic
             try:
                 field = entity.__mapped_fields__[key]
             except KeyError:
+                logger.debug(f'EvaluatingConditions: Field {key} not found in entity {entity}')
                 return False
 
         if isinstance(field, model_fields.MappingField):
@@ -47,6 +50,7 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dic
                 continue
 
             if value != mapped_entity_id:
+                logger.debug(f'EvaluatingConditions: Mapped entity\'s ID does not match')
                 return False
 
             continue
@@ -82,6 +86,7 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dic
             continue
 
         if str(entity_value) != str(value):
+            logger.debug(f'EvaluatingConditions: String values do not match: {entity_value} != {value}')
             return False
 
     return True
@@ -258,6 +263,8 @@ class TogglSet(object):
 
         if fetched_entities is None:
             return []
+
+        logger.debug(f'Filter: Fetched {fetched_entities} entities')
 
         # There are no specified conditions ==> return all
         if not conditions:

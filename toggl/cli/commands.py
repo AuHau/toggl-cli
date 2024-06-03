@@ -622,7 +622,7 @@ def clients_ls(ctx):
 def clients_get(ctx, spec):
     """
     Gets details of a client specified by SPEC argument. SPEC can be either ID or Name of the client.
-    Be aware that if you use specify SPEC using Name you won't get note for this client.
+    Be aware that if you specify SPEC using Name you won't get note for this client.
 
     If SPEC is Name, then the lookup is done in the default workspace, unless --workspace is specified.
     """
@@ -769,7 +769,7 @@ def project_users_ls(ctx, fields):
     project = ctx.obj['project']
     src = api.ProjectUser.objects.filter(project=project, config=ctx.obj['config'])
 
-    helpers.entity_listing(src, fields)
+    helpers.entity_listing(src, fields, obj=ctx.obj)
 
 
 @project_users.command('add', short_help='add a user into the project')

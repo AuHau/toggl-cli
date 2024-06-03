@@ -259,6 +259,20 @@ class WorkspacedEntity(base.TogglEntity):
     def get_url(self):  # type: () -> str
         return f'workspaces/{self.workspace.id}/{self.get_endpoints_name()}'
 
+class OldWorkspacedEntity(base.TogglEntity):
+    """
+    Abstract entity which has linked Workspace
+    """
+
+    workspace = fields.MappingField(Workspace, 'wid', write=False,
+                                               default=lambda config: config.default_workspace) # type: Workspace
+    """
+    Workspace to which the resource is linked to.
+    """
+
+    def get_url(self):  # type: () -> str
+        return f'workspaces/{self.workspace.id}/{self.get_endpoints_name()}'
+
 
 # Premium Entity
 class PremiumEntity(WorkspacedEntity):
@@ -276,7 +290,7 @@ class PremiumEntity(WorkspacedEntity):
 # ----------------------------------------------------------------------------
 # Entities definitions
 # ----------------------------------------------------------------------------
-class Client(WorkspacedEntity):
+class Client(OldWorkspacedEntity):
     """
     Client entity
     """
@@ -551,12 +565,12 @@ class ProjectUser(WorkspacedEntity):
     Admin rights for this project
     """
 
-    project = fields.MappingField(Project, 'pid', write=False)
+    project = fields.MappingField(Project, 'project_id', write=False)
     """
     Project to which the User is assigned.
     """
 
-    user = fields.MappingField(User, 'uid', write=False)
+    user = fields.MappingField(User, 'user_id', write=False)
     """
     User which is linked to Project.
     """
