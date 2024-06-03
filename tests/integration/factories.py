@@ -40,7 +40,6 @@ class ProjectFactory(TogglFactory):
     # client = factory.SubFactory(ClientFactory)
     active = True
     is_private = True
-    billable = False
 
 
 class TaskFactory(TogglFactory):

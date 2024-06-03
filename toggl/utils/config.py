@@ -64,15 +64,15 @@ class IniConfigMixin:
     }
 
     _old_file_path = Path.expanduser(Path('~/.togglrc'))
-    
+
     if "XDG_CONFIG_HOME" in os.environ:
         _new_file_path = Path(os.environ["XDG_CONFIG_HOME"]).joinpath(".togglrc")
-        
+
         if _new_file_path.exists() or not _old_file_path.exists():
             DEFAULT_CONFIG_PATH = _new_file_path
         else:
             DEFAULT_CONFIG_PATH = _old_file_path
-            
+
     else:
         DEFAULT_CONFIG_PATH = _old_file_path
 

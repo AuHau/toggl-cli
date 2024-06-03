@@ -101,7 +101,7 @@ class Migration200b1(MigrationBase):
             click.echo('We have not recognized your timezone!')
             new_tz = inquirer.shortcuts.text(
                 'Please enter valid timezone. Default is your system\'s timezone.',
-                default='local', validate=lambda _, i: i in pendulum.timezones or i == 'local')
+                default='local', validate=lambda _, i: i in pendulum.timezones() or i == 'local')
             parser.set('options', 'tz', new_tz)
 
     @classmethod

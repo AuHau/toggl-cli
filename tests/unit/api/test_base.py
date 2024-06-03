@@ -11,6 +11,8 @@ from ... import helpers
 
 
 class RandomEntity(base.TogglEntity):
+    _endpoints_name = 'random_entities'
+
     some_field = fields.StringField()
 
 
@@ -149,14 +151,14 @@ class TestTogglSet:
             tset.filter()
 
         with pytest.raises(exceptions.TogglException):
-            tset.base_url
+            tset.entity_endpoints_name
 
     def test_url(self):
         tset = base.TogglSet(url='http://some-url.com')
-        assert tset.base_url == 'http://some-url.com'
+        assert tset.entity_endpoints_name == 'http://some-url.com'
 
         tset = base.TogglSet(RandomEntity)
-        assert tset.base_url == 'random_entitys'
+        assert tset.entity_endpoints_name == 'random_entities'
 
     def test_can_get_detail(self):
         tset = base.TogglSet(can_get_detail=False)
@@ -189,9 +191,8 @@ class TestTogglSet:
     def test_get_detail_basic(self, mocker):
         mocker.patch.object(utils, 'toggl')
         utils.toggl.return_value = {
-            'data': {
-                'some_field': 'asdf'
-            }
+            'id': 123,
+            'some_field': 'asdf'
         }
 
         tset = base.TogglSet(RandomEntity)
@@ -202,9 +203,7 @@ class TestTogglSet:
 
     def test_get_detail_none(self, mocker):
         mocker.patch.object(utils, 'toggl')
-        utils.toggl.return_value = {
-            'data': None
-        }
+        utils.toggl.return_value = None
 
         tset = base.TogglSet(RandomEntity)
         obj = tset.get(id=123)
@@ -477,6 +476,8 @@ class TestTogglEntityMeta:
 ## TogglEntity
 
 class Entity(base.TogglEntity):
+    _endpoints_name = "entities"
+
     string = fields.StringField()
     integer = fields.IntegerField()
     boolean = fields.BooleanField()
@@ -616,9 +617,7 @@ class TestTogglEntity:
     def test_save_create(self, mocker):
         mocker.patch.object(utils, 'toggl')
         utils.toggl.return_value = {
-            'data': {
-                'id': 333
-            }
+            'id': 333
         }
 
         obj = Entity(string='asd', integer=123)

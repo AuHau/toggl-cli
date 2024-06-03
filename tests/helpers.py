@@ -114,11 +114,13 @@ class Cleanup:
     def _ids_cleanup(base, config=None, batch=False, *ids):
         config = config or get_config()
 
+        wid = config.default_workspace.id
+        workspace_url = '/workspaces/{}'.format(wid)
         if batch:
-            utils.toggl('/{}/{}'.format(base, ','.join([str(eid) for eid in ids])), 'delete', config=config)
+            utils.toggl('{}/{}/{}'.format(workspace_url, base, ','.join([str(eid) for eid in ids])), 'delete', config=config)
         else:
             for entity_id in ids:
-                utils.toggl('/{}/{}'.format(base, entity_id), 'delete', config=config)
+                utils.toggl('{}/{}/{}'.format(workspace_url, base, entity_id), 'delete', config=config)
 
     @staticmethod
     def _all_cleanup(cls, config=None):
@@ -171,12 +173,16 @@ class Cleanup:
         if not ids:
             config = config or get_config()
             entities = api.TimeEntry.objects.all(config=config)
+            current_entry = api.TimeEntry.objects.current(config=config)
+            if current_entry is not None:
+                current_entry.stop_and_save()
+                entities.append(current_entry)
             ids = [entity.id for entity in entities]
 
         if not ids:
             return
 
-        Cleanup._ids_cleanup('time_entries', config, True, *ids)
+        Cleanup._ids_cleanup('time_entries', config, False, *ids)
 
     @staticmethod
     def project_users(config=None, *ids):
@@ -195,7 +201,7 @@ class Cleanup:
         if not ids:
             return
 
-        Cleanup._ids_cleanup('projects', config, True, *ids)
+        Cleanup._ids_cleanup('projects', config, False, *ids)
 
     @staticmethod
     def tasks(config=None, *ids):

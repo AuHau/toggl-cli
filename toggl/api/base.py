@@ -24,6 +24,8 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dic
     :param conditions: dict
     :return:
     """
+    logger.debug(f'EvaluatingConditions: Filtering based on conditions: {conditions}')
+
     for key, value in conditions.items():
         try:
             field = entity.__fields__[key]
@@ -31,6 +33,7 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dic
             try:
                 field = entity.__mapped_fields__[key]
             except KeyError:
+                logger.debug(f'EvaluatingConditions: Field {key} not found in entity {entity}')
                 return False
 
         if isinstance(field, model_fields.MappingField):
@@ -47,6 +50,7 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dic
                 continue
 
             if value != mapped_entity_id:
+                logger.debug(f'EvaluatingConditions: Mapped entity\'s ID does not match')
                 return False
 
             continue
@@ -82,6 +86,7 @@ def evaluate_conditions(conditions, entity, contain=False):  # type: (typing.Dic
             continue
 
         if str(entity_value) != str(value):
+            logger.debug(f'EvaluatingConditions: String values do not match: {entity_value} != {value}')
             return False
 
     return True
@@ -115,7 +120,7 @@ class TogglSet(object):
         self.entity_cls = cls
 
     @property
-    def base_url(self):  # type: (TogglSet) -> str
+    def entity_endpoints_name(self):  # type: (TogglSet) -> str
         """
         Returns base URL which will be used for building listing or detail URLs.
         """
@@ -125,7 +130,7 @@ class TogglSet(object):
         if self.entity_cls is None:
             raise exceptions.TogglException('The TogglSet instance is not binded to any TogglEntity!')
 
-        return self.entity_cls.get_url()
+        return self.entity_cls.get_endpoints_name()
 
     def build_list_url(self, caller, config, conditions):  # type: (str, utils.Config, typing.Dict) -> str
         """
@@ -136,17 +141,18 @@ class TogglSet(object):
         :param conditions: If caller == 'filter' then contain conditions for filtering. Passed as reference,
         therefore any modifications will result modifications
         """
-        return '/{}'.format(self.base_url)
+        return '/me/{}'.format(self.entity_endpoints_name)
 
-    def build_detail_url(self, eid, config):  # type: (int, utils.Config) -> str
+    def build_detail_url(self, eid, config, conditions):  # type: (int, utils.Config, typing.Dict) -> str
         """
         Build the detail URL.
 
         :param eid: ID of the entity to fetch.
         :param config: Config
+        :param conditions: If caller == 'filter' then contain conditions for filtering. Passed as reference,
+        therefore any modifications will result modifications
         """
-        return '/{}/{}'.format(self.base_url, eid)
-
+        return '/me/{}/{}'.format(self.entity_endpoints_name, eid)
 
     @property
     def can_get_detail(self):  # type: (TogglSet) -> bool
@@ -174,7 +180,7 @@ class TogglSet(object):
 
         return True
 
-    def get(self, id=None, config=None, **conditions):  # type: (typing.Any, utils.Config, **typing.Any) -> Entity
+    def get(self, id=None, config=None, **conditions):  # type: (typing.Any, utils.Config, **typing.Any) -> typing.Optional[Entity]
         """
         Method for fetching detail object of the entity. it fetches the object based on specified conditions.
 
@@ -194,11 +200,11 @@ class TogglSet(object):
         if id is not None:
             if self.can_get_detail:
                 try:
-                    fetched_entity = utils.toggl(self.build_detail_url(id, config), 'get', config=config)
-                    if fetched_entity['data'] is None:
+                    fetched_entity = utils.toggl(self.build_detail_url(id, config, conditions), 'get', config=config)
+                    if fetched_entity is None:
                         return None
 
-                    return self.entity_cls.deserialize(config=config, **fetched_entity['data'])
+                    return self.entity_cls.deserialize(config=config, **fetched_entity)
                 except exceptions.TogglNotFoundException:
                     return None
             else:
@@ -223,19 +229,15 @@ class TogglSet(object):
         """
         fetched_entities = utils.toggl(url, 'get', config=config)
 
+        if isinstance(fetched_entities, dict):
+            fetched_entities = fetched_entities.get('data')
+
         if fetched_entities is None:
             return []
 
-        output = []
-        i = 0 if order == 'asc' else len(fetched_entities) - 1
-        while 0 <= i < len(fetched_entities):
-            output.append(self.entity_cls.deserialize(config=config, **fetched_entities[i]))
-
-            if order == 'asc':
-                i += 1
-            else:
-                i -= 1
-
+        output = [self.entity_cls.deserialize(config=config, **entry) for entry in fetched_entities]
+        if order == 'desc':
+            return output[::-1]
         return output
 
     def filter(self, order='asc', config=None, contain=False, **conditions):  # type: (str, utils.Config, bool, **typing.Any) -> typing.List[Entity]
@@ -261,6 +263,8 @@ class TogglSet(object):
 
         if fetched_entities is None:
             return []
+
+        logger.debug(f'Filter: Fetched {fetched_entities} entities')
 
         # There are no specified conditions ==> return all
         if not conditions:
@@ -292,18 +296,33 @@ class TogglSet(object):
         return 'TogglSet<{}>'.format(self.entity_cls.__name__)
 
 
-class WorkspaceTogglSet(TogglSet):
+class WorkspacedTogglSet(TogglSet):
     """
     Specialized TogglSet for Workspaced entries.
     """
 
-    def build_list_url(self, caller, config, conditions):  # type: (str, utils.Config, typing.Dict) -> str
+    @classmethod
+    def _get_workspace_id(cls, config, conditions):  # type: (utils.Config, typing.Dict) -> int
         if conditions.get('workspace') is not None:
-            wid = conditions['workspace'].id
+            return conditions['workspace'].id
+        elif conditions.get('workspace_id') is not None:
+            return conditions['workspace_id']
         else:
-            wid = conditions.get('wid') or config.default_workspace.id
+            return conditions.get('wid') or config.default_workspace.id
 
-        return '/workspaces/{}/{}'.format(wid, self.base_url)
+    def build_list_url(self, caller, config, conditions):  # type: (str, utils.Config, typing.Dict) -> str
+        wid = self._get_workspace_id(config, conditions)
+        return f'/workspaces/{wid}/{self.entity_endpoints_name}'
+
+    def build_detail_url(self, eid, config, conditions):  # type: (int, utils.Config, typing.Dict) -> str
+        """
+        Build the detail URL.
+
+        :param eid: ID of the entity to fetch.
+        :param config: Config
+        """
+        wid = self._get_workspace_id(config, conditions)
+        return f"/workspaces/{wid}/{self.entity_endpoints_name}/{eid}"
 
 
 class TogglEntityMeta(ABCMeta):
@@ -337,7 +356,7 @@ class TogglEntityMeta(ABCMeta):
         for key, field in attrs.items():
             if isinstance(field, model_fields.TogglField):
                 if key in fields:
-                    logger.warning('Field \'{}\' is being overridden'.format(key))
+                    logger.warning(f'Field \'{key}\' is being overridden')
 
                 field.name = key
                 fields[key] = field
@@ -374,7 +393,7 @@ class TogglEntityMeta(ABCMeta):
 
         # Add objects only if they are not defined to allow custom TogglSet implementations
         if 'objects' not in new_class.__dict__:
-            setattr(new_class, 'objects', WorkspaceTogglSet(new_class))
+            setattr(new_class, 'objects', WorkspacedTogglSet(new_class))
         else:
             try:
                 new_class.objects.bind_to_class(new_class)
@@ -398,6 +417,7 @@ class TogglEntity(metaclass=TogglEntityMeta):
     __signature__ = Signature()
     __fields__ = OrderedDict()
 
+    _endpoints_name = None
     _validate_workspace = True
     _can_create = True
     _can_update = True
@@ -466,7 +486,7 @@ class TogglEntity(metaclass=TogglEntityMeta):
             self.__change_dict__ = {}  # Reset tracking changes
         else:  # Create
             data = utils.toggl('/{}'.format(self.get_url()), 'post', self.json(), config=config)
-            self.id = data['data']['id']  # Store the returned ID
+            self.id = data['id']  # Store the returned ID
 
     def delete(self, config=None):  # type: (utils.Config) -> None
         """
@@ -492,7 +512,7 @@ class TogglEntity(metaclass=TogglEntityMeta):
 
         :param update: Specifies if the resulted JSON should contain only changed fields (for PUT call) or whole entity.
         """
-        return json.dumps({self.get_name(): self.to_dict(serialized=True, changes_only=update)})
+        return json.dumps(self.to_dict(serialized=True, changes_only=update))
 
     def validate(self):  # type: () -> None
         """
@@ -515,6 +535,10 @@ class TogglEntity(metaclass=TogglEntityMeta):
         :param serialized: If True, the returned dict contains only Python primitive types and no objects (eq. so JSON serialization could happen)
         :param changes_only: If True, the returned dict contains only changes to the instance since last call of save() method.
         """
+        from .models import WorkspacedEntity
+        workspace = self.workspace if isinstance(self, WorkspacedEntity) else self
+        allow_premium = getattr(workspace, "premium", False)
+
         source_dict = self.__change_dict__ if changes_only else self.__fields__
         entity_dict = {}
         for field_name in source_dict.keys():
@@ -522,6 +546,9 @@ class TogglEntity(metaclass=TogglEntityMeta):
                 field = self.__fields__[field_name]
             except KeyError:
                 field = self.__mapped_fields__[field_name]
+
+            if field.premium and not allow_premium:
+                continue
 
             try:
                 value = field._get_value(self)
@@ -570,8 +597,12 @@ class TogglEntity(metaclass=TogglEntityMeta):
         return name
 
     @classmethod
-    def get_url(cls):  # type: () -> str
-        return cls.get_name() + 's'
+    def get_endpoints_name(self):  # type: () -> str
+        assert self._endpoints_name is not None
+        return self._endpoints_name
+
+    def get_url(self):  # type: () -> str
+        return self.get_endpoints_name()
 
     @classmethod
     def deserialize(cls, config=None, **kwargs):  # type: (utils.Config, **typing.Any) -> typing.Generic[Entity]
