@@ -192,7 +192,7 @@ class ConfigBootstrap:
 
             inquirer.Text('timezone', 'Timezone to use (value \'{}\', will keep Toggl\'s setting)'.format(self.TOGGL_TIMEZONE),
                           default=self.SYSTEM_TIMEZONE,
-                          validate=lambda answers, current: current in pendulum.timezones
+                          validate=lambda answers, current: current in pendulum.timezones()
                                                             or current == self.SYSTEM_TIMEZONE
                                                             or current == self.TOGGL_TIMEZONE),
             inquirer.List('theme', message='What theme should be used for the CLI interface?',
