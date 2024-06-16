@@ -4,6 +4,13 @@ Earlier changes were not versioned. Therefore dates of change are used instead t
 
 For new releases see [Github Release page](https://github.com/AuHau/toggl-cli)
 
+## [3.0.1](https://github.com/AuHau/toggl-cli/compare/v3.0.0...v3.0.1) (2024-06-16)
+
+
+### Bug Fixes
+
+* bootstrap timezone ([#325](https://github.com/AuHau/toggl-cli/issues/325)) ([cd81170](https://github.com/AuHau/toggl-cli/commit/cd81170fb4281c1ea7afb52736808bc5d99071d6))
+
 ## [3.0.0](https://github.com/AuHau/toggl-cli/compare/v2.4.4...v3.0.0) (2024-06-03)
 
 
