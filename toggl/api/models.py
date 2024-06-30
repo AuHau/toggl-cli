@@ -842,7 +842,7 @@ class TimeEntry(WorkspacedEntity):
     Description of the entry.
     """
 
-    project = fields.MappingField(Project, 'project_id')
+    project = fields.MappingField(Project, 'pid')
     """
     Project to which the Time entry is linked to.
     """
