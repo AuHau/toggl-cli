@@ -143,7 +143,7 @@ class IniConfigMixin:
         """
         return bool(self._loaded)
 
-    def persist(self, items=None):  # type: (dict) -> None
+    def persist(self, items=None, set_permission=False):  # type: (dict, bool) -> None
         """
         Method persists the Config's values which are related to IniConfigMixin (eq. are defined in the INI_MAPPING)
         into config's file.
@@ -166,7 +166,8 @@ class IniConfigMixin:
         with open(self._config_path, 'w') as config_file:
             self._store.write(config_file)
 
-        os.chmod(self._config_path, 0o600)
+        if set_permission:
+            os.chmod(self._config_path, 0o600)
 
 
 EnvEntry = namedtuple('EnvEntry', ['variable', 'type'])
