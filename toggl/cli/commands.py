@@ -88,7 +88,7 @@ def cli(ctx, quiet, verbose, debug, simple, header, config=None):
 
         if not config.is_loaded:
             config.cli_bootstrap()
-            config.persist()
+            config.persist(set_permission=True)
 
         ctx.obj['config'] = config
     else:
