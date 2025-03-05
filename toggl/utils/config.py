@@ -2,7 +2,6 @@ import configparser
 import logging
 import os
 import platform
-import typing
 from collections import namedtuple
 
 import click
@@ -166,6 +165,8 @@ class IniConfigMixin:
 
         with open(self._config_path, 'w') as config_file:
             self._store.write(config_file)
+
+        os.chmod(self._config_path, 0o600)
 
 
 EnvEntry = namedtuple('EnvEntry', ['variable', 'type'])
