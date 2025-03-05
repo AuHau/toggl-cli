@@ -4,6 +4,14 @@ Earlier changes were not versioned. Therefore dates of change are used instead t
 
 For new releases see [Github Release page](https://github.com/AuHau/toggl-cli)
 
+## [3.0.3](https://github.com/AuHau/toggl-cli/compare/v3.0.2...v3.0.3) (2025-03-05)
+
+
+### Bug Fixes
+
+* set permissions only on config creation ([#339](https://github.com/AuHau/toggl-cli/issues/339)) ([b698a4d](https://github.com/AuHau/toggl-cli/commit/b698a4db9f67ce33deab2aa31833b8e993cb47c5))
+* set restrictive permissions each time config file is persisted ([#337](https://github.com/AuHau/toggl-cli/issues/337)) ([d952f1e](https://github.com/AuHau/toggl-cli/commit/d952f1eaa06129ed903db7b88e8a78e91500f7b6))
+
 ## [3.0.2](https://github.com/AuHau/toggl-cli/compare/v3.0.1...v3.0.2) (2024-07-17)
 
 
