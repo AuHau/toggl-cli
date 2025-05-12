@@ -1,5 +1,5 @@
 setuptools==69.0.3
-pendulum==3.0.0
+pendulum==3.1.0
 requests>=2.23.0
 click==8.1.7
 inquirer==3.2.4
