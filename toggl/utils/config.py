@@ -272,7 +272,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
     In case when the HTTP API call is interrupted or the API rejects it because of throttling reasons,
     the tool will use exponential back-off with number of retries specified by this value.
     """
-    retries = 2
+    retries = 4
 
     """
     Theme to be used for CLI interface
