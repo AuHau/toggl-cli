@@ -163,16 +163,19 @@ def toggl(url, method, data=None, headers=None, config=None, address=None):
 
     exception = None
     for _ in range(tries):
-        try:
-            logger.debug('Default workspace: {}'.format(config._default_workspace))
-            response = _toggl_request(url, method, data, headers, config.get_auth())
-            response_json = response.json() if response.text else None
-            logger.debug('Response {}:\n{}'.format(response.status_code, pformat(response_json)))
-            return response_json
-        except (exceptions.TogglThrottlingException, requests.exceptions.ConnectionError) as e:
-            sleep(0.1)  # Lets give Toggl API some time to recover
-            exception = e
-            # TODO: Make it exponential
+        backoff = 0.1  # Initial backoff duration
+        max_backoff = 5  # Maximum backoff duration in seconds
+        for _ in range(tries):
+            try:
+                logger.debug('Default workspace: {}'.format(config._default_workspace))
+                response = _toggl_request(url, method, data, headers, config.get_auth())
+                response_json = response.json() if response.text else None
+                logger.debug('Response {}:\n{}'.format(response.status_code, pformat(response_json)))
+                return response_json
+            except (exceptions.TogglThrottlingException, requests.exceptions.ConnectionError) as e:
+                sleep(backoff)  # Exponentially increase the backoff duration
+                backoff = min(backoff * 2, max_backoff)
+                exception = e
 
     # If retries failed then 'e' contains the last Exception/Error, lets re-raise it!
     raise exception

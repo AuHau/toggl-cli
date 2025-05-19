@@ -58,8 +58,8 @@ class TestProjects:
         id_parsed = result.parse_detail()
 
         assert id_parsed['name'] == name
-        assert not bool(id_parsed['billable'])
-        assert not bool(id_parsed['auto_estimates'])
+        assert id_parsed['billable'] == 'False'
+        assert id_parsed['auto_estimates'] == ''
         assert id_parsed['active'] == 'True'
         assert id_parsed['is_private'] == 'False'
         assert id_parsed['color'] == '#c9806b'
@@ -69,8 +69,8 @@ class TestProjects:
         name_parsed = result.parse_detail()
 
         assert name_parsed['name'] == name
-        assert not bool(name_parsed['billable'])
-        assert not bool(name_parsed['auto_estimates'])
+        assert id_parsed['billable'] == 'False'
+        assert id_parsed['auto_estimates'] == ''
         assert name_parsed['active'] == 'True'
         assert name_parsed['is_private'] == 'False'
         assert name_parsed['color'] == '#c9806b'
