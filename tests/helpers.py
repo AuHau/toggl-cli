@@ -8,6 +8,7 @@ from click.testing import CliRunner
 
 from toggl.cli.commands import cli
 from toggl import utils, api
+from toggl.exceptions import TogglNotFoundException
 
 
 def inner_cmd(cmd, config=None, simple=True, *args):  # type: (str, str, bool, typing.List[str]) -> ParsingResult
@@ -116,11 +117,14 @@ class Cleanup:
 
         wid = config.default_workspace.id
         workspace_url = '/workspaces/{}'.format(wid)
-        if batch:
-            utils.toggl('{}/{}/{}'.format(workspace_url, base, ','.join([str(eid) for eid in ids])), 'delete', config=config)
-        else:
-            for entity_id in ids:
-                utils.toggl('{}/{}/{}'.format(workspace_url, base, entity_id), 'delete', config=config)
+        try:
+            if batch:
+                utils.toggl('{}/{}/{}'.format(workspace_url, base, ','.join([str(eid) for eid in ids])), 'delete', config=config)
+            else:
+                for entity_id in ids:
+                    utils.toggl('{}/{}/{}'.format(workspace_url, base, entity_id), 'delete', config=config)
+        except TogglNotFoundException:
+            pass
 
     @staticmethod
     def _all_cleanup(cls, config=None):
