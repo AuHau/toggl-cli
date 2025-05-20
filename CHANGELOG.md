@@ -4,6 +4,18 @@ Earlier changes were not versioned. Therefore dates of change are used instead t
 
 For new releases see [Github Release page](https://github.com/AuHau/toggl-cli)
 
+## [4.0.0](https://github.com/AuHau/toggl-cli/compare/v3.0.3...v4.0.0) (2025-05-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* python 3.13 support and dropping python 3.8 ([#340](https://github.com/AuHau/toggl-cli/issues/340))
+
+### Features
+
+* exponential backoff retry mechanism ([#341](https://github.com/AuHau/toggl-cli/issues/341)) ([14f0f0a](https://github.com/AuHau/toggl-cli/commit/14f0f0a28fc81d9873efe0b57626095e7baf0e7a))
+* python 3.13 support and dropping python 3.8 ([#340](https://github.com/AuHau/toggl-cli/issues/340)) ([4181a73](https://github.com/AuHau/toggl-cli/commit/4181a731f8fdf31e2ea685af623a2835377aa0f9))
+
 ## [3.0.3](https://github.com/AuHau/toggl-cli/compare/v3.0.2...v3.0.3) (2025-03-05)
 
 
