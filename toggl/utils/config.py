@@ -416,7 +416,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
         self.default_wid = value.id
 
     # TODO: Decide if default values should be also persisted for backwards compatibility
-    def persist(self, items=None):  # type: (typing.Dict) -> None
+    def persist(self, items=None, set_permission=False):  # type: (typing.Dict) -> None
         """
         Method that enables persist the config and its parent's parts (eq. IniConfigMixin saves a file).
         """
@@ -428,7 +428,7 @@ class Config(EnvConfigMixin, IniConfigMixin, metaclass=ConfigMeta):
 
                 items[item] = value
 
-        super().persist(items)
+        super().persist(items, set_permission)
 
     def get_auth(self):  # type: () -> requests.auth.HTTPBasicAuth
         """
