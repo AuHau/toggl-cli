@@ -4,6 +4,13 @@ Earlier changes were not versioned. Therefore dates of change are used instead t
 
 For new releases see [Github Release page](https://github.com/AuHau/toggl-cli)
 
+## [4.0.1](https://github.com/AuHau/toggl-cli/compare/v4.0.0...v4.0.1) (2025-11-02)
+
+
+### Bug Fixes
+
+* update persist method for Config Class ([#347](https://github.com/AuHau/toggl-cli/issues/347)) ([80a3801](https://github.com/AuHau/toggl-cli/commit/80a3801c2e2d4a54db7e3dc96f501cdc46daaded))
+
 ## [4.0.0](https://github.com/AuHau/toggl-cli/compare/v3.0.3...v4.0.0) (2025-05-20)
 
 
