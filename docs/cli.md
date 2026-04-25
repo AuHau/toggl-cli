@@ -1,6 +1,6 @@
 # Command Line Interface
 
-Upon installation of Toggl CLI with pip, it exposes the command line interface under binary `toggl`. 
+Upon installation of Toggl CLI, it exposes the command line interface under binary `toggl`. 
 
 This section will explain the high-level overview of the CLI and several features. For detailed 
 overview of all options for each command, please use `--help` parameter.

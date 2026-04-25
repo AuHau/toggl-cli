@@ -7,17 +7,17 @@ Originally written by [D. Robert Adams](https://github.com/drobertadams), curren
 
 ## Installation
 
-To install Toggl CLI the easiest way is to use pip:
+To install Toggl CLI the easiest way is to use [uv](https://docs.astral.sh/uv/):
 
 ```shell
-$ pip install togglCli
+$ uv tool install togglCli
 ```
 
 To use edge master you can also clone the repo and install it directly:
 ```shell
 $ git clone https://github.com/AuHau/toggl-cli
 $ cd toggl-cli
-$ pip install .
+$ uv tool install .
 ```
 
 Master branch should contain mostly working version, but it is not guaranteed.

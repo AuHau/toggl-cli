@@ -10,10 +10,10 @@
 
 ## Install
 
-Easiest way to install this package is through PyPi:
+Easiest way to install this package is through PyPI using [uv](https://docs.astral.sh/uv/):
 
 ```shell
-$ pip install togglCli
+$ uv tool install togglCli
 ```
 
 ## Usage
