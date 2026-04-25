@@ -23,22 +23,21 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # We need the whole Git history in order for the PBR to pick up correctly the tag
+          fetch-depth: 0 # Full history needed for release-please and setuptools-scm
 
-      - uses: actions/setup-python@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          python-version: 3.9
-          cache: 'pip'
+          enable-cache: true
+          python-version: "3.9"
 
-      - name: Install requirements
-        run: |
-          pip install --upgrade --upgrade-strategy eager -r test-requirements.txt -e .
+      - name: Install dependencies
+        run: uv sync --extra docs
 
       - name: Build distribution 📦
-        run: |
-          python setup.py sdist bdist_wheel
+        run: uv build
 
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -46,4 +45,4 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Publish documentation
-        run: mkdocs gh-deploy --force
+        run: uv run mkdocs gh-deploy --force

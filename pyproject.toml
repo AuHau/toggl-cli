@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "togglCli"
+description = "Command line tool and set of Python wrapper classes for interacting with toggl's API"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "D. Robert Adams" },
+    { name = "Adam Uhlir", email = "adam@uhlir.dev" },
+]
+requires-python = ">=3.9"
+dynamic = ["version"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Development Status :: 5 - Production/Stable",
+    "Topic :: Office/Business :: Scheduling",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+]
+dependencies = [
+    "pendulum==3.1.0",
+    "requests>=2.23.0",
+    "click==8.1.7",
+    "inquirer==3.2.4",
+    "prettytable==3.6.0",
+    "validate_email==1.3",
+    "click-completion==0.5.2",
+    "pbr==6.1.1",
+    "notify-py==0.3.42",
+]
+
+[project.urls]
+Homepage = "https://toggl.uhlir.dev"
+Source = "https://github.com/auhau/toggl-cli"
+Documentation = "https://toggl.uhlir.dev"
+
+[project.scripts]
+toggl = "toggl.toggl:main"
+
+[project.optional-dependencies]
+test = [
+    "pytest==6.2.5",
+    "pytest-mock==3.10.0",
+    "pytest-cov==2.12.1",
+    "factory_boy==3.2.1",
+]
+docs = [
+    "mkdocs==1.4.2",
+    "mkdocs-material==8.1.7",
+]
+
+[tool.setuptools.packages.find]
+include = ["toggl*"]
+
+[tool.setuptools.package-data]
+toggl = ["assets/*"]
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0"
+local_scheme = "no-local-version"

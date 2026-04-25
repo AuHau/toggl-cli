@@ -18,6 +18,7 @@ htmlcov
 .mypy_cache
 build
 dist
+.venv/
 AUTHORS
 ChangeLog
 

@@ -6,8 +6,13 @@ For submitting PRs, they need to have test coverage which pass the full run in T
 
 ## Developing
 
-If you want to run the toggl CLI during development, I recommend you to use flow where you `pip install -e .`, which
-symlinks locally the package and then you can simply use the CLI like `toggl ls`. If you have the toggl CLI installed globally (e.g. via pipx) you'll also need to source your shell profile again to get the new symlinked version.
+If you want to run the toggl CLI during development, set up the project with [uv](https://docs.astral.sh/uv/):
+
+```shell
+uv sync --extra test --extra docs
+```
+
+This creates a virtualenv at `.venv` with the package installed in editable mode plus all test and docs dependencies. Run the CLI via `uv run toggl ls`, or activate the venv (`source .venv/bin/activate`) and call `toggl` directly. If you have the toggl CLI installed globally (e.g. via `uv tool install togglCli`), source your shell profile again to pick up the new symlinked version.
 
 Also, if you find yourself with non-descriptive exception, you can set env. variable `export TOGGL_EXCEPTIONS=1` which
  will then give you the full stack trace.
@@ -30,8 +35,7 @@ Tests are written using `pytest` framework and are split into three categories (
 
 ## Running tests
 
-In order to run tests first you need to have required packages installed. You can install them using `pip install togglCli[test]`,
-`python setup.py test` or `pip install -r test-requirements.txt`.
+In order to run tests, install the test dependencies into the project's virtualenv with `uv sync --extra test`, then run the suite with `uv run pytest`.
 
 By default unit and integration tests are run without the one testing premium functionality, as most probably you don't have access to Premium workspace for testing purposes.
 If you want to run just specific category you can do so using for example`pytest -m unit` for only unit tests.
