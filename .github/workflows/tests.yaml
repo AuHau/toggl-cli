@@ -35,4 +35,5 @@ jobs:
       - name: Run tests
         env:
           TOGGL_API_TOKEN: ${{ secrets.TOGGL_API_TOKEN }}
+          TOGGL_DEFAULT_WORKSPACE_ID: ${{ vars.TOGGL_TEST_WORKSPACE_ID }}
         run: uv run pytest --cov tgl
