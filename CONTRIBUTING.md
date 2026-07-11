@@ -6,22 +6,22 @@ For submitting PRs, they need to have test coverage which pass the full run in T
 
 ## Developing
 
-If you want to run the toggl CLI during development, set up the project with [uv](https://docs.astral.sh/uv/):
+If you want to run the `tgl` CLI during development, set up the project with [uv](https://docs.astral.sh/uv/):
 
 ```shell
 uv sync --extra test --extra docs
 ```
 
-This creates a virtualenv at `.venv` with the package installed in editable mode plus all test and docs dependencies. Run the CLI via `uv run toggl ls`, or activate the venv (`source .venv/bin/activate`) and call `toggl` directly. If you have the toggl CLI installed globally (e.g. via `uv tool install togglCli`), source your shell profile again to pick up the new symlinked version.
+This creates a virtualenv at `.venv` with the package installed in editable mode plus all test and docs dependencies. Run the CLI via `uv run tgl ls`, or activate the venv (`source .venv/bin/activate`) and call `tgl` directly. If you have `tgl` installed globally (e.g. via `uv tool install tgl`), source your shell profile again to pick up the new symlinked version.
 
-Also, if you find yourself with non-descriptive exception, you can set env. variable `export TOGGL_EXCEPTIONS=1` which
+Also, if you find yourself with non-descriptive exception, you can set env. variable `export TGL_EXCEPTIONS=1` which
  will then give you the full stack trace.
 
 ## Tests
 
 For running integration tests you need dummy account on Toggl, where **you don't have any important data** as the data
 will be messed up with and eventually **deleted**! Get API token for this test account and set it as an environmental variable
-`TOGGL_API_TOKEN`. Also figure out the Workspace ID of your account (`toggl workspace ls`) and set is as `TOGGL_WORKSPACE`
+`TOGGL_API_TOKEN`. Also figure out the Workspace ID of your account (`tgl workspaces ls`) and set is as `TOGGL_WORKSPACE`
 environmental variable.
 
 There are two sets of integration tests: normal and premium. To be able to run the premium set you have to have payed

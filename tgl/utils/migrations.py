@@ -8,9 +8,9 @@ from pbr import version
 import click
 import inquirer
 
-from toggl import exceptions
+from tgl import exceptions
 
-logger = logging.getLogger('toggl.utils.config')
+logger = logging.getLogger('tgl.utils.config')
 
 
 class MigrationBase:

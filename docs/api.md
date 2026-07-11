@@ -1,7 +1,7 @@
 # API wrapper classes
 
-Except Command Line Interface, Toggl also consists of wrapper classes to interact with Toggl's API.
-They wrappers are placed in `toggl.api` package. There are these classes available:
+In addition to the command-line interface, `tgl` provides wrapper classes for the Toggl Track API.
+The wrappers are available in the `tgl.api` package. There are these classes available:
 
 * Client
 * Workspace
@@ -13,20 +13,19 @@ They wrappers are placed in `toggl.api` package. There are these classes availab
 * Task
 * Tag
 
-Currently there is no API reference available, for details see directly the code which is well documented and readable
-[here](https://github.com/AuHau/toggl-cli/blob/master/toggl/api/models.py).
+There is currently no generated API reference. See the documented [model source](https://github.com/sekR4/tgl/blob/master/tgl/api/models.py) for details.
 
 ## Configuration
 
-As described at [Configuration section](index.md#configuration) Toggl CLI heavily depends on configuration, which is also
-true for the API wrappers. 
+As described at [Configuration section](index.md#configuration) `tgl` heavily depends on configuration, which is also
+true for the API wrappers.
 
-You can specify the config object to be used for the API calls passing the object to TogglSet's methods and entities's constructor using 
+You can specify the config object to be used for the API calls passing the object to TogglSet's methods and entities's constructor using
 `config=<config object>` (examples bellow). If no config object is passed, the default config is parsed from config
-file at `~/.togglrc`. 
+file at `~/.tglrc`.
 
 If you want to use some config object across whole application, you can replace the default config object using call
-`utils.Config.set_default(<config_obj>)` (example bellow). It is recommended to put this step as part of bootstraping 
+`utils.Config.set_default(<config_obj>)` (example bellow). It is recommended to put this step as part of bootstraping
 of your application.
 
 
@@ -35,13 +34,13 @@ of your application.
 The API wrapper classes follow similar design pattern like Django's ORM classes. Here are some examples of the API calls.
 
 ```python
-from toggl import api, utils
+from tgl import api, utils
 
-# All clients from default config which is placed under ~/.togglrc
+# All clients from default config which is placed under ~/.tglrc
 all_clients = api.Client.objects.all()
 for client in all_clients:
     print(client.name)
-    
+
 specific_client = api.Client.objects.get(123)
 
 project = api.Project(name='New project!')
@@ -51,7 +50,7 @@ project.save() # Creating new instance does not automatically save the entity, y
 update_project = api.Project()
 
 
-# Loads config from different place then ~/.togglrc
+# Loads config from different place then ~/.tglrc
 loaded_config = utils.Config.factory('/some/path/to/config')
 
 new_task_with_different_config = api.Task(name='some name', config=loaded_config)

@@ -1,4 +1,4 @@
-from toggl.cli.helpers import format_duration
+from tgl.cli.helpers import format_duration
 
 
 class TestDuration:

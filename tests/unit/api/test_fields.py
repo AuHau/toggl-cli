@@ -2,8 +2,8 @@ import datetime
 
 import pendulum
 
-from toggl.api import base, fields, models
-from toggl import exceptions, utils
+from tgl.api import base, fields, models
+from tgl import exceptions, utils
 import pytest
 
 

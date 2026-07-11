@@ -2,7 +2,7 @@ import logging
 from pprint import pformat
 from traceback import format_stack
 
-logger = logging.getLogger('toggl.utils.metas')
+logger = logging.getLogger('tgl.utils.metas')
 
 sentinel = object()
 

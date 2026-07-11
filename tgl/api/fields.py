@@ -9,10 +9,10 @@ import typing
 import pendulum
 from validate_email import validate_email
 
-from toggl import exceptions, utils
-from toggl.api import base
+from tgl import exceptions, utils
+from tgl.api import base
 
-logger = logging.getLogger('toggl.api.fields')
+logger = logging.getLogger('tgl.api.fields')
 
 NOTSET = object()
 

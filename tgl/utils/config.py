@@ -9,10 +9,10 @@ import requests
 from pbr import version
 from pathlib import Path
 
-from toggl.utils import metas, bootstrap, migrations
-from toggl import exceptions
+from tgl.utils import metas, bootstrap, migrations
+from tgl import exceptions
 
-logger = logging.getLogger('toggl.utils.config')
+logger = logging.getLogger('tgl.utils.config')
 
 # Defines which attrs of all parents will be merged into the new config class -> related to ConfigMeta
 MERGE_ATTRS = ('INI_MAPPING', 'ENV_MAPPING')
@@ -62,18 +62,14 @@ class IniConfigMixin:
         'version': IniEntry('version', str),
     }
 
-    _old_file_path = Path.expanduser(Path('~/.togglrc'))
+    _legacy_file_path = Path('~/.togglrc').expanduser()
+    _new_file_path = Path(os.environ.get('XDG_CONFIG_HOME') or '~').expanduser().joinpath('.tglrc')
 
-    if "XDG_CONFIG_HOME" in os.environ:
-        _new_file_path = Path(os.environ["XDG_CONFIG_HOME"]).joinpath(".togglrc")
-
-        if _new_file_path.exists() or not _old_file_path.exists():
-            DEFAULT_CONFIG_PATH = _new_file_path
-        else:
-            DEFAULT_CONFIG_PATH = _old_file_path
-
+    if _new_file_path.exists() or not _legacy_file_path.exists():
+        DEFAULT_CONFIG_PATH = _new_file_path
     else:
-        DEFAULT_CONFIG_PATH = _old_file_path
+        # Existing users keep their configuration until they choose to move it.
+        DEFAULT_CONFIG_PATH = _legacy_file_path
 
     def __init__(self, config_path=sentinel, **kwargs):  # type: (typing.Optional[str], **typing.Any) -> None
         self._config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path

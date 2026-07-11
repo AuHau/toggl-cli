@@ -5,9 +5,9 @@ import pytest
 import pytest_mock
 from pbr import version
 
-import toggl
-from toggl.utils import migrations
-from toggl.utils import others
+import tgl
+from tgl.utils import migrations
+from tgl.utils import others
 
 
 class ConfigFakeFile(io.StringIO):

@@ -1,22 +1,25 @@
-# Welcome to Toggl CLI
+# Welcome to tgl
 
-Toggl CLI is a Python utility which consists of Command-Line-Interface and Python's API Wrappers to interact with Toggl API.
-Each part is discussed in detail in corresponding section.   
+`tgl` is an independent command-line client and Python library for the Toggl Track API.
+Each part is discussed in detail in the corresponding section.
 
-Originally written by [D. Robert Adams](https://github.com/drobertadams), currently maintained by [Adam Uhlir](https://github.com/AuHau).
+!!! warning "Unofficial project"
+    `tgl` is not affiliated with, endorsed by, or sponsored by Toggl. Toggl and Toggl Track are trademarks of Toggl OÜ.
+
+`tgl` is maintained by Sebastian Kwon and forked from [AuHau/toggl-cli](https://github.com/AuHau/toggl-cli), originally written by D. Robert Adams and later maintained by Adam Uhlir.
 
 ## Installation
 
-To install Toggl CLI the easiest way is to use [uv](https://docs.astral.sh/uv/):
+The easiest way to install `tgl` is with [uv](https://docs.astral.sh/uv/):
 
 ```shell
-$ uv tool install togglCli
+$ uv tool install tgl
 ```
 
 To use edge master you can also clone the repo and install it directly:
 ```shell
-$ git clone https://github.com/AuHau/toggl-cli
-$ cd toggl-cli
+$ git clone https://github.com/sekR4/tgl
+$ cd tgl
 $ uv tool install .
 ```
 
@@ -24,25 +27,24 @@ Master branch should contain mostly working version, but it is not guaranteed.
 
 ## Configuration
 
-Toggl CLI heavily depends on user's configuration. Upon first usage of the CLI the user is taken through bootstrap
+`tgl` depends on user configuration. Upon first usage of the CLI the user is taken through bootstrap
 process where he is asked questions regarding the desired settings and authentication credentials. The final configuration is
-stored as configuration file at `~/.togglrc`.
+stored in `~/.tglrc`. Existing `~/.togglrc` files remain supported for migration.
 
 If user select's to enter username & password, then the bootstrap process will convert it into API token which is then
 stored.
 
 !!! info "Bootstrap on Windows"
-    Currently the bootstrap process is not available for Windows users. Upon the first usage of the CLI, Toggl CLI will
+    Currently the bootstrap process is not available for Windows users. Upon first use, `tgl` will
     create dummy config file and exit in order for user to configure it before next run. Use the bellow explanations
-    to see available options. 
+    to see available options.
 
 !!! danger "Plaintext credentials"
     By default the authentication credentials are stored in plain text in your configuration file! Be aware of that!
 
 ### Migrations
 
-If you have used original version of Toggl CLI and have proper config file, upon the first run of the new version, Toggl
-CLI will try to migrate it into new format.
+If you used the original Toggl CLI, `tgl` will load your existing `~/.togglrc` when `~/.tglrc` does not exist and will apply any required format migrations.
 
 ### Possible settings
 

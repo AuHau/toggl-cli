@@ -11,11 +11,11 @@ import click_completion
 import pendulum
 from prettytable import PrettyTable
 
-from toggl import api, exceptions, utils, __version__
-from toggl.cli import helpers, types
-from toggl.cli.themes import themes
+from tgl import api, exceptions, utils, __version__
+from tgl.cli import helpers, types
+from tgl.cli.themes import themes
 
-logger = logging.getLogger('toggl.cli.commands')
+logger = logging.getLogger('tgl.cli.commands')
 click_completion.init()
 
 
@@ -26,7 +26,7 @@ def entrypoint(args, obj=None):
     """
     CLI entry point, where exceptions are handled.
 
-    If the exceptions should be propagated out of the tool use env. variable: TOGGL_EXCEPTIONS=1
+    To propagate exceptions out of the tool, use TGL_EXCEPTIONS=1.
     """
     try:
         cli(args, obj=obj or {})
@@ -35,7 +35,7 @@ def entrypoint(args, obj=None):
         logger.debug(traceback.format_exc())
         exit(e.exit_code)
     except Exception as e:
-        if os.environ.get('TOGGL_EXCEPTIONS') == '1':
+        if os.environ.get('TGL_EXCEPTIONS', os.environ.get('TOGGL_EXCEPTIONS')) == '1':
             raise
 
         logger.error(str(e).strip())
@@ -50,8 +50,8 @@ def entrypoint(args, obj=None):
 @click.option('--header/--no-header', default=True, help="Specifies if header/labels of data should be displayed")
 @click.option('--simple', '-s', is_flag=True,
               help="Instead of pretty aligned tables prints only data separated by tabulator")
-@click.option('--config', type=click.Path(), envvar='TOGGL_CONFIG',
-              help="Sets specific Config file to be used (ENV: TOGGL_CONFIG)")
+@click.option('--config', type=click.Path(), envvar=['TGL_CONFIG', 'TOGGL_CONFIG'],
+              help="Sets the config file (ENV: TGL_CONFIG; legacy: TOGGL_CONFIG)")
 @click.version_option(__version__)
 @click.pass_context
 def cli(ctx, quiet, verbose, debug, simple, header, config=None):
@@ -128,7 +128,7 @@ def cli(ctx, quiet, verbose, debug, simple, header, config=None):
 
 @cli.command('www', short_help='open Toggl\'s web client')
 def visit_www():
-    from ..toggl import WEB_CLIENT_ADDRESS
+    from ..app import WEB_CLIENT_ADDRESS
     webbrowser.open(WEB_CLIENT_ADDRESS)
 
 
@@ -353,7 +353,7 @@ def entry_goal(ctx, goal, timeoff, no_notification, **conditions):
     """
     Continuously runs until GOAL is reached for today's entries. When GOAL is reached OS notification is triggered.
 
-    GOAL should be specified in DURATION format. E.g. "1h30m", "30s" etc. See `toggl add --help` for details.
+    GOAL should be specified in DURATION format. E.g. "1h30m", "30s" etc. See `tgl add --help` for details.
     """
     config = ctx.obj['config']
     theme = themes.get(config.theme)
@@ -1283,7 +1283,7 @@ def timezone(ctx, tz, default):
         click.echo('Current timezone: {}'.format(config.timezone))
 
 
-cmd_help = """Shell completion for toggl command
+cmd_help = """Shell completion for tgl command
 
 Available shell types:
 
@@ -1295,7 +1295,7 @@ Default type: auto
     click_completion.core.shells.keys())))
 
 
-@user_config.group(help=cmd_help, short_help='shell completion for toggl')
+@user_config.group(help=cmd_help, short_help='shell completion for tgl')
 def completion():
     pass
 
@@ -1304,8 +1304,8 @@ def completion():
 @click.option('-i', '--case-insensitive/--no-case-insensitive', help="Case insensitive completion")
 @click.argument('shell', required=False, type=click_completion.DocumentedChoice(click_completion.core.shells))
 def show(shell, case_insensitive):
-    """Show the toggl completion code"""
-    extra_env = {'_TOGGL_CASE_INSENSITIVE_COMPLETE': 'ON'} if case_insensitive else {}
+    """Show the tgl completion code."""
+    extra_env = {'_TGL_CASE_INSENSITIVE_COMPLETE': 'ON'} if case_insensitive else {}
     click.echo(click_completion.core.get_code(shell, extra_env=extra_env))
 
 
@@ -1315,7 +1315,7 @@ def show(shell, case_insensitive):
 @click.argument('shell', required=False, type=click_completion.DocumentedChoice(click_completion.core.shells))
 @click.argument('path', required=False)
 def install(append, case_insensitive, shell, path):
-    """Install the toggl completion"""
-    extra_env = {'_TOGGL_CASE_INSENSITIVE_COMPLETE': 'ON'} if case_insensitive else {}
+    """Install tgl completion."""
+    extra_env = {'_TGL_CASE_INSENSITIVE_COMPLETE': 'ON'} if case_insensitive else {}
     shell, path = click_completion.core.install(shell=shell, path=path, append=append, extra_env=extra_env)
     click.echo('%s completion installed in %s' % (shell, path))

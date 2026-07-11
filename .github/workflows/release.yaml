@@ -16,7 +16,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: python
-          package-name: togglCli
+          package-name: tgl
 
   publish:
     runs-on: ubuntu-latest

@@ -4,8 +4,8 @@ import pendulum
 
 import pytest
 
-from toggl.api import base, fields
-from toggl import exceptions, utils
+from tgl.api import base, fields
+from tgl import exceptions, utils
 
 from ... import helpers
 

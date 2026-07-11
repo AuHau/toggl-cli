@@ -1,7 +1,7 @@
 import pendulum
 import pytest
 
-from toggl.api import TimeEntry
+from tgl.api import TimeEntry
 
 
 class TestTimeEntries:

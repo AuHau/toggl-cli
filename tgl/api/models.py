@@ -9,10 +9,10 @@ from validate_email import validate_email
 import datetime
 import pendulum
 
-from toggl.api import base, fields
-from toggl import utils, exceptions
+from tgl.api import base, fields
+from tgl import utils, exceptions
 
-logger = logging.getLogger('toggl.api.models')
+logger = logging.getLogger('tgl.api.models')
 
 
 class OrganizationToggleSet(base.TogglSet):
@@ -460,13 +460,13 @@ class User(WorkspacedEntity):
     """
     Timezone which is used to convert the times into.
 
-    May differ from one used in this tool, see toggl.utils.Config().
+    May differ from one used in this tool, see tgl.utils.Config().
     """
 
     objects = UserSet()
 
     @classmethod
-    def signup(cls, email, password, timezone=None, created_with='TogglCLI',
+    def signup(cls, email, password, timezone=None, created_with='tgl',
                config=None):  # type: (str, str, str, str, utils.Config) -> User
         """
         Creates brand new user. After creation confirmation email is sent to him.
@@ -759,7 +759,7 @@ class TimeEntrySet(base.WorkspacedTogglSet):
         return self.entity_cls.deserialize(config=config, **fetched_entity)
 
     def _build_reports_url(self, start, stop, page, wid):
-        url = '/details?user_agent=toggl_cli&workspace_id={}&page={}'.format(wid, page)
+        url = '/details?user_agent=tgl&workspace_id={}&page={}'.format(wid, page)
 
         if start is not None:
             url += '&since={}'.format(quote_plus(start.isoformat()))
@@ -800,7 +800,7 @@ class TimeEntrySet(base.WorkspacedTogglSet):
         :param config:
         :return: Generator that yields TimeEntry
         """
-        from .. import toggl
+        from .. import app
 
         config = config or utils.Config.factory()
         page = 1
@@ -820,7 +820,7 @@ class TimeEntrySet(base.WorkspacedTogglSet):
 
         while True:
             url = self._build_reports_url(start, stop, page, wid)
-            returned = utils.toggl(url, 'get', config=config, address=toggl.REPORTS_URL)
+            returned = utils.toggl(url, 'get', config=config, address=app.REPORTS_URL)
 
             if not returned.get('data'):
                 return
@@ -880,7 +880,7 @@ class TimeEntry(WorkspacedEntity):
     calculated as current_time + duration, where current_time is the current time in seconds since epoch.
     """
 
-    created_with = fields.StringField(required=True, default='TogglCLI', read=False)
+    created_with = fields.StringField(required=True, default='tgl', read=False)
     """
     Information who created the time entry.
     """
