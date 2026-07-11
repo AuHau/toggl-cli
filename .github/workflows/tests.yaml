@@ -32,8 +32,5 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra test
 
-      - name: Run tests
-        env:
-          TOGGL_API_TOKEN: ${{ secrets.TOGGL_API_TOKEN }}
-          TOGGL_DEFAULT_WORKSPACE_ID: ${{ vars.TOGGL_TEST_WORKSPACE_ID }}
-        run: uv run pytest --cov tgl
+      - name: Run unit tests
+        run: uv run pytest -m unit
