@@ -181,9 +181,12 @@ class TestTogglField:
             workspace = WorkspaceMock
             premium_field = fields.StringField(premium=True)
 
+        class ConfigMock:
+            default_workspace = WorkspaceMock
+
         with pytest.raises(exceptions.TogglPremiumException):
-            obj = WorkspacedEntityMock(premium_field='something')
-            obj.save()
+            obj = WorkspacedEntityMock(config=ConfigMock(), premium_field='something')
+            obj.validate()
 
         obj = WorkspacedEntityMock()
 
