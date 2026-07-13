@@ -9,7 +9,7 @@ For new releases, see the [GitHub releases](https://github.com/sekR4/tgl/release
 ### Breaking changes
 
 * Renamed the distribution, CLI executable, and Python package to `tgl`.
-* Changed the default configuration filename to `~/.tglrc`; existing `~/.togglrc` files remain supported.
+* Changed the default configuration file to `~/.tglrc` (or `$XDG_CONFIG_HOME/.tglrc` if set); `~/.togglrc` is no longer read.
 
 ## [4.0.1](https://github.com/AuHau/toggl-cli/compare/v4.0.0...v4.0.1) (2025-11-02)
 

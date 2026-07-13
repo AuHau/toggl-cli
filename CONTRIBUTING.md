@@ -2,7 +2,7 @@
 
 Any contribution are welcomed.
 
-For submitting PRs, they need to have test coverage which pass the full run in Travis CI.
+For submitting PRs, they need to have test coverage. GitHub Actions runs the unit tests on every PR and they must pass. Integration tests run against the live Toggl API and are triggered manually via workflow dispatch.
 
 ## Developing
 
@@ -21,11 +21,11 @@ Also, if you find yourself with non-descriptive exception, you can set env. vari
 
 For running integration tests you need dummy account on Toggl, where **you don't have any important data** as the data
 will be messed up with and eventually **deleted**! Get API token for this test account and set it as an environmental variable
-`TOGGL_API_TOKEN`. Also figure out the Workspace ID of your account (`tgl workspaces ls`) and set is as `TOGGL_WORKSPACE`
+`TOGGL_API_TOKEN`. Also figure out the Workspace ID of your account (`tgl workspaces ls`) and set it as `TOGGL_DEFAULT_WORKSPACE_ID`
 environmental variable.
 
-There are two sets of integration tests: normal and premium. To be able to run the premium set you have to have payed
-workspace. As this is quiet unlikely you can leave the testing on Travis CI as it runs also the premium tests set.
+There are two sets of integration tests: normal and premium. To be able to run the premium set you have to have a paid
+workspace; premium tests are skipped otherwise and are not run in CI.
 
 Tests are written using `pytest` framework and are split into three categories (each having its own pytest mark):
 

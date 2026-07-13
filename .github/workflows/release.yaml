@@ -39,10 +39,15 @@ jobs:
       - name: Build distribution 📦
         run: uv build
 
+      # NOTE: Package is not published on PyPI yet; this step fails until
+      # PYPI_API_TOKEN is set and the project name is registered.
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
+      # NOTE: No docs site is hosted yet; gh-deploy pushes to the gh-pages
+      # branch, but the page is only served once GitHub Pages is enabled
+      # in the repo settings.
       - name: Publish documentation
         run: uv run mkdocs gh-deploy --force

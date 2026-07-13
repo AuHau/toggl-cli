@@ -8,16 +8,20 @@ An independent command-line client and Python library for Toggl Track.
 > [!NOTE]
 > This project is a fork of [AuHau/toggl-cli](https://github.com/AuHau/toggl-cli), maintained by Sebastian Kwon.
 
-[![PyPI version](https://badge.fury.io/py/tgl.svg)](https://pypi.org/project/tgl)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/tgl.svg)](https://pypi.org/project/tgl)
 [![Tests](https://github.com/sekR4/tgl/actions/workflows/tests.yaml/badge.svg)](https://github.com/sekR4/tgl/actions/workflows/tests.yaml)
 
 ## Install
 
-Easiest way to install this package is through PyPI using [uv](https://docs.astral.sh/uv/):
+`tgl` is not yet published on PyPI. Install it straight from GitHub using [uv](https://docs.astral.sh/uv/):
 
 ```shell
-$ uv tool install tgl
+$ uv tool install git+https://github.com/sekR4/tgl
+```
+
+Or run it without installing:
+
+```shell
+$ uvx --from git+https://github.com/sekR4/tgl tgl
 ```
 
 ## Usage
@@ -48,7 +52,7 @@ $ tgl projects ls
 
 `tgl` includes Python class wrappers that follow a pattern similar to Django's ORM.
 
-The wrappers depend on a config object. When none is provided, the default config file (`~/.tglrc`) is used. Existing `~/.togglrc` files remain supported.
+The wrappers depend on a config object. When none is provided, the default config file (`~/.tglrc`, or `$XDG_CONFIG_HOME/.tglrc` if set) is used.
 
 `tgl` uses `pendulum` for datetime management but also accepts Python's native datetime objects.
 

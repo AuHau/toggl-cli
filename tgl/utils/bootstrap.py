@@ -194,7 +194,7 @@ class ConfigBootstrap:
         click.echo("""
         Configuration successfully finished!
 
-        If you want to enable command completion run: toggl config completion install
+        If you want to enable command completion run: tgl config completion install
 
         Now continuing with your command:
 

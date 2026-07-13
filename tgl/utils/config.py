@@ -62,14 +62,7 @@ class IniConfigMixin:
         'version': IniEntry('version', str),
     }
 
-    _legacy_file_path = Path('~/.togglrc').expanduser()
-    _new_file_path = Path(os.environ.get('XDG_CONFIG_HOME') or '~').expanduser().joinpath('.tglrc')
-
-    if _new_file_path.exists() or not _legacy_file_path.exists():
-        DEFAULT_CONFIG_PATH = _new_file_path
-    else:
-        # Existing users keep their configuration until they choose to move it.
-        DEFAULT_CONFIG_PATH = _legacy_file_path
+    DEFAULT_CONFIG_PATH = Path(os.environ.get('XDG_CONFIG_HOME') or '~').expanduser().joinpath('.tglrc')
 
     def __init__(self, config_path=sentinel, **kwargs):  # type: (typing.Optional[str], **typing.Any) -> None
         self._config_path = self.DEFAULT_CONFIG_PATH if config_path == sentinel else config_path

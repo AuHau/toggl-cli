@@ -10,13 +10,19 @@ Each part is discussed in detail in the corresponding section.
 
 ## Installation
 
-The easiest way to install `tgl` is with [uv](https://docs.astral.sh/uv/):
+`tgl` is not yet published on PyPI. Install it straight from GitHub with [uv](https://docs.astral.sh/uv/):
 
 ```shell
-$ uv tool install tgl
+$ uv tool install git+https://github.com/sekR4/tgl
 ```
 
-To use edge master you can also clone the repo and install it directly:
+Or run it without installing:
+
+```shell
+$ uvx --from git+https://github.com/sekR4/tgl tgl
+```
+
+You can also clone the repo and install it directly:
 ```shell
 $ git clone https://github.com/sekR4/tgl
 $ cd tgl
@@ -29,7 +35,7 @@ Master branch should contain mostly working version, but it is not guaranteed.
 
 `tgl` depends on user configuration. Upon first usage of the CLI the user is taken through bootstrap
 process where he is asked questions regarding the desired settings and authentication credentials. The final configuration is
-stored in `~/.tglrc`. Existing `~/.togglrc` files remain supported for migration.
+stored in `~/.tglrc` (or `$XDG_CONFIG_HOME/.tglrc` if set).
 
 If user select's to enter username & password, then the bootstrap process will convert it into API token which is then
 stored.
@@ -41,10 +47,6 @@ stored.
 
 !!! danger "Plaintext credentials"
     By default the authentication credentials are stored in plain text in your configuration file! Be aware of that!
-
-### Migrations
-
-If you used the original Toggl CLI, `tgl` will load your existing `~/.togglrc` when `~/.tglrc` does not exist and will apply any required format migrations.
 
 ### Possible settings
 
