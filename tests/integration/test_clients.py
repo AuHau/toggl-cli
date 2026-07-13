@@ -1,7 +1,7 @@
 import pytest
 
-from toggl.api import Client
-from toggl import exceptions
+from tgl.api import Client
+from tgl import exceptions
 
 
 class TestClients:

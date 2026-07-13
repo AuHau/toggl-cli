@@ -6,10 +6,10 @@ from abc import ABCMeta
 from collections import OrderedDict
 from inspect import Signature, Parameter
 
-from toggl import utils, exceptions
-from toggl.api import fields as model_fields
+from tgl import utils, exceptions
+from tgl.api import fields as model_fields
 
-logger = logging.getLogger('toggl.api.base')
+logger = logging.getLogger('tgl.api.base')
 
 Entity = typing.TypeVar('Entity', bound='TogglEntity')
 

@@ -1,4 +1,4 @@
-from toggl.utils import config
+from tgl.utils import config
 
 
 class TestIniConfigMixin:

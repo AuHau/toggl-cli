@@ -2,8 +2,8 @@ import datetime
 
 import pendulum
 
-from toggl.api import base, fields, models
-from toggl import exceptions, utils
+from tgl.api import base, fields, models
+from tgl import exceptions, utils
 import pytest
 
 
@@ -181,9 +181,12 @@ class TestTogglField:
             workspace = WorkspaceMock
             premium_field = fields.StringField(premium=True)
 
+        class ConfigMock:
+            default_workspace = WorkspaceMock
+
         with pytest.raises(exceptions.TogglPremiumException):
-            obj = WorkspacedEntityMock(premium_field='something')
-            obj.save()
+            obj = WorkspacedEntityMock(config=ConfigMock(), premium_field='something')
+            obj.validate()
 
         obj = WorkspacedEntityMock()
 

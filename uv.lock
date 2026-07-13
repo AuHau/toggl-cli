@@ -729,7 +729,7 @@ wheels = [
 ]
 
 [[package]]
-name = "togglcli"
+name = "tgl"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

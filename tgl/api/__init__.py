@@ -1,4 +1,4 @@
-from toggl.api.models import (
+from tgl.api.models import (
     Client,
     Workspace,
     Project,

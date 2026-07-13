@@ -1,6 +1,6 @@
 from pbr.version import VersionInfo
 
-VERSION = VersionInfo('togglCli').semantic_version()
+VERSION = VersionInfo('tgl').semantic_version()
 __version__ = VERSION.release_string()
 
 __all__ = (
@@ -9,5 +9,5 @@ __all__ = (
     'api',
     'utils',
     'exceptions',
-    'toggl'
+    'app'
 )

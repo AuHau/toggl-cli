@@ -1,7 +1,7 @@
 import pytest
 
-from toggl.api import Project
-from toggl import exceptions
+from tgl.api import Project
+from tgl import exceptions
 
 
 class TestProjects:

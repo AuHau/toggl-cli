@@ -4,10 +4,10 @@ from collections import OrderedDict
 import click
 import pendulum
 
-from toggl import utils, exceptions
-from toggl.cli import helpers
+from tgl import utils, exceptions
+from tgl.cli import helpers
 
-logger = logging.getLogger('toggl.cli')
+logger = logging.getLogger('tgl.cli')
 
 
 class DateTimeType(click.ParamType):

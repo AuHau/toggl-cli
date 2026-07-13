@@ -1,11 +1,11 @@
-site_name: 'Toggl CLI - Documentation'
-site_description: 'Command line tool and set of Python wrapper classes for interacting with toggl''s API'
-site_author: 'Adam Uhlíř'
+site_name: 'tgl Documentation'
+site_description: 'Independent command-line client and Python library for Toggl Track'
+site_author: 'Sebastian Kwon'
 
-copyright: 'Copyright &copy; 2023 <a href="https://uhlir.dev">Adam Uhlíř</a>'
+copyright: 'Copyright &copy; 2026 Sebastian Kwon'
 
-repo_name: 'auhau/toggl-cli'
-repo_url: 'https://github.com/auhau/toggl-cli'
+repo_name: 'sekR4/tgl'
+repo_url: 'https://github.com/sekR4/tgl'
 theme:
   name: 'material'
   palette:
@@ -21,10 +21,6 @@ markdown_extensions:
       guess_lang: false
   - toc:
       permalink: true
-
-google_analytics:
-  - UA-69422360-3
-  - auto
 
 nav:
   - About: 'index.md'

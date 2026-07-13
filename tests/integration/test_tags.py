@@ -1,7 +1,7 @@
 import pytest
 
-from toggl.api import Tag
-from toggl import exceptions
+from tgl.api import Tag
+from tgl import exceptions
 
 
 class TestTags:

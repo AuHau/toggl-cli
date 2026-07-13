@@ -3,7 +3,7 @@ import click
 
 class TogglException(Exception):
     """
-    General top-level Exception for TogglCLI related issues
+    General top-level exception for tgl-related issues
     """
     exit_code = 1
 
@@ -32,12 +32,12 @@ class TogglConfigException(TogglException):
 
 class TogglConfigMigrationException(TogglException):
     """
-    Exception related to migrations of Config files (.togglrc)
+    Exception related to config-file migrations
     """
     pass
 
 
-class TogglCliException(TogglException, click.ClickException):
+class TglCliException(TogglException, click.ClickException):
     """
     Exception related to the CLI functionality.
     """

@@ -7,8 +7,8 @@ import pendulum
 import click
 import pytest
 
-from toggl.cli import types
-from toggl import utils, api
+from tgl.cli import types
+from tgl import utils, api
 
 
 def remove_tz_helper(datetime_object):

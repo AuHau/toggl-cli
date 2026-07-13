@@ -10,10 +10,10 @@ import pendulum
 from notifypy import Notify
 from prettytable import PrettyTable
 
-from toggl.api import base
-from toggl.cli.themes import themes
+from tgl.api import base
+from tgl.cli.themes import themes
 
-logger = logging.getLogger('toggl.cli')
+logger = logging.getLogger('tgl.cli')
 
 
 def entity_listing(cls, fields=('id', 'name',), obj=None):  # type: (typing.Union[typing.Sequence, base.Entity], typing.Sequence, dict) -> None

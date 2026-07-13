@@ -3,7 +3,7 @@ from datetime import timedelta
 import factory
 import faker
 
-from toggl import api
+from tgl import api
 from tests import helpers
 
 # TODO: Do more clean way how to pass config into the Factory

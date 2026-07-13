@@ -3,11 +3,12 @@ requires = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "togglCli"
-description = "Command line tool and set of Python wrapper classes for interacting with toggl's API"
+name = "tgl"
+description = "Independent command-line client and Python library for Toggl Track"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
+    { name = "Sebastian Kwon" },
     { name = "D. Robert Adams" },
     { name = "Adam Uhlir", email = "adam@uhlir.dev" },
 ]
@@ -37,12 +38,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://toggl.uhlir.dev"
-Source = "https://github.com/auhau/toggl-cli"
-Documentation = "https://toggl.uhlir.dev"
+Homepage = "https://github.com/sekR4/tgl"
+Source = "https://github.com/sekR4/tgl"
 
 [project.scripts]
-toggl = "toggl.toggl:main"
+tgl = "tgl.app:main"
 
 [project.optional-dependencies]
 test = [
@@ -57,10 +57,10 @@ docs = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["toggl*"]
+include = ["tgl*"]
 
 [tool.setuptools.package-data]
-toggl = ["assets/*"]
+tgl = ["assets/*"]
 
 [tool.setuptools_scm]
 fallback_version = "0.0.0"

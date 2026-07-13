@@ -6,9 +6,9 @@ from pathlib import Path
 from click.testing import Result
 from click.testing import CliRunner
 
-from toggl.cli.commands import cli
-from toggl import utils, api
-from toggl.exceptions import TogglNotFoundException
+from tgl.cli.commands import cli
+from tgl import utils, api
+from tgl.exceptions import TogglNotFoundException
 
 
 def inner_cmd(cmd, config=None, simple=True, *args):  # type: (str, str, bool, typing.List[str]) -> ParsingResult

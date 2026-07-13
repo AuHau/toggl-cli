@@ -7,14 +7,14 @@ import click
 import inquirer
 import pendulum
 
-from toggl import exceptions, __version__, utils
+from tgl import exceptions, __version__, utils
 
-logger = logging.getLogger('toggl.utils.bootstrap')
+logger = logging.getLogger('tgl.utils.bootstrap')
 
 
 class ConfigBootstrap:
     """
-    Class for facilitation of bootstraping the TogglCLI application with user's configuration.
+    Facilitates bootstrapping tgl with the user's configuration.
     """
 
     KEEP_TOGGLS_DEFAULT_WORKSPACE = '-- Keep Toggl\'s default --'
@@ -59,7 +59,7 @@ class ConfigBootstrap:
         """
         Creates dict which follows the ConfigParser convention from the provided user's answers.
         """
-        from toggl.cli.themes import themes
+        from tgl.cli.themes import themes
 
         output = {
             'version': __version__,
@@ -133,18 +133,10 @@ class ConfigBootstrap:
         exit(-1)
 
     def _bootstrap_windows(self):
-        click.secho(""" _____                 _   _____  _     _____
-|_   _|               | | /  __ \| |   |_   _|
-  | | ___   __ _  __ _| | | /  \/| |     | |
-  | |/ _ \ / _` |/ _` | | | |    | |     | |
-  | | (_) | (_| | (_| | | | \__/\| |_____| |_
-  \_/\___/ \__, |\__, |_|  \____/\_____/\___/
-            __/ | __/ |
-           |___/ |___/
-""", fg="red")
+        click.secho("tgl", fg="red")
 
-        click.echo("Welcome to Toggl CLI!\n"
-                   "Unfortunately for Windows users we don't have interactive initialization of TogglCLI. "
+        click.echo("Welcome to tgl!\n"
+                   "Unfortunately, interactive initialization is not available on Windows. "
                    "We have created dummy configuration file which you should configure before using this tool.\n")
 
         return {
@@ -158,23 +150,15 @@ class ConfigBootstrap:
         The process will gather required information for configuration and then return those information in dict which
         follows the utils.config.Config attribute's naming.
         """
-        from toggl.cli.themes import themes
+        from tgl.cli.themes import themes
 
         if platform.system() == 'Windows':
             return self._bootstrap_windows()
 
-        click.secho(""" _____                 _   _____  _     _____
-|_   _|               | | /  __ \| |   |_   _|
-  | | ___   __ _  __ _| | | /  \/| |     | |
-  | |/ _ \ / _` |/ _` | | | |    | |     | |
-  | | (_) | (_| | (_| | | | \__/\| |_____| |_
-  \_/\___/ \__, |\__, |_|  \____/\_____/\___/
-            __/ | __/ |
-           |___/ |___/
-""", fg="red")
+        click.secho("tgl", fg="red")
 
-        click.echo("Welcome to Toggl CLI!\n"
-                   "We need to setup some configuration before you start using this awesome tool!\n")
+        click.echo("Welcome to tgl!\n"
+                   "We need to set up some configuration before you start using this tool.\n")
 
         click.echo("{} Your credentials will be stored in plain-text inside of the configuration!\n".format(
             click.style("Warning!", fg="yellow", bold=True)
@@ -186,7 +170,7 @@ class ConfigBootstrap:
             self._exit()
 
         questions = [
-            inquirer.List('default workspace', message="Should TogglCli use different default workspace from Toggl's "
+            inquirer.List('default workspace', message="Should tgl use a different default workspace from Toggl's "
                                                        "setting?",
                           choices=lambda answers: self._get_workspaces(api_token)),
 
@@ -197,9 +181,9 @@ class ConfigBootstrap:
                                                             or current == self.TOGGL_TIMEZONE),
             inquirer.List('theme', message='What theme should be used for the CLI interface?',
                           choices=lambda answers: [theme.name for theme in themes.values()]),
-            inquirer.Confirm('file_logging', message="Enable logging of togglCli actions into file?", default=False),
+            inquirer.Confirm('file_logging', message="Enable logging of tgl actions into a file?", default=False),
             inquirer.Path('file_logging_path', message="Path to the log file", ignore=lambda x: not x['file_logging'],
-                          default='~/.toggl_log'),
+                          default='~/.tgl.log'),
         ]
 
         answers = inquirer.prompt(questions)
@@ -210,7 +194,7 @@ class ConfigBootstrap:
         click.echo("""
         Configuration successfully finished!
 
-        If you want to enable command completion run: toggl config completion install
+        If you want to enable command completion run: tgl config completion install
 
         Now continuing with your command:
 

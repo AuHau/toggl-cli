@@ -6,10 +6,10 @@ from time import sleep
 import click
 import requests
 
-from toggl.utils.config import Config
-from toggl import exceptions
+from tgl.utils.config import Config
+from tgl import exceptions
 
-logger = logging.getLogger('toggl.utils')
+logger = logging.getLogger('tgl.utils')
 
 
 class SubCommandsGroup(click.Group):
@@ -149,7 +149,7 @@ def toggl(url, method, data=None, headers=None, config=None, address=None):
     """
     Makes an HTTP request to toggl.com. Returns the parsed JSON as dict.
     """
-    from ..toggl import TOGGL_URL
+    from ..app import TOGGL_URL
 
     if headers is None:
         headers = {'content-type': 'application/json'}
