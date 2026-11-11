@@ -148,7 +148,7 @@ class ModifierSetType(SetType):
     @staticmethod
     def is_modifiers_value(parsed_values):
         for value in parsed_values:
-            if value[0] != '+' and value[0] != '-':
+            if not value or (value[0] != '+' and value[0] != '-'):
                 return False
 
         return True

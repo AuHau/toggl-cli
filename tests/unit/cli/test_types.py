@@ -119,6 +119,23 @@ class TestDurationType:
         assert remove_tz_helper(duration_type.convert("20.5.2017", None, Context({'config': config}))) == remove_tz_helper(pendulum.datetime(2017, 5, 20, 0, 0))
 
 
+class TestModifierSetType:
+
+    def test_empty_string_does_not_crash(self):
+        modifier_type = types.ModifierSetType()
+        assert modifier_type.convert('', None, None) == {''}
+
+    def test_trailing_comma_does_not_crash(self):
+        modifier_type = types.ModifierSetType()
+        assert modifier_type.convert('+a,', None, None) == {'+a', ''}
+
+    def test_modifiers_still_parsed(self):
+        modifier_type = types.ModifierSetType()
+        result = modifier_type.convert('+a,-b', None, None)
+        assert result.add_set == {'a'}
+        assert result.remove_set == {'b'}
+
+
 class TestResourceType:
 
     def test_default_lookup(self, mocker, config):
